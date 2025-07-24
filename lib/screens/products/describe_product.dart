@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:junction/app_state.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/form_text.dart';
 import '../../../widgets/app_dropdown.dart';
+import '../../widgets/tune_auction.dart';
 import './add_product_images.dart';
 
 class DescribeProductPage extends StatefulWidget {
@@ -102,7 +104,24 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
       condition: selectedCondition!,
       brandName: brandController.text.trim(),
     );
-
+  if(AppState.instance.isJuction == true){
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TuneAuctionWidget(
+          selectedCategory: productDetails.category,
+          title: productDetails.title,
+          price: productDetails.price,
+          description: productDetails.description,
+          productName: productDetails.productName,
+          yearOfPurchase: productDetails.year,
+          brandName: productDetails.brandName,
+          usage: productDetails.usage,
+          condition: productDetails.condition,
+        ),
+      ),
+    );
+  }else{
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -119,6 +138,8 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
         ),
       ),
     );
+  }
+
   }
 
   @override

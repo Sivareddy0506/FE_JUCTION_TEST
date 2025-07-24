@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:junction/app_state.dart';
 import '../screens/products/home.dart';
 import '../screens/jauction/main.dart';
 import '../screens/products/category_post.dart';
@@ -47,6 +48,7 @@ class BottomNavBar extends StatelessWidget {
                       context,
                       label: 'Regular Listing',
                       onPressed: () {
+                        AppState.instance.isJuction = false;
                         Navigator.of(context).pop();
                         Navigator.push(
                           context,
@@ -63,11 +65,13 @@ class BottomNavBar extends StatelessWidget {
                       context,
                       label: 'Jauction Listing',
                       onPressed: () {
+                        AppState.instance.isJuction = true;
+
                         Navigator.of(context).pop();
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const JauctionCategoryPostPage(),
+                            builder: (_) => const CategoryPostPage(),
                           ),
                         );
                       },

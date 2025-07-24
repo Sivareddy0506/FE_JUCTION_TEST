@@ -2,9 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:junction/screens/products/review_listing.dart';
 
 class SelectLocationPage extends StatefulWidget {
-  const SelectLocationPage({Key? key, required String selectedCategory, required String title, required String price, required String description, required String productName, required String yearOfPurchase, required String brandName, required String usage, required String condition, required List<String> imageNames}) : super(key: key);
+  final String selectedCategory;
+  final String title;
+  final String price;
+  final String description;
+  final String productName;
+  final String yearOfPurchase;
+  final String brandName;
+  final String usage;
+  final String condition;
+  final List<String> imageNames;
+
+  const SelectLocationPage({
+    Key? key,
+    required this.selectedCategory,
+    required this.title,
+    required this.price,
+    required this.description,
+    required this.productName,
+    required this.yearOfPurchase,
+    required this.brandName,
+    required this.usage,
+    required this.condition,
+    required this.imageNames,
+  }) : super(key: key);
 
   @override
   State<SelectLocationPage> createState() => _SelectLocationPageState();
@@ -110,14 +134,37 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _onConfirm,
-                    child: const Text("Confirm Location"),
+                    onPressed: _onNext,
+                    child: const Text("Next"),
                   ),
                 )
               ],
             ),
           )
         ],
+      ),
+    );
+  }
+
+  void _onNext() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewListingPage(
+          imageUrls: widget.imageNames,
+          title: widget.title,
+          price: widget.price,
+          age: widget.yearOfPurchase,
+          usage: widget.usage,
+          condition: widget.condition,
+          description: widget.description,
+          pickupLocation: _address,
+          brandName: widget.brandName,
+          productName: widget.productName,
+          selectedCategory: widget.selectedCategory,
+          yearOfPurchase: widget.yearOfPurchase,
+          latlng: _currentLatLng,
+        ),
       ),
     );
   }

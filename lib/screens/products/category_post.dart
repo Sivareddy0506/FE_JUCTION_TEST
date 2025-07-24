@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:junction/app_state.dart';
 import '../../../widgets/custom_appbar.dart';
 import './describe_product.dart';
 
@@ -42,7 +43,9 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
           height: 4,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            color: isActive ? const Color(0xFFFF6705) : const Color(0xFFE9E9E9),
+            color: isActive ? AppState.instance.isJuction?
+            const Color(0xFFC105FF):
+             const Color(0xFFFF6705): const Color(0xFFE9E9E9),
           ),
         );
       }),
