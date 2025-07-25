@@ -62,7 +62,7 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
     final pickedFile = await _picker.pickImage(source: source, imageQuality: 80);
     if (pickedFile != null) {
       setState(() {
-        imageNames.add(pickedFile.path.split('/').last);
+        imageNames.add(pickedFile.path);
       });
     }
   }

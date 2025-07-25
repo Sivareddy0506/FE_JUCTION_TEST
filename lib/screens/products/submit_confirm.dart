@@ -1,10 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:junction/app_state.dart';
 import 'package:mime/mime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
+import '../profile/user_profile.dart';
 
 class PostGuidelinesPage extends StatefulWidget {
   final String selectedCategory;
@@ -17,7 +22,8 @@ class PostGuidelinesPage extends StatefulWidget {
   final String brand;
   final String price;
   final String location;
-  final List<File> images; // image files
+  final List<String> images; // image files
+  final LatLng latlng;
 
   const PostGuidelinesPage({
     super.key,
@@ -32,6 +38,7 @@ class PostGuidelinesPage extends StatefulWidget {
     required this.price,
     required this.location,
     required this.images,
+    required this.latlng
   });
 
   @override
@@ -46,10 +53,12 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
     if (!isConfirmed) return;
 
     setState(() => isSubmitting = true);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
 
     final uri = Uri.parse("https://api.junctionverse.com/product/products");
     final request = http.MultipartRequest("POST", uri)
-      ..headers['Authorization'] = 'Bearer {{token}}';
+      ..headers['Authorization'] = 'Bearer $token';
 
     request.fields['name'] = widget.productName;
     request.fields['title'] = widget.title;
@@ -60,24 +69,40 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
     request.fields['yearOfPurchase'] = widget.yearOfPurchase;
     request.fields['usage'] = widget.usage;
     request.fields['price'] = widget.price;
-    request.fields['isAuction'] = 'false';
-    request.fields['location'] = widget.location;
+    request.fields['initialBid'] = widget.price;
+    request.fields['startingPrice'] = widget.price;
+    request.fields['isAuction'] = AppState.instance.isJuction.toString();
+    if(AppState.instance.isJuction == true){
+      request.fields['duration'] = AppState.instance.listingDuration;
+      request.fields['bidStartDate'] = AppState.instance.auctionDate;
+    }
+
+    request.fields['location'] =jsonEncode({"lat":widget.latlng.latitude,
+      "lng":widget.latlng.longitude});
     request.fields['notes'] = 'Charger included';
 
-    for (File image in widget.images) {
-      final mimeType = lookupMimeType(image.path)?.split('/') ?? ['image', 'jpeg'];
+    for (String image in widget.images) {
+      debugPrint('❌ Submission test: test $image');
+
+      final mimeType = lookupMimeType(image) ?? 'image/jpeg';
+      final mimeSplit = mimeType.split('/');
       request.files.add(await http.MultipartFile.fromPath(
         'images',
-        image.path,
-        contentType: MediaType(mimeType[0], mimeType[1]),
+        image,
+        contentType: MediaType(mimeSplit[0], mimeSplit[1]),
       ));
     }
+    debugPrint('❌ Submission test: test');
 
     try {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Navigator.pushNamed(context, '/product_submitted');
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const UserProfilePage()),
+              (Route<dynamic> route) => false, // ⬅️ removes all previous routes
+        );
       } else {
         debugPrint('❌ Submission failed: ${response.statusCode}');
         debugPrint(response.body);
