@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:junction/screens/profile/user_profile.dart';
+import 'package:junction/screens/signup/signup_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app_overview.dart';  
 import '../widgets/app_button.dart';
 
@@ -39,9 +42,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 3), () {
-      setState(() {
-        _showMainContent = true;
+
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      bool? isLoggedIn = await prefs.getBool('isLogin');
+      Timer(const Duration(seconds: 3), () async{
+        if(isLoggedIn == null || isLoggedIn == false) {
+          bool? isFirstTime = await prefs.getBool('isFirstTime');
+          if(isFirstTime == false){
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const SignupPage()),
+            );
+          }else {
+            setState(() {
+              _showMainContent = true;
+            });
+          }
+        }else{
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const UserProfilePage()),
+          );
+        }
       });
     });
   }

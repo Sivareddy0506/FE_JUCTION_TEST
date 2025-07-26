@@ -106,9 +106,12 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
 
       // Navigate based on userStatus
       if (userStatus == 'Active') {
-        Navigator.pushReplacement(
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLogin', true);
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const UserProfilePage()),
+              (Route<dynamic> route) => false, // removes all previous routes
         );
       } else if (userStatus == 'Pending' || userStatus == 'Submitted') {
         Navigator.pushReplacement(
