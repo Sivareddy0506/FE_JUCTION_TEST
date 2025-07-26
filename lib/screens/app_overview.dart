@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/app_button.dart';
 import './signup/signup_page.dart';
@@ -115,7 +116,9 @@ class AppOverviewScreen extends StatelessWidget {
               label: 'Get Started',
               backgroundColor: Colors.black,
               bottomSpacing: 24,
-              onPressed: () {
+              onPressed: () async{
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('isFirstTime', false);
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const SignupPage()),
