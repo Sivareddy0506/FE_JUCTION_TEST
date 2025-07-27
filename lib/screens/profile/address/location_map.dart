@@ -3,14 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:junction/screens/profile/address/address_response.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'add_more_details.dart'; // import the new page
 
 class LocationMapPage extends StatefulWidget {
-  final String? initialAddress;
+  final Address? initialAddress;
+  final bool isItFromEdit;
 
-  const LocationMapPage({super.key, this.initialAddress});
+  const LocationMapPage({super.key, this.initialAddress, required this.isItFromEdit});
 
   @override
   State<LocationMapPage> createState() => _LocationMapPageState();
@@ -24,15 +26,20 @@ class _LocationMapPageState extends State<LocationMapPage> {
   Timer? _debounce;
   bool _userSearched = false;
   bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
     if (widget.initialAddress != null) {
-      _selectedAddress = widget.initialAddress!;
-      _searchController.text = widget.initialAddress!;
-      _userSearched = true;
       _getCurrentLocation();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(seconds: 3), () {
+          _moveMapToAddress(widget.initialAddress!.address);
+          setState(() {
+            _selectedAddress = widget.initialAddress!.address;
+            _searchController.text = widget.initialAddress!.address;
+          });
+        });
+      });
     } else {
       _getCurrentLocation();
     }
@@ -145,7 +152,10 @@ class _LocationMapPageState extends State<LocationMapPage> {
       context,
       MaterialPageRoute(
         builder: (_) => AddMoreDetailsPage(
+          id: widget.isItFromEdit? widget.initialAddress!.id :"",
           address: _selectedAddress,
+          isEditable: widget.isItFromEdit,
+
         ),
       ),
     );

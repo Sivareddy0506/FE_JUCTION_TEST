@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../widgets/custom_appbar.dart';
+import 'package:http/http.dart' as http;
 import '../../../widgets/app_button.dart';
-import 'location_map.dart';
+import '../../../widgets/custom_appbar.dart';
+import 'address_response.dart';
+import 'location_map.dart'; // adjust import if needed
 
 class AddressPage extends StatefulWidget {
   const AddressPage({super.key});
@@ -14,8 +15,8 @@ class AddressPage extends StatefulWidget {
 }
 
 class _AddressPageState extends State<AddressPage> {
-  Map<String, String> _addressMap = {};
-  String? _selectedAddressLabel;
+  List<Address> _addresses = [];
+  String? _defaultAddressId;
   bool _isLoading = true;
 
   @override
@@ -41,18 +42,13 @@ class _AddressPageState extends State<AddressPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final addresses = data['addressJson']?['addresses'] as Map<String, dynamic>?;
-        final defaultAddress = data['addressJson']?['default'] as String?;
+        final addressResponse = AddressResponse.fromJson(data);
 
-        if (addresses != null) {
-          setState(() {
-            _addressMap = addresses.map((k, v) => MapEntry(k, v.toString()));
-            _selectedAddressLabel = defaultAddress;
-            _isLoading = false;
-          });
-        } else {
-          throw Exception("Unexpected response format");
-        }
+        setState(() {
+          _addresses = addressResponse.addresses;
+          _defaultAddressId = addressResponse.defaultAddressId;
+          _isLoading = false;
+        });
       } else {
         throw Exception("Failed to load addresses");
       }
@@ -66,11 +62,14 @@ class _AddressPageState extends State<AddressPage> {
     }
   }
 
-  void _navigateToEdit({String? editingAddress}) async {
+  void _navigateToEdit(bool isItFromEdit, {Address? editingAddress}) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LocationMapPage(initialAddress: editingAddress)
+        builder: (_) => LocationMapPage(
+          initialAddress: editingAddress,
+          isItFromEdit: isItFromEdit,
+        ),
       ),
     );
 
@@ -88,55 +87,58 @@ class _AddressPageState extends State<AddressPage> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _addressMap.isEmpty
-                    ? const Center(child: Text("No addresses found."))
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _addressMap.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          final label = _addressMap.keys.elementAt(index);
-                          final address = _addressMap[label]!;
+                : _addresses.isEmpty
+                ? const Center(child: Text("No addresses found."))
+                : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: _addresses.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final addressObj = _addresses[index];
 
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Radio<String>(
-                                        value: label,
-                                        groupValue: _selectedAddressLabel,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _selectedAddressLabel = value;
-                                          });
-                                        },
-                                      ),
-                                      Text(label[0].toUpperCase() + label.substring(1)),
-                                      const Spacer(),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () => _navigateToEdit(editingAddress: address),
-                                      )
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 48),
-                                    child: Text(
-                                      address,
-                                      style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Radio<String>(
+                              value: addressObj.id,
+                              groupValue: _defaultAddressId,
+                              onChanged: (value) {
+                                setState(() {
+                                  _defaultAddressId = value;
+                                });
+                              },
                             ),
-                          );
-                        },
-                      ),
+                            Text(
+                              addressObj.label[0].toUpperCase() +
+                                  addressObj.label.substring(1),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _navigateToEdit(true,
+                                  editingAddress: addressObj),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 48),
+                          child: Text(
+                            addressObj.address,
+                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -144,7 +146,7 @@ class _AddressPageState extends State<AddressPage> {
               bottomSpacing: 20,
               label: 'Add New Address',
               backgroundColor: const Color(0xFF262626),
-              onPressed: () => _navigateToEdit(),
+              onPressed: () => _navigateToEdit(false),
             ),
           ),
         ],
