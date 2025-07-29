@@ -2,6 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import './active_listing.dart';
+import './purchased.dart';
+import 'sold.dart';
+import './about.dart';
+import './favourites.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -282,18 +287,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   },
                                 ),
                               ),
-                              const Expanded(
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.info_outline, color: Colors.grey),
-                                      SizedBox(height: 8),
-                                      Text('No items to display', style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                              Expanded(
+  child: Builder(
+    builder: (context) {
+      switch (selectedTabIndex) {
+        case 0:
+          return const ActiveAuctionsTab();
+        case 1:
+          return const AboutTab();
+        case 2:
+          return const PurchasedTab();
+        case 3:
+          return const SoldTab();
+        case 4:
+          return const FavoritesTab(); // Or EmptyState widget
+        default:
+          return const Center(child: Text("Invalid Tab"));
+      }
+    },
+  ),
+),
+
+
                             ],
                           ),
                         ),

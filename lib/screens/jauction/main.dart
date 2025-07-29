@@ -4,6 +4,7 @@ import '../../widgets/search_bar_widget.dart';
 import '../../widgets/category_grid.dart';
 import '../../widgets/bottom_navbar.dart';
 import '../../widgets/products_grid.dart';
+import '../../models/product.dart';
 
 class JauctionHomePage extends StatefulWidget {
   const JauctionHomePage({Key? key}) : super(key: key);
