@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../screens/Notifications/notifications_screen.dart';
 
 class LogoAndIconsWidget extends StatelessWidget {
   const LogoAndIconsWidget({super.key});
@@ -25,32 +26,37 @@ class LogoAndIconsWidget extends StatelessWidget {
         const Spacer(),
 
         // Notification Icon with orange dot
-        Stack(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Image.asset('assets/Notification.png'),
-            ),
-            Positioned(
-              right: 6,
-              top: 6,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.orange,
+        GestureDetector(
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationPage()));
+          },
+          child: Stack(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
+                child: Image.asset('assets/Notification.png'),
               ),
-            )
-          ],
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.orange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              )
+            ],
+          ),
         ),
 
         // Chat Icon
