@@ -42,50 +42,28 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final auctions = data['auctions'] ?? [];
-        final products = data['products'] ?? [];
 
-        List<Product> allFetchedItems = [];
+        List<Product> allFetchedItems = data.map<Product>((item) {
+    final imageUrl = (item['images'] != null && item['images'].isNotEmpty)
+        ? item['images'][0]['fileUrl']
+        : 'assets/images/placeholder.png';
 
-        // Convert auctions
-        allFetchedItems.addAll(
-          auctions.map<Product>((item) {
-            final image = (item['images'] != null && item['images'].isNotEmpty)
-                ? item['images'][0]
-                : 'assets/images/placeholder.png';
+    final isAuction = item['isAuction'] ?? false;
 
-            return Product(
-              imageUrl: image,
-              title: item['title'] ?? 'No title',
-              price: item['starting_price'] != null
-                  ? 'Starting: ₹${item['starting_price']}'
-                  : null,
-              location: item['location'] ?? 'Unknown',
-              isAuction: true,
-              bidStartDate: item['bid_start_date'] != null
-                  ? DateTime.tryParse(item['bid_start_date'])
-                  : null,
-              duration: item['duration'],
-            );
-          }).toList(),
-        );
-
-        // Convert regular products
-        allFetchedItems.addAll(
-          products.map<Product>((item) {
-            final image = (item['images'] != null && item['images'].isNotEmpty)
-                ? item['images'][0]
-                : 'assets/images/placeholder.png';
-
-            return Product(
-              imageUrl: image,
-              title: item['title'] ?? 'No title',
-              price: item['price'] != null ? '₹${item['price']}' : null,
-              location: item['location'] ?? 'Unknown',
-              isAuction: false,
-            );
-          }).toList(),
-        );
+    return Product(
+      imageUrl: imageUrl,
+      title: item['title'] ?? 'No title',
+      price: isAuction
+          ? (item['price'] != null ? 'Starting: ₹${item['price']}' : null)
+          : (item['price'] != null ? '₹${item['price']}' : null),
+      location: 'Lat: ${item['location']['lat']}, Lng: ${item['location']['lng']}',
+      isAuction: isAuction,
+      bidStartDate: item['bidStartDate'] != null
+          ? DateTime.tryParse(item['bidStartDate'])
+          : null,
+      duration: item['duration'],
+    );
+  }).toList();
 
         setState(() {
           allItems = allFetchedItems;
