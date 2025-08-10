@@ -17,9 +17,16 @@ class HorizontalProductList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (products.isEmpty) return const SizedBox.shrink();
+    debugPrint('HorizontalProductList: build called for "$title" with ${products.length} products');
 
-    final limitedProducts = products.take(2).toList(); // limit to 2
+    if (products.isEmpty) {
+      debugPrint('HorizontalProductList: No products for "$title", returning empty widget');
+      return const SizedBox.shrink();
+    }
+
+    final limitedProducts = products.length > 2 ? products.take(2).toList() : products;
+
+    debugPrint('HorizontalProductList: Showing ${limitedProducts.length} products for "$title"');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,6 +40,7 @@ class HorizontalProductList extends StatelessWidget {
             const Spacer(),
             TextButton(
               onPressed: () {
+                debugPrint('HorizontalProductList: "View All" pressed for "$title"');
                 Navigator.push(
                   context,
                   MaterialPageRoute(
