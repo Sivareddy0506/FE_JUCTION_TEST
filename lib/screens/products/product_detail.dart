@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/product.dart';
-import '../../widgets/search_bar_widget.dart';
-import '../../widgets/bottom_navbar.dart';
+import '../../widgets/app_button.dart';
 
 class ProductDetailPage extends StatelessWidget {
   final Product product;
