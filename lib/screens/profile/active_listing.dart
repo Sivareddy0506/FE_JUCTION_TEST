@@ -43,27 +43,38 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        List<Product> allFetchedItems = data.map<Product>((item) {
-    final imageUrl = (item['images'] != null && item['images'].isNotEmpty)
-        ? item['images'][0]['fileUrl']
-        : 'assets/images/placeholder.png';
+       List<Product> allFetchedItems = data.map<Product>((item) {
+  final imageUrl = (item['images'] != null && item['images'].isNotEmpty)
+      ? item['images'][0]['fileUrl']
+      : 'assets/images/placeholder.png';
 
-    final isAuction = item['isAuction'] ?? false;
+  final isAuction = item['isAuction'] ?? false;
+  final location = item['location'];
+  final double? latitude = location != null ? location['lat']?.toDouble() : null;
+  final double? longitude = location != null ? location['lng']?.toDouble() : null;
 
-    return Product(
-      imageUrl: imageUrl,
-      title: item['title'] ?? 'No title',
-      price: isAuction
-          ? (item['price'] != null ? 'Starting: ₹${item['price']}' : null)
-          : (item['price'] != null ? '₹${item['price']}' : null),
-      location: 'Lat: ${item['location']['lat']}, Lng: ${item['location']['lng']}',
-      isAuction: isAuction,
-      bidStartDate: item['bidStartDate'] != null
-          ? DateTime.tryParse(item['bidStartDate'])
-          : null,
-      duration: item['duration'],
-    );
-  }).toList();
+  return Product(
+    id: item['_id'] ?? item['id'] ?? '', // ✅ add this line
+    imageUrl: imageUrl,
+    title: item['title'] ?? 'No title',
+    price: isAuction
+        ? (item['price'] != null ? 'Starting: ₹${item['price']}' : null)
+        : (item['price'] != null ? '₹${item['price']}' : null),
+    isAuction: isAuction,
+    bidStartDate: item['bidStartDate'] != null
+        ? DateTime.tryParse(item['bidStartDate'])
+        : null,
+    duration: item['duration'],
+    latitude: latitude,
+    longitude: longitude,
+    description: item['description'],
+    location: item['pickupLocation'] ?? item['locationName'],
+    seller: item['seller'] != null
+        ? Seller.fromJson(item['seller'])
+        : null,
+  );
+}).toList();
+
 
         setState(() {
           allItems = allFetchedItems;

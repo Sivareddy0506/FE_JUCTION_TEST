@@ -20,10 +20,11 @@ dependencies:
   geolocator: ^11.0.0
   geocoding: ^2.1.0
   permission_handler: ^11.3.0
-  carousel_slider: ^4.2.1
+  carousel_slider: 4.2.0
   flutter_svg: ^2.0.7
   flutter_image_compress: ^2.1.0
   path_provider: ^2.1.1
+  firebase_core: ^4.0.0
   
 
 dev_dependencies:

@@ -17,24 +17,7 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
   String activeTab = 'home';
 
   final List<Product> dummyProducts = [
-    Product(
-      imageUrl: 'assets/images/product1.png',
-      title: 'Product 1',
-      price: '₹199',
-      location: 'Koregaon Park',
-    ),
-    Product(
-      imageUrl: 'assets/images/product2.png',
-      title: 'Product 2',
-      price: '₹299',
-      location: 'Viman Nagar',
-    ),
-    Product(
-      imageUrl: 'assets/images/product3.png',
-      title: 'Product 3',
-      price: '₹399',
-      location: 'Baner',
-    ),
+   
   ];
 
   void handleTabChange(String selected) {
