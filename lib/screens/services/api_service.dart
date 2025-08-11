@@ -10,6 +10,11 @@ class ApiService {
     return prefs.getString('authToken');
   }
 
+  /// Helper: filter out auction products
+  static List<Product> _filterNonAuction(List<Product> products) {
+    return products.where((p) => p.isAuction != true).toList();
+  }
+
   /// Fetch last opened products
   static Future<List<Product>> fetchLastOpened() async {
     final token = await _getToken();
@@ -22,7 +27,7 @@ class ApiService {
     if (res.statusCode == 200) {
       final data = json.decode(res.body);
       if (data is List) {
-        return data.map((e) => Product.fromJson(e)).toList();
+        return _filterNonAuction(data.map((e) => Product.fromJson(e)).toList());
       }
     }
     return [];
@@ -39,7 +44,7 @@ class ApiService {
     if (res.statusCode == 200) {
       final data = json.decode(res.body);
       if (data is List) {
-        return data.map((e) => Product.fromJson(e)).toList();
+        return _filterNonAuction(data.map((e) => Product.fromJson(e)).toList());
       }
     }
     return [];
@@ -56,13 +61,13 @@ class ApiService {
 
     if (res.statusCode == 200) {
       final data = json.decode(res.body);
+      List<Product> products = [];
       if (data is Map && data['products'] is List) {
-        return (data['products'] as List)
-            .map((e) => Product.fromJson(e))
-            .toList();
+        products = (data['products'] as List).map((e) => Product.fromJson(e)).toList();
       } else if (data is List) {
-        return data.map((e) => Product.fromJson(e)).toList();
+        products = data.map((e) => Product.fromJson(e)).toList();
       }
+      return _filterNonAuction(products);
     }
     return [];
   }
@@ -100,33 +105,32 @@ class ApiService {
     if (res.statusCode == 200) {
       final data = json.decode(res.body);
       if (data is List) {
-        return data.map((e) => Product.fromJson(e)).toList();
+        return _filterNonAuction(data.map((e) => Product.fromJson(e)).toList());
       }
     }
     return [];
   }
-static Future<List<String>> fetchAdUrls() async {
-  final token = await _getToken();
-  final uri = Uri.parse('https://api.junctionverse.com/api/ad/allids');
-  final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
-  print('🔍 fetchAdUrls: ${res.statusCode}');
-  print('🧾 Response: ${res.body}');
+  static Future<List<String>> fetchAdUrls() async {
+    final token = await _getToken();
+    final uri = Uri.parse('https://api.junctionverse.com/api/ad/allids');
+    final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
-  if (res.statusCode == 200) {
-    final data = json.decode(res.body);
-    if (data is List) {
-      final urls = data
-          .map<String>((e) => e['mediaUrl'] ?? '')
-          .where((url) => url.isNotEmpty && url.startsWith('http'))
-          .toList();
+    print('🔍 fetchAdUrls: ${res.statusCode}');
+    print('🧾 Response: ${res.body}');
 
-      print("✅ Filtered Ad URLs: $urls");
-      return urls;
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body);
+      if (data is List) {
+        final urls = data
+            .map<String>((e) => e['mediaUrl'] ?? '')
+            .where((url) => url.isNotEmpty && url.startsWith('http'))
+            .toList();
+
+        print("✅ Filtered Ad URLs: $urls");
+        return urls;
+      }
     }
+    return [];
   }
-  return [];
-}
-
-
 }

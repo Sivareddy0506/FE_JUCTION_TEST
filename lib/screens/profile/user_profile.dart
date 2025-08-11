@@ -57,22 +57,39 @@ class _UserProfilePageState extends State<UserProfilePage> {
         'Content-Type': 'application/json',
       });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final user = data['user'];
+     if (response.statusCode == 200) {
+  final data = jsonDecode(response.body);
+  final user = data['user'];
 
-        setState(() {
-          name = user['fullName'] ?? '';
-          university = user['university'] ?? '';
-          final fullAddress = user['homeAddress'] ?? '';
-          final parts = fullAddress.split(',');
-          location = parts.length >= 2 ? parts[parts.length - 3].trim() : fullAddress;
-          profileImage = user['selfieUrl'] ?? '';
-          isLoading = false;
-        });
-      } else {
-        setState(() => isLoading = false);
-      }
+  // Default empty location
+  String extractedLocation = '';
+
+  // Parse the addressJson field
+  if (user['addressJson'] != null && user['addressJson'] is List) {
+    final addressList = user['addressJson'] as List;
+
+    // Find the "Home" address, fallback to the first address if not found
+    final homeAddress = addressList.firstWhere(
+      (addr) => addr['label'] == 'Home',
+      orElse: () => addressList.isNotEmpty ? addressList[0] : null,
+    );
+
+    if (homeAddress != null && homeAddress['address'] != null) {
+      extractedLocation = homeAddress['address'];
+    }
+  }
+
+  setState(() {
+    name = user['fullName'] ?? '';
+    university = user['university'] ?? '';
+    location = extractedLocation; // Use parsed address instead of ID
+    profileImage = user['selfieUrl'] ?? '';
+    isLoading = false;
+  });
+} else {
+  setState(() => isLoading = false);
+}
+
     } catch (e) {
       print("Error: $e");
       setState(() => isLoading = false);

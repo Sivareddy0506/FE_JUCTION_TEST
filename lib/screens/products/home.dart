@@ -102,16 +102,15 @@ Widget build(BuildContext context) {
             const SearchBarWidget(),
 
             const SizedBox(height: 16),
-            const Divider(height: 1, color: Colors.grey),
             const SizedBox(height: 16),
-
+            
             // Correct usage: CategoryGrid wrapped in SizedBox with fixed height
             const SizedBox(
-              height: 120,
+              height: 150,
               child: CategoryGrid(),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             debugLogWidget('CrewCrashBanner'),
             const CrewCrashBanner(),
@@ -170,7 +169,7 @@ Widget build(BuildContext context) {
               const SizedBox(height: 16),
             ],
 
-            const SizedBox(height: 50),
+            const SizedBox(height: 30),
           ],
         ),
       ),

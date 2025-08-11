@@ -3,7 +3,8 @@ import 'package:junction/app_state.dart';
 import '../screens/products/home.dart';
 import '../screens/jauction/main.dart';
 import '../screens/products/category_post.dart';
-import '../screens/jauction/category_post.dart';
+//import '../screens/jauction/category_post.dart';
+import '../screens/profile/user_profile.dart';
 
 class BottomNavBar extends StatelessWidget {
   final String activeItem;
@@ -114,53 +115,59 @@ static Widget _buildOverlayButton(BuildContext context,
 }
 
 
-  Widget _buildNavItem(
-      BuildContext context, String label, String iconBaseName) {
-    final isActive = activeItem.toLowerCase() == label.toLowerCase();
-    final assetPath = 'assets/${iconBaseName}${isActive ? "-active" : ""}.png';
+ Widget _buildNavItem(
+    BuildContext context, String label, String iconBaseName) {
+  final isActive = activeItem.toLowerCase() == label.toLowerCase();
+  final assetPath = 'assets/${iconBaseName}${isActive ? "-active" : ""}.png';
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          final lowerLabel = label.toLowerCase();
-          if (lowerLabel == 'post') {
-            _showPostOverlay(context);
-          } else if (lowerLabel == 'home') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HomePage()),
-            );
-          } else if (lowerLabel == 'junction') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const JauctionHomePage()),
-            );
-          } else {
-            onTap(lowerLabel);
-          }
-        },
-        behavior: HitTestBehavior.translucent,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(assetPath, width: 24, height: 24),
-            const SizedBox(height: 4),
-            Text(
-              label[0].toUpperCase() + label.substring(1).toLowerCase(),
-              style: TextStyle(
-                fontSize: 12,
-                color: isActive
-                    ? const Color(0xFFFF6705)
-                    : const Color(0xFF8A8894),
-                fontWeight: FontWeight.w500,
-              ),
+  return Expanded(
+    child: GestureDetector(
+      onTap: () {
+        final lowerLabel = label.toLowerCase();
+        if (lowerLabel == 'post') {
+          _showPostOverlay(context);
+        } else if (lowerLabel == 'home') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        } else if (lowerLabel == 'junction') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const JauctionHomePage()),
+          );
+        } else if (lowerLabel == 'profile') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const UserProfilePage()),
+          );
+        } else {
+          onTap(lowerLabel);
+        }
+      },
+      behavior: HitTestBehavior.translucent,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(assetPath, width: 24, height: 24),
+          const SizedBox(height: 4),
+          Text(
+            label[0].toUpperCase() + label.substring(1).toLowerCase(),
+            style: TextStyle(
+              fontSize: 12,
+              color: isActive
+                  ? const Color(0xFFFF6705)
+                  : const Color(0xFF8A8894),
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {

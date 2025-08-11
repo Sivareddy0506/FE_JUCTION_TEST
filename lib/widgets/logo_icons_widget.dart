@@ -19,7 +19,7 @@ class LogoAndIconsWidget extends StatelessWidget {
         ...logoAssets.map(
           (asset) => Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: Image.asset(asset, width: 32, height: 32),
+            child: Image.asset(asset, width: 28, height: 28),
           ),
         ),
 

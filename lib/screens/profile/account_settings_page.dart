@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../widgets/custom_appbar.dart';
 import '../../widgets/app_button.dart';
 
 import './personalinfo/personalinfo.dart';
-import './loginandsecurity/login_security.dart';
+import './loginandsecurity/login_security.dart' as security;
 import './address/address.dart';
 import './privacy/privacy.dart';
 import './notification/notification.dart';
@@ -17,7 +18,7 @@ import './faq/faq.dart';
 import './terms/terms.dart';
 import './support/support.dart';
 import './report/report.dart';
-import '../products/home.dart'; // Adjust this import if path is different
+import '../login/login_page.dart' as auth;
 
 class AccountSettingsPage extends StatelessWidget {
   const AccountSettingsPage({super.key});
@@ -68,34 +69,47 @@ class AccountSettingsPage extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     const url = 'https://api.junctionverse.com/user/auth/logout';
-    final token = await _getToken(); // Replace with your token logic
+    final token = await _getToken();
 
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      // Clear local storage/session if needed here
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()), // Adjust as needed
-        (route) => false,
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Logout failed. Please try again.')),
-      );
+
+      if (response.statusCode == 200) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+
+        if (context.mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const auth.LoginPage()),
+            (route) => false,
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Logout failed. Please try again.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
   Future<String> _getToken() async {
-    // TODO: Replace with your secure token fetch (e.g., SharedPreferences)
-    return 'your_actual_token';
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('token') ?? '';
   }
 
   @override
@@ -124,7 +138,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Login & Security",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                      MaterialPageRoute(builder: (_) => const security.LoginPage()),
                     ),
                   ),
                   _buildSettingItem(
@@ -151,7 +165,6 @@ class AccountSettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const NotificationPage()),
                     ),
                   ),
-
                   _buildSectionTitle("Payments and Transactions"),
                   _buildSettingItem(
                     icon: Icons.account_balance_wallet_outlined,
@@ -161,7 +174,6 @@ class AccountSettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const WalletPage()),
                     ),
                   ),
-
                   _buildSectionTitle("Marketing"),
                   _buildSettingItem(
                     icon: Icons.group_outlined,
@@ -179,7 +191,6 @@ class AccountSettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const CrewClashPage()),
                     ),
                   ),
-
                   _buildSectionTitle("Help and Support"),
                   _buildSettingItem(
                     icon: Icons.help_outline,
@@ -217,8 +228,6 @@ class AccountSettingsPage extends StatelessWidget {
                 ],
               ),
             ),
-
-            // LOGOUT BUTTON
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: AppButton(

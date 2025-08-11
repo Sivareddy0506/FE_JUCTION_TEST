@@ -110,7 +110,7 @@ class _SignupPageState extends State<SignupPage> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text(
-                  'No College Email?',
+                  'No College Email? ',
                   style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
                 ),
                 TextButton(

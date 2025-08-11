@@ -26,46 +26,67 @@ class _PurchasedTabState extends State<PurchasedTab> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('authToken');
+
+    if (token == null || token.isEmpty) {
+      debugPrint("Error: No auth token found.");
+      setState(() => isLoading = false);
+      return;
+    }
+
     final uri = Uri.parse('https://api.junctionverse.com/product/purchased');
 
-    final response = await http.get(uri, headers: {
-      'Authorization': 'Bearer $token',
-    });
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final items = data['products'] ?? [];
-
-      final fetchedProducts = items.map<Product>((item) {
-        final imageUrl = (item['images'] != null && item['images'].isNotEmpty)
-            ? item['images'][0]['fileUrl']
-            : 'assets/images/placeholder.png';
-
-        final location = item['location'];
-        final latitude = location != null ? location['lat']?.toDouble() : null;
-        final longitude = location != null ? location['lng']?.toDouble() : null;
-
-
-        return Product(
-          id: item['_id'] ?? item['id'] ?? '',
-          imageUrl: imageUrl,
-          title: item['title'] ?? 'No title',
-          price: item['price'] != null ? '₹${item['price']}' : null,
-          isAuction: item['isAuction'] ?? false,
-          bidStartDate: item['bidStartDate'] != null
-              ? DateTime.tryParse(item['bidStartDate'])
-              : null,
-          duration: item['duration'],
-          latitude: latitude,
-          longitude: longitude,
-        );
-      }).toList();
-
-      setState(() {
-        products = fetchedProducts;
-        isLoading = false;
+    try {
+      final response = await http.get(uri, headers: {
+        'Authorization': 'Bearer $token',
       });
-    } else {
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> items = decoded['products'] ?? [];
+
+        final fetchedProducts = items.map<Product>((item) {
+          final List<ProductImage> imageList = (item['images'] != null && item['images'] is List)
+              ? (item['images'] as List)
+                  .map((img) => ProductImage(
+                        fileUrl: img['fileUrl'] ?? 'assets/images/placeholder.png',
+                      ))
+                  .toList()
+              : [];
+
+          final imageUrl = imageList.isNotEmpty
+              ? imageList.first.fileUrl
+              : 'assets/images/placeholder.png';
+
+          final location = item['location'];
+          final double? latitude = location != null ? location['lat']?.toDouble() : null;
+          final double? longitude = location != null ? location['lng']?.toDouble() : null;
+
+          return Product(
+            id: item['_id'] ?? item['id'] ?? '',
+            images: imageList,
+            imageUrl: imageUrl,
+            title: item['title'] ?? 'No title',
+            price: item['price'] != null ? '₹${item['price']}' : null,
+            isAuction: item['isAuction'] ?? false,
+            bidStartDate: item['bidStartDate'] != null
+                ? DateTime.tryParse(item['bidStartDate'])
+                : null,
+            duration: item['duration'],
+            latitude: latitude,
+            longitude: longitude,
+          );
+        }).toList();
+
+        setState(() {
+          products = fetchedProducts;
+          isLoading = false;
+        });
+      } else {
+        debugPrint("API Error: ${response.statusCode}");
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Exception while fetching purchased products: $e");
       setState(() => isLoading = false);
     }
   }
