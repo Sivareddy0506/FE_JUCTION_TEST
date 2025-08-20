@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:junction/screens/Chat/ChatScreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../widgets/app_button.dart';
@@ -124,6 +125,33 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       setState(() => isLoadingRelated = false);
     }
   }
+
+  void startChat(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final loggedUserId = prefs.getString('userId');
+    final sellerId = widget.product.seller?.id;
+
+    if (loggedUserId != null && sellerId != null && loggedUserId != sellerId) {
+      try {
+          // Navigate to the chat screen with the chatSessionId
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => ChatScreen(
+                                          productId: widget.product.id,
+                                          productName: widget.product.title,
+                                          productOwnerId: sellerId,
+                                          productImageUrl: widget.product.imageUrl,
+                                          productPrice: widget.product.price ?? "",
+                                          productCategory: widget.product.category ?? "",
+                                          // Pass the current user's UID as the buyer (current chat initiator)
+                                          currentUserId: loggedUserId,
+                                        ))
+          );
+        } catch (e) {
+         debugPrint('ProductDetailPage: error starting chat $e');
+      }
+  }
+}
+
 
  @override
 Widget build(BuildContext context) {
