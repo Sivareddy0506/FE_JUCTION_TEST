@@ -6,45 +6,47 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../screens/products/product_detail.dart';
 import '../screens/services/location_helper.dart';  // Assuming you have a utility for location
+import '../services/favorites_service.dart';
 
 // Inside your ProductGridWidget:
 
 class ProductGridWidget extends StatefulWidget {
   final List<Product> products;
+  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
 
-  const ProductGridWidget({super.key, required this.products});
+  const ProductGridWidget({
+    super.key, 
+    required this.products,
+    this.onFavoriteChanged,
+  });
 
   @override
   State<ProductGridWidget> createState() => _ProductGridWidgetState();
 }
 
 class _ProductGridWidgetState extends State<ProductGridWidget> {
-  Set<String> favoriteProductIds = {};
+  late FavoritesService _favoritesService;
 
   @override
   void initState() {
     super.initState();
-    _loadFavorites();
+    _favoritesService = FavoritesService();
+    // Defer listener registration to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _favoritesService.addListener(_onFavoritesChanged);
+    });
   }
 
-  Future<void> _loadFavorites() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('authToken');
-      if (token == null || token.isEmpty) return;
+  @override
+  void dispose() {
+    _favoritesService.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
 
-      final uri = Uri.parse('https://api.junctionverse.com/user/my-favourites');
-      final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
-
-      if (response.statusCode == 200) {
-        final List favList = jsonDecode(response.body);
-        setState(() {
-          favoriteProductIds = favList.map<String>((item) => item['id'].toString()).toSet();
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to load favorites: $e');
-    }
+  void _onFavoritesChanged() {
+    setState(() {
+      // Trigger rebuild when favorites change
+    });
   }
 
   Future<void> _sendTrackRequest(String productId) async {
@@ -70,28 +72,48 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
   Future<void> _toggleFavorite(String productId) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('authToken');
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add favorites')),
+      );
+      return;
+    }
 
-    final isFav = favoriteProductIds.contains(productId);
-    // Example endpoint - Adjust according to your API for toggling favorite
-    final uri = Uri.parse('https://api.junctionverse.com/user/favourite-toggle');
-
-    final response = await http.post(
-      uri,
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
-      body: jsonEncode({'productId': productId, 'favorite': !isFav}),
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        if (isFav) {
-          favoriteProductIds.remove(productId);
+    final isFav = _favoritesService.isFavorited(productId);
+    
+    try {
+      if (isFav) {
+        // Remove from favorites using the global service
+        final success = await _favoritesService.removeFromFavorites(productId);
+        if (success) {
+          widget.onFavoriteChanged?.call(); // Notify parent of change
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Removed from favorites')),
+          );
         } else {
-          favoriteProductIds.add(productId);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to remove from favorites')),
+          );
         }
-      });
-    } else {
-      debugPrint('Failed to toggle favorite');
+      } else {
+        // Add to favorites using the global service
+        final success = await _favoritesService.addToFavorites(productId);
+        if (success) {
+          widget.onFavoriteChanged?.call(); // Notify parent of change
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Added to favorites')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to add to favorites')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please try again.')),
+      );
     }
   }
 
@@ -109,7 +131,7 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
       ),
       itemBuilder: (context, index) {
         final product = widget.products[index];
-        final isFav = favoriteProductIds.contains(product.id);
+        final isFav = _favoritesService.isFavorited(product.id);
 
         return InkWell(
           onTap: () {
@@ -117,7 +139,10 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ProductDetailPage(product: product),
+                builder: (context) => ProductDetailPage(
+                  product: product,
+                  onFavoriteChanged: widget.onFavoriteChanged,
+                ),
               ),
             );
           },
@@ -285,20 +310,29 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
                     ),
                   ),
 
-                // Love icon overlapped bottom right, only if NOT auction product
-                if (!product.isAuction)
-                  Positioned(
-                    bottom: 10,
-                    right: 10,
-                    child: GestureDetector(
-                      onTap: () => _toggleFavorite(product.id),
-                      child: Icon(
-                        isFav ? Icons.favorite : Icons.favorite_border,
-                        color: isFav ? Colors.deepOrange : Colors.grey,
-                        size: 28,
-                      ),
-                    ),
-                  ),
+                                 // Love icon overlapped bottom right, only if NOT auction product
+                 if (!product.isAuction)
+                   Positioned(
+                     bottom: 10,
+                     right: 10,
+                     child: _favoritesService.isLoading
+                         ? const SizedBox(
+                             width: 28,
+                             height: 28,
+                             child: CircularProgressIndicator(
+                               strokeWidth: 2,
+                               valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                             ),
+                           )
+                         : GestureDetector(
+                             onTap: () => _toggleFavorite(product.id),
+                             child: Icon(
+                               _favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
+                               color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : Colors.grey,
+                               size: 28,
+                             ),
+                           ),
+                   ),
               ],
             ),
           ),

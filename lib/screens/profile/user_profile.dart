@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../widgets/bottom_navbar.dart';
+import '../../services/favorites_service.dart';
 import 'account_settings_page.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -41,7 +42,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Initialize favorites service first
+    await FavoritesService().initialize();
+    // Then load user profile
+    await _loadUserProfile();
   }
 
   Future<void> _loadUserProfile() async {

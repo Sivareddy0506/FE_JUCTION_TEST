@@ -8,6 +8,7 @@ import './crew_crash_banner.dart';
 import './horizontal_product_list.dart';
 import './ad_banner_widget.dart';
 import '../services/api_service.dart';
+import '../../services/favorites_service.dart';
 //import './products_display.dart';
 
 class HomePage extends StatefulWidget {
@@ -39,7 +40,14 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     debugPrint('HomePage: initState called');
-    fetchHomeData();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Initialize favorites service first
+    await FavoritesService().initialize();
+    // Then fetch home data
+    await fetchHomeData();
   }
 
   Future<void> fetchHomeData() async {
@@ -77,6 +85,15 @@ class _HomePageState extends State<HomePage> {
       });
     }
   }
+
+  // Method to refresh favorites state across all product lists
+  void _refreshFavorites() {
+    debugPrint('HomePage: Refreshing favorites state');
+    setState(() {
+      // This will trigger a rebuild of all ProductGridWidget instances
+      // which will reload their favorite states from the API
+    });
+  }
 @override
 Widget build(BuildContext context) {
   debugPrint('HomePage: build called. isLoading=$isLoading');
@@ -106,7 +123,7 @@ Widget build(BuildContext context) {
             
             // Correct usage: CategoryGrid wrapped in SizedBox with fixed height
             const SizedBox(
-              height: 150,
+              height: 120, // Reduced from 150 to 120 to match CategoryGrid height
               child: CategoryGrid(),
             ),
 
@@ -123,6 +140,7 @@ Widget build(BuildContext context) {
                 title: 'Pick up where you left off',
                 products: lastViewedProducts,
                 source: 'lastViewed',
+                onFavoriteChanged: _refreshFavorites,
               ),
               const SizedBox(height: 16),
             ],
@@ -139,6 +157,7 @@ Widget build(BuildContext context) {
                 title: 'Fresh Listings',
                 products: allProducts,
                 source: 'fresh',
+                onFavoriteChanged: _refreshFavorites,
               ),
               const SizedBox(height: 16),
             ],
@@ -149,6 +168,7 @@ Widget build(BuildContext context) {
                 title: 'Based on your Previous Search',
                 products: previousSearchProducts,
                 source: 'searched',
+                onFavoriteChanged: _refreshFavorites,
               ),
               const SizedBox(height: 16),
             ],
@@ -165,6 +185,7 @@ Widget build(BuildContext context) {
                 title: 'Trending in your Locality',
                 products: trendingProducts,
                 source: 'trending',
+                onFavoriteChanged: _refreshFavorites,
               ),
               const SizedBox(height: 16),
             ],
