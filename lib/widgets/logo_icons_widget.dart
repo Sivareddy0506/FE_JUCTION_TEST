@@ -1,6 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../screens/Notifications/notifications_screen.dart';
-
+import '../../screens/Chat/chats_list_page.dart';
 class LogoAndIconsWidget extends StatelessWidget {
   const LogoAndIconsWidget({super.key});
 
@@ -60,7 +61,14 @@ class LogoAndIconsWidget extends StatelessWidget {
         ),
 
         // Chat Icon
-        Container(
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ChatListPage()),
+);
+          },
+          child: Container(
           width: 40,
           height: 40,
           margin: const EdgeInsets.only(right: 8),
@@ -70,6 +78,7 @@ class LogoAndIconsWidget extends StatelessWidget {
             border: Border.all(color: Colors.grey.shade300),
           ),
           child: Image.asset('assets/Chat.png'),
+        )
         ),
       ],
     );
