@@ -18,11 +18,7 @@ class CategoryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-<<<<<<< Updated upstream
       height: 100, // Adjust height as needed
-=======
-      height: 130, // Increased from 120 to 130 to accommodate larger icons
->>>>>>> Stashed changes
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
