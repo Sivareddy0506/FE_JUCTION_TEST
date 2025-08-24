@@ -6,39 +6,55 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../screens/products/product_detail.dart';
 import '../screens/services/location_helper.dart';  // Assuming you have a utility for location
-<<<<<<< Updated upstream
-=======
 import '../services/favorites_service.dart';
 import '../screens/services/api_service.dart';
->>>>>>> Stashed changes
 
 // Inside your ProductGridWidget:
 
 class ProductGridWidget extends StatefulWidget {
   final List<Product> products;
+  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
 
-  const ProductGridWidget({super.key, required this.products});
+  const ProductGridWidget({
+    super.key, 
+    required this.products,
+    this.onFavoriteChanged,
+  });
 
   @override
   State<ProductGridWidget> createState() => _ProductGridWidgetState();
 }
 
 class _ProductGridWidgetState extends State<ProductGridWidget> {
-  Set<String> favoriteProductIds = {};
+  late FavoritesService _favoritesService;
 
   @override
   void initState() {
     super.initState();
-    _loadFavorites();
+    _favoritesService = FavoritesService();
+    // Defer listener registration to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _favoritesService.addListener(_onFavoritesChanged);
+    });
   }
 
+  @override
+  void dispose() {
+    _favoritesService.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    setState(() {
+      // Trigger rebuild when favorites change
+    });
+  }
   Future<void> _loadFavorites() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
       if (token == null || token.isEmpty) return;
 
-<<<<<<< Updated upstream
       final uri = Uri.parse('https://api.junctionverse.com/user/my-favourites');
       final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
@@ -50,15 +66,6 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
       }
     } catch (e) {
       debugPrint('Failed to load favorites: $e');
-=======
-  void _onFavoritesChanged() {
-    // Only rebuild if we're actually displaying favorite states
-    // This prevents unnecessary rebuilds that cause location flickering
-    if (mounted) {
-      setState(() {
-        // Trigger rebuild when favorites change
-      });
->>>>>>> Stashed changes
     }
   }
 
@@ -85,30 +92,13 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
   Future<void> _toggleFavorite(String productId) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('authToken');
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add favorites')),
+      );
+      return;
+    }
 
-<<<<<<< Updated upstream
-    final isFav = favoriteProductIds.contains(productId);
-    // Example endpoint - Adjust according to your API for toggling favorite
-    final uri = Uri.parse('https://api.junctionverse.com/user/favourite-toggle');
-
-    final response = await http.post(
-      uri,
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
-      body: jsonEncode({'productId': productId, 'favorite': !isFav}),
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        if (isFav) {
-          favoriteProductIds.remove(productId);
-        } else {
-          favoriteProductIds.add(productId);
-        }
-      });
-    } else {
-      debugPrint('Failed to toggle favorite');
-=======
     final isFav = _favoritesService.isFavorited(productId);
     
     try {
@@ -117,16 +107,10 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
         final success = await _favoritesService.removeFromFavorites(productId);
         if (success) {
           widget.onFavoriteChanged?.call(); // Notify parent of change
-          // Show a brief, subtle snackbar for removal
-          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Removed from favorites'),
-              duration: Duration(seconds: 1),
-            ),
+            const SnackBar(content: Text('Removed from favorites')),
           );
         } else {
-          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to remove from favorites')),
           );
@@ -136,15 +120,10 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
         final success = await _favoritesService.addToFavorites(productId);
         if (success) {
           widget.onFavoriteChanged?.call(); // Notify parent of change
-          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Added to favorites'),
-              duration: Duration(seconds: 1),
-            ),
+            const SnackBar(content: Text('Added to favorites')),
           );
         } else {
-          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to add to favorites')),
           );
@@ -152,11 +131,9 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
       }
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Network error. Please try again.')),
       );
->>>>>>> Stashed changes
     }
   }
 
@@ -174,8 +151,7 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
       ),
       itemBuilder: (context, index) {
         final product = widget.products[index];
-<<<<<<< Updated upstream
-        final isFav = favoriteProductIds.contains(product.id);
+        final isFav = _favoritesService.isFavorited(product.id);
 
         return InkWell(
           onTap: () {
@@ -183,7 +159,10 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ProductDetailPage(product: product),
+                builder: (context) => ProductDetailPage(
+                  product: product,
+                  onFavoriteChanged: widget.onFavoriteChanged,
+                ),
               ),
             );
           },
@@ -351,43 +330,31 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
                     ),
                   ),
 
-                // Love icon overlapped bottom right, only if NOT auction product
-                if (!product.isAuction)
-                  Positioned(
-                    bottom: 10,
-                    right: 10,
-                    child: GestureDetector(
-                      onTap: () => _toggleFavorite(product.id),
-                      child: Icon(
-                        isFav ? Icons.favorite : Icons.favorite_border,
-                        color: isFav ? Colors.deepOrange : Colors.grey,
-                        size: 28,
-                      ),
-                    ),
-                  ),
+                                 // Love icon overlapped bottom right, only if NOT auction product
+                 if (!product.isAuction)
+                   Positioned(
+                     bottom: 10,
+                     right: 10,
+                     child: _favoritesService.isLoading
+                         ? const SizedBox(
+                             width: 28,
+                             height: 28,
+                             child: CircularProgressIndicator(
+                               strokeWidth: 2,
+                               valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                             ),
+                           )
+                         : GestureDetector(
+                             onTap: () => _toggleFavorite(product.id),
+                             child: Icon(
+                               _favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
+                               color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : Colors.grey,
+                               size: 28,
+                             ),
+                           ),
+                   ),
               ],
-=======
         return _buildProductCard(product);
-      },
-    );
-  }
-
-    Widget _buildProductCard(Product product) {
-    return ProductCard(
-      product: product,
-      onFavoriteChanged: widget.onFavoriteChanged,
-      onTap: () {
-        _sendTrackRequest(product.id);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              product: product,
-              onFavoriteChanged: widget.onFavoriteChanged,
->>>>>>> Stashed changes
-            ),
-          ),
-        );
       },
     );
   }

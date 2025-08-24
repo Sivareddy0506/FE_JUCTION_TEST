@@ -73,39 +73,8 @@ class _FavoritesTabState extends State<FavoritesTab> {
         final List<dynamic> favouritesList = decoded['favourites'] ?? [];
 
         final products = favouritesList.map<Product>((item) {
-         final List<ProductImage> imageList =
-    (item['images'] != null && item['images'] is List)
-        ? (item['images'] as List)
-            .map<ProductImage>((img) => ProductImage(
-                  fileUrl: img['fileUrl'] ??
-                      'assets/images/placeholder.png',
-                ))
-            .toList()
-        : <ProductImage>[];
-
-
-          return Product(
-            id: item['id'] ?? '',
-            title: item['title'] ?? item['name'] ?? 'No title',
-            description: item['description'],
-            price: item['price'] != null
-                ? '₹${item['price']}'
-                : null,
-            isAuction: item['isAuction'] ?? false,
-            images: imageList,
-            imageUrl: imageList.isNotEmpty
-                ? imageList.first.fileUrl
-                : 'assets/images/placeholder.png',
-            latitude: item['location']?['lat']?.toDouble(),
-            longitude: item['location']?['lng']?.toDouble(),
-            bidStartDate: item['bidStartDate'] != null
-                ? DateTime.tryParse(item['bidStartDate'])
-                : null,
-            duration: item['duration'],
-            seller: item['seller'] != null
-                ? Seller.fromJson(item['seller'])
-                : null,
-          );
+          // Use the proper Product.fromJson method to handle all type conversions
+          return Product.fromJson(Map<String, dynamic>.from(item));
         }).toList();
 
         setState(() {

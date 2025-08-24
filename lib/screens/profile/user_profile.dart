@@ -15,11 +15,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../widgets/bottom_navbar.dart';
-<<<<<<< Updated upstream
-=======
 import '../../services/favorites_service.dart';
 import '../../services/profile_service.dart';
->>>>>>> Stashed changes
 import 'account_settings_page.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -57,10 +54,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
   @override
   void initState() {
     super.initState();
-<<<<<<< Updated upstream
-    _loadUserProfile();
-=======
     _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Initialize favorites service first
+    await FavoritesService().initialize();
+    // Then load user profile
+    await _loadUserProfile();
   }
 
   Future<void> _initializeApp() async {
@@ -127,7 +128,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _profileReady = true; // Set to true even on error to prevent infinite loading
       });
     }
->>>>>>> Stashed changes
   }
 
   Future<void> _loadUserProfile() async {

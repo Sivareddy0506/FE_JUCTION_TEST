@@ -6,11 +6,17 @@ import '../../models/product.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
+import '../../services/favorites_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
+  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
 
-  const ProductDetailPage({super.key, required this.product});
+  const ProductDetailPage({
+    super.key, 
+    required this.product,
+    this.onFavoriteChanged,
+  });
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
@@ -19,12 +25,78 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
   bool isLoadingRelated = true;
+  late FavoritesService _favoritesService;
 
   @override
   void initState() {
     super.initState();
+    _favoritesService = FavoritesService();
+    // Defer listener registration to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _favoritesService.addListener(_onFavoritesChanged);
+    });
     _fetchRelatedProducts();
     _loadSellerName();
+  }
+
+  @override
+  void dispose() {
+    _favoritesService.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    setState(() {
+      // Trigger rebuild when favorites change
+    });
+  }
+
+
+
+  Future<void> _toggleFavorite(String productId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add favorites')),
+      );
+      return;
+    }
+
+    try {
+      if (_favoritesService.isFavorited(productId)) {
+        // Remove from favorites using the global service
+        final success = await _favoritesService.removeFromFavorites(productId);
+        if (success) {
+          widget.onFavoriteChanged?.call(); // Notify parent of change
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Removed from favorites')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to remove from favorites')),
+          );
+        }
+      } else {
+        // Add to favorites using the global service
+        final success = await _favoritesService.addToFavorites(productId);
+        if (success) {
+          widget.onFavoriteChanged?.call(); // Notify parent of change
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Added to favorites')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to add to favorites')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please try again.')),
+      );
+    }
   }
 
   Future<void> _fetchRelatedProducts() async {
@@ -368,13 +440,27 @@ Widget build(BuildContext context) {
           ),
           child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.favorite_border),
-                  label: const Text('Favourite'),
-                ),
-              ),
+                             Expanded(
+                 child: OutlinedButton.icon(
+                   onPressed: _favoritesService.isLoading ? null : () => _toggleFavorite(product.id),
+                   icon: _favoritesService.isLoading
+                       ? const SizedBox(
+                           width: 20,
+                           height: 20,
+                           child: CircularProgressIndicator(
+                             strokeWidth: 2,
+                             valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                           ),
+                         )
+                       : Icon(
+                           _favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
+                           color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : null,
+                         ),
+                   label: _favoritesService.isLoading
+                       ? const Text('Loading...')
+                       : Text(_favoritesService.isFavorited(product.id) ? 'Favourited' : 'Favourite'),
+                 ),
+               ),
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(

@@ -108,7 +108,6 @@ class FavoritesService extends ChangeNotifier {
         return true;
       }
       debugPrint('FavoritesService: Failed to remove product $productId, status: ${response.statusCode}');
-      return false;
     } catch (e) {
       debugPrint('Error removing from favorites: $e');
       return false;
