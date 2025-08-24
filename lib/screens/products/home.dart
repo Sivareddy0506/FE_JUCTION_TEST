@@ -45,55 +45,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     debugPrint('HomePage: initState called');
-<<<<<<< Updated upstream
     fetchHomeData();
-=======
-    _initializeApp();
-  }
-
-  Future<void> _initializeApp() async {
-    debugPrint('HomePage: Starting parallel initialization');
-    
-    // Initialize both favorites and products data in parallel
-    await Future.wait([
-      _initializeFavorites(),
-      _initializeProducts(),
-    ]);
-    
-    debugPrint('HomePage: All data initialization completed');
-  }
-
-  Future<void> _initializeFavorites() async {
-    debugPrint('HomePage: Initializing favorites service');
-    try {
-      await FavoritesService().initialize();
-      setState(() {
-        _favoritesReady = true;
-      });
-      debugPrint('HomePage: Favorites service initialized successfully');
-    } catch (e) {
-      debugPrint('HomePage: Error initializing favorites service - $e');
-      setState(() {
-        _favoritesReady = true; // Set to true even on error to prevent infinite loading
-      });
-    }
-  }
-
-  Future<void> _initializeProducts() async {
-    debugPrint('HomePage: Initializing products data');
-    try {
-      await fetchHomeData();
-      setState(() {
-        _productsReady = true;
-      });
-      debugPrint('HomePage: Products data initialized successfully');
-    } catch (e) {
-      debugPrint('HomePage: Error initializing products data - $e');
-      setState(() {
-        _productsReady = true; // Set to true even on error to prevent infinite loading
-      });
-    }
->>>>>>> Stashed changes
   }
 
   Future<void> fetchHomeData() async {
@@ -129,21 +81,9 @@ class _HomePageState extends State<HomePage> {
       rethrow; // Re-throw to be caught by _initializeProducts
     }
   }
-<<<<<<< Updated upstream
 @override
 Widget build(BuildContext context) {
   debugPrint('HomePage: build called. isLoading=$isLoading');
-=======
-
-  // Method to refresh favorites state across all product lists
-  void _refreshFavorites() {
-    debugPrint('HomePage: Refreshing favorites state');
-    setState(() {
-      // This will trigger a rebuild of all ProductGridWidget instances
-      // which will reload their favorite states from the API
-    });
-  }
->>>>>>> Stashed changes
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +109,6 @@ Widget build(BuildContext context) {
               debugLogWidget('SearchBarWidget'),
               const SearchBarWidget(),
 
-<<<<<<< Updated upstream
             const SizedBox(height: 16),
             const SizedBox(height: 16),
             
@@ -192,20 +131,10 @@ Widget build(BuildContext context) {
                 title: 'Pick up where you left off',
                 products: lastViewedProducts,
                 source: 'lastViewed',
-=======
-              const SizedBox(height: 16),
-              const SizedBox(height: 16),
-              
-              // Correct usage: CategoryGrid wrapped in SizedBox with fixed height
-              const SizedBox(
-                height: 130, // Increased from 120 to 130 to match CategoryGrid height
-                child: CategoryGrid(),
->>>>>>> Stashed changes
               ),
 
               const SizedBox(height: 8),
 
-<<<<<<< Updated upstream
             if (allProducts.isNotEmpty) ...[
               debugLogWidget('HorizontalProductList: Fresh Listings'),
               HorizontalProductList(
@@ -223,11 +152,6 @@ Widget build(BuildContext context) {
                 products: previousSearchProducts,
                 source: 'searched',
               ),
-=======
-              debugLogWidget('CrewCrashBanner'),
-              const CrewCrashBanner(),
-
->>>>>>> Stashed changes
               const SizedBox(height: 16),
 
               if (lastViewedProducts.isNotEmpty) ...[
@@ -241,7 +165,6 @@ Widget build(BuildContext context) {
                 const SizedBox(height: 16),
               ],
 
-<<<<<<< Updated upstream
             if (trendingProducts.isNotEmpty) ...[
               debugLogWidget('HorizontalProductList: Trending in your Locality'),
               HorizontalProductList(
@@ -251,13 +174,6 @@ Widget build(BuildContext context) {
               ),
               const SizedBox(height: 16),
             ],
-=======
-              if (adUrl1.isNotEmpty) ...[
-                debugLogWidget('AdBannerWidget: adUrl1'),
-                AdBannerWidget(mediaUrl: adUrl1),
-                const SizedBox(height: 16),
-              ],
->>>>>>> Stashed changes
 
               if (allProducts.isNotEmpty) ...[
                 debugLogWidget('HorizontalProductList: Fresh Listings'),
