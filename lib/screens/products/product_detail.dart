@@ -36,6 +36,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       _favoritesService.addListener(_onFavoritesChanged);
     });
     _fetchRelatedProducts();
+    _loadSellerName();
   }
 
   @override
@@ -219,10 +220,13 @@ Widget build(BuildContext context) {
                 fit: BoxFit.cover,
               ),
               const SizedBox(width: 8),
-              Text(
-                product.seller?.fullName ?? 'Unknown Seller',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
+                             Text(
+                 _sellerName ?? 
+                 (product.seller?.fullName?.startsWith('Seller ') == true ? 
+                  'Loading seller...' : 
+                  product.seller?.fullName ?? 'Unknown Seller'),
+                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+               ),
               const Spacer(),
               Row(
                 children: [

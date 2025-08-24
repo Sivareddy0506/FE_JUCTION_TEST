@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../widgets/products_grid.dart';
+import '../../services/favorites_service.dart';
 import './empty_state.dart';
 
 class FavoritesTab extends StatefulWidget {
@@ -16,11 +17,38 @@ class FavoritesTab extends StatefulWidget {
 class _FavoritesTabState extends State<FavoritesTab> {
   bool isLoading = true;
   List<Product> favouriteProducts = [];
+  late FavoritesService _favoritesService;
 
   @override
   void initState() {
     super.initState();
+    _favoritesService = FavoritesService();
     _fetchFavourites();
+    
+    // Listen to favorites service changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _favoritesService.addListener(_onFavoritesChanged);
+    });
+  }
+
+  @override
+  void dispose() {
+    _favoritesService.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    debugPrint('FavoritesTab: Favorites changed, filtering products');
+    if (mounted) {
+      final beforeCount = favouriteProducts.length;
+      setState(() {
+        favouriteProducts = favouriteProducts.where((product) {
+          return _favoritesService.isFavorited(product.id);
+        }).toList();
+      });
+      final afterCount = favouriteProducts.length;
+      debugPrint('FavoritesTab: Filtered products from $beforeCount to $afterCount');
+    }
   }
 
   Future<void> _fetchFavourites() async {
@@ -63,6 +91,11 @@ class _FavoritesTabState extends State<FavoritesTab> {
     }
   }
 
+  void _onFavoriteRemoved() {
+    // This callback will be called when a favorite is removed from the ProductGridWidget
+    // The _onFavoritesChanged method will handle the filtering
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -75,7 +108,10 @@ class _FavoritesTabState extends State<FavoritesTab> {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: ProductGridWidget(products: favouriteProducts),
+      child: ProductGridWidget(
+        products: favouriteProducts,
+        onFavoriteChanged: _onFavoriteRemoved,
+      ),
     );
   }
 }
