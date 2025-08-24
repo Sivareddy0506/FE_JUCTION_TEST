@@ -6,11 +6,6 @@ import '../../models/product.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
-<<<<<<< Updated upstream
-=======
-import '../../services/favorites_service.dart';
-import '../services/api_service.dart';
->>>>>>> Stashed changes
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -24,11 +19,6 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
   bool isLoadingRelated = true;
-<<<<<<< Updated upstream
-=======
-  late FavoritesService _favoritesService;
-  String? _sellerName;
->>>>>>> Stashed changes
 
   @override
   void initState() {
@@ -37,126 +27,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _loadSellerName();
   }
 
-<<<<<<< Updated upstream
-=======
-  @override
-  void dispose() {
-    _favoritesService.removeListener(_onFavoritesChanged);
-    super.dispose();
-  }
-
-  void _onFavoritesChanged() {
-    setState(() {
-      // Trigger rebuild when favorites change
-    });
-  }
-
-  Future<void> _loadSellerName() async {
-    debugPrint('🔍 Starting seller name fetch for product: ${widget.product.id}');
-    debugPrint('🔍 Current seller: ${widget.product.seller?.toString()}');
-    
-    if (widget.product.seller != null) {
-      final currentName = widget.product.seller!.fullName;
-      debugPrint('🔍 Current seller name: "$currentName"');
-      
-      // Check if name is just an ID (multiple patterns)
-      final isIdPattern = currentName.startsWith('Seller ') && 
-                         (currentName.contains('...') || currentName.length > 20);
-      
-      if (isIdPattern || currentName.isEmpty || currentName == 'Unknown Seller') {
-        debugPrint('🔍 Detected ID pattern, fetching actual seller name...');
-        await _fetchActualSellerName();
-      } else {
-        debugPrint('🔍 Using existing seller name: $currentName');
-        _sellerName = currentName;
-      }
-    } else {
-      debugPrint('🔍 No seller information available');
-    }
-  }
-
-  Future<void> _fetchActualSellerName() async {
-    try {
-      final sellerId = widget.product.seller!.id;
-      debugPrint('🔍 Fetching seller details for ID: $sellerId');
-      
-      final sellerDetails = await ApiService.fetchSellerDetails(sellerId);
-      
-      if (sellerDetails != null && mounted) {
-        final actualName = sellerDetails['fullName'] ?? 
-                          sellerDetails['name'] ?? 
-                          sellerDetails['firstName'] ?? 
-                          sellerDetails['displayName'] ??
-                          'Unknown Seller';
-        
-        debugPrint('🔍 Fetched seller name: $actualName');
-        
-        setState(() {
-          _sellerName = actualName;
-        });
-      } else {
-        debugPrint('❌ No seller details returned from API');
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching seller details: $e');
-      // Set fallback name
-      if (mounted) {
-        setState(() {
-          _sellerName = 'Seller ${widget.product.seller!.id.substring(0, 8)}...';
-        });
-      }
-    }
-  }
-
-
-
-  Future<void> _toggleFavorite(String productId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('authToken');
-    if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login to add favorites')),
-      );
-      return;
-    }
-
-    try {
-      if (_favoritesService.isFavorited(productId)) {
-        // Remove from favorites using the global service
-        final success = await _favoritesService.removeFromFavorites(productId);
-        if (success) {
-          widget.onFavoriteChanged?.call(); // Notify parent of change
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Removed from favorites')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to remove from favorites')),
-          );
-        }
-      } else {
-        // Add to favorites using the global service
-        final success = await _favoritesService.addToFavorites(productId);
-        if (success) {
-          widget.onFavoriteChanged?.call(); // Notify parent of change
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Added to favorites')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to add to favorites')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error toggling favorite: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Network error. Please try again.')),
-      );
-    }
-  }
-
->>>>>>> Stashed changes
   Future<void> _fetchRelatedProducts() async {
     setState(() => isLoadingRelated = true);
 
