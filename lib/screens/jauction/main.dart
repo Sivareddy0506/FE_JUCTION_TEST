@@ -94,11 +94,7 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
               debugLogWidget('SearchBarWidget'),
               const SearchBarWidget(),
               const SizedBox(height: 16),
-<<<<<<< Updated upstream
               const SizedBox(height: 150, child: CategoryGrid()),
-=======
-              const SizedBox(height: 130, child: CategoryGrid()), // Increased from 120 to 130
->>>>>>> Stashed changes
               const SizedBox(height: 8),
 
               if (upcomingAuctions.isNotEmpty) ...[
