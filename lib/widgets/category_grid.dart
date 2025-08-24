@@ -18,12 +18,12 @@ class CategoryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 100, // Adjust height as needed
+      height: 120, // Reduced from 100 to 120 to accommodate smaller icons
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 16),
+        separatorBuilder: (context, index) => const SizedBox(width: 12), // Reduced from 16 to 12
         itemBuilder: (context, index) {
           final category = categories[index];
           return CategoryItem(

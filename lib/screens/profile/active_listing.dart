@@ -7,7 +7,14 @@ import '../../widgets/products_grid.dart';
 import '../../../models/product.dart';
 
 class ActiveAuctionsTab extends StatefulWidget {
-  const ActiveAuctionsTab({super.key});
+  final bool hideLoadingIndicator;
+  final bool startLoading;
+  
+  const ActiveAuctionsTab({
+    super.key,
+    this.hideLoadingIndicator = false,
+    this.startLoading = true,
+  });
 
   @override
   State<ActiveAuctionsTab> createState() => _ActiveAuctionsTabState();
@@ -20,7 +27,10 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
   @override
   void initState() {
     super.initState();
-    _fetchAllData();
+    // Only start fetching data if we're supposed to start loading
+    if (widget.startLoading) {
+      _fetchAllData();
+    }
   }
 
   Future<void> _fetchAllData() async {
@@ -163,7 +173,9 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) return const Center(child: CircularProgressIndicator());
+    if (isLoading && !widget.hideLoadingIndicator) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (allItems.isEmpty) {
       return const EmptyState(text: 'No products or auctions available.');
     }

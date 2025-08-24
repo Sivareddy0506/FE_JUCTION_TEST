@@ -11,15 +11,15 @@ class CategoryItem extends StatelessWidget {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6), // Reduced from 8 to 6
           decoration: BoxDecoration(
             //shape: BoxShape.circle,
             //color: Colors.grey[200],
           ),
           child: Image.asset(
             imagePath,
-            height: 80,
-            width: 80,
+            height: 60, // Reduced from 80 to 60
+            width: 60,  // Reduced from 80 to 60
             fit: BoxFit.contain,
           ),
         ),
@@ -27,7 +27,7 @@ class CategoryItem extends StatelessWidget {
         Text(
           label,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 11), // Reduced from 12 to 11
         ),
       ],
     );
