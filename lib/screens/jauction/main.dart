@@ -77,14 +77,12 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
   Widget build(BuildContext context) {
     debugPrint('JauctionHomePage: build called. isLoading=$isLoading');
 
+    Widget content;
+    
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Scaffold(
-      body: SafeArea(
+      content = const Center(child: CircularProgressIndicator());
+    } else {
+      content = SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
@@ -96,7 +94,11 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
               debugLogWidget('SearchBarWidget'),
               const SearchBarWidget(),
               const SizedBox(height: 16),
+<<<<<<< Updated upstream
               const SizedBox(height: 150, child: CategoryGrid()),
+=======
+              const SizedBox(height: 130, child: CategoryGrid()), // Increased from 120 to 130
+>>>>>>> Stashed changes
               const SizedBox(height: 8),
 
               if (upcomingAuctions.isNotEmpty) ...[
@@ -124,7 +126,7 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
 
               if (liveTodayAuctions.isNotEmpty) ...[
                 HorizontalProductList(
-                  title: 'Today’s Auctions',
+                  title: 'Today\'s Auctions',
                   products: liveTodayAuctions,
                   source: 'today',
                 ),
@@ -158,11 +160,13 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        activeItem: activeTab,
-        onTap: handleTabChange,
-      ),
+      );
+    }
+
+    return BottomNavWrapper(
+      activeItem: activeTab,
+      onTap: handleTabChange,
+      child: content,
     );
   }
 

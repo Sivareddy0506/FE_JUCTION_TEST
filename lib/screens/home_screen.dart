@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:junction/screens/profile/user_profile.dart';
 import 'package:junction/screens/signup/signup_page.dart';
+import 'package:junction/screens/products/home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_overview.dart';  
 import '../widgets/app_button.dart';
+import '../services/app_cache_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,8 +45,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Initialize cache system at app startup
+      await AppCacheService.initializeCache();
+      
       final prefs = await SharedPreferences.getInstance();
       bool? isLoggedIn = await prefs.getBool('isLogin');
       Timer(const Duration(seconds: 3), () async{
@@ -63,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }else{
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const UserProfilePage()),
+            MaterialPageRoute(builder: (_) => HomePage()),
           );
         }
       });

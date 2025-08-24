@@ -1,9 +1,14 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
+import '../../services/cache_manager.dart';
+import '../../services/app_cache_service.dart';
 
 class ApiService {
+  static final CacheManager _cacheManager = CacheManager();
+  
   // Get auth token from local storage
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -15,7 +20,31 @@ class ApiService {
     return products.where((p) => p.isAuction != true).toList();
   }
 
-  /// Fetch last opened products
+  /// Fetch last opened products with caching
+  static Future<List<Product>> fetchLastOpenedWithCache() async {
+    // Check cache first
+    final cachedProducts = await _cacheManager.getCachedData<List<Product>>(CacheConfig.lastViewedKey);
+    if (cachedProducts != null) {
+      debugPrint('ApiService: Returning cached last viewed products');
+      return cachedProducts;
+    }
+
+    // Fetch from API if not cached
+    final products = await fetchLastOpened();
+    if (products.isNotEmpty) {
+      // Cache the products
+      await _cacheManager.setCachedData(
+        CacheConfig.lastViewedKey,
+        products,
+        expiry: CacheConfig.productsExpiry,
+      );
+      debugPrint('ApiService: Cached last viewed products');
+    }
+
+    return products;
+  }
+
+  /// Fetch last opened products (original method)
   static Future<List<Product>> fetchLastOpened() async {
     final token = await _getToken();
     final uri = Uri.parse('https://api.junctionverse.com/api/history/last-opened');
@@ -33,7 +62,31 @@ class ApiService {
     return [];
   }
 
-  /// Fetch most clicked products
+  /// Fetch most clicked products with caching
+  static Future<List<Product>> fetchMostClickedWithCache() async {
+    // Check cache first
+    final cachedProducts = await _cacheManager.getCachedData<List<Product>>(CacheConfig.trendingKey);
+    if (cachedProducts != null) {
+      debugPrint('ApiService: Returning cached trending products');
+      return cachedProducts;
+    }
+
+    // Fetch from API if not cached
+    final products = await fetchMostClicked();
+    if (products.isNotEmpty) {
+      // Cache the products
+      await _cacheManager.setCachedData(
+        CacheConfig.trendingKey,
+        products,
+        expiry: CacheConfig.productsExpiry,
+      );
+      debugPrint('ApiService: Cached trending products');
+    }
+
+    return products;
+  }
+
+  /// Fetch most clicked products (original method)
   static Future<List<Product>> fetchMostClicked() async {
     final uri = Uri.parse('https://api.junctionverse.com/api/history/most-clicked');
     final res = await http.get(uri);
@@ -50,7 +103,31 @@ class ApiService {
     return [];
   }
 
-  /// Fetch all public products
+  /// Fetch all public products with caching
+  static Future<List<Product>> fetchAllProductsWithCache() async {
+    // Check cache first
+    final cachedProducts = await _cacheManager.getCachedData<List<Product>>(CacheConfig.productsKey);
+    if (cachedProducts != null) {
+      debugPrint('ApiService: Returning cached all products');
+      return cachedProducts;
+    }
+
+    // Fetch from API if not cached
+    final products = await fetchAllProducts();
+    if (products.isNotEmpty) {
+      // Cache the products
+      await _cacheManager.setCachedData(
+        CacheConfig.productsKey,
+        products,
+        expiry: CacheConfig.productsExpiry,
+      );
+      debugPrint('ApiService: Cached all products');
+    }
+
+    return products;
+  }
+
+  /// Fetch all public products (original method)
   static Future<List<Product>> fetchAllProducts() async {
     final token = await _getToken();
     final uri = Uri.parse('https://api.junctionverse.com/product/products/public');
@@ -72,7 +149,7 @@ class ApiService {
     return [];
   }
 
-  /// Track product click
+  /// Track product click with offline support
   static Future<void> trackProductClick(String productId) async {
     try {
       final token = await _getToken();
@@ -90,10 +167,41 @@ class ApiService {
       print('📦 Track Click Response: ${res.body}');
     } catch (e) {
       print('❌ Track Click Error: $e');
+      // Queue for offline execution if network fails
+      try {
+        await AppCacheService.queueTrackClick(productId);
+        print('📱 Track click queued for offline execution');
+      } catch (offlineError) {
+        print('❌ Failed to queue track click: $offlineError');
+      }
     }
   }
 
-  /// Fetch based on user search history
+  /// Fetch based on user search history with caching
+  static Future<List<Product>> fetchLastSearchedWithCache() async {
+    // Check cache first
+    final cachedProducts = await _cacheManager.getCachedData<List<Product>>(CacheConfig.searchedKey);
+    if (cachedProducts != null) {
+      debugPrint('ApiService: Returning cached searched products');
+      return cachedProducts;
+    }
+
+    // Fetch from API if not cached
+    final products = await fetchLastSearched();
+    if (products.isNotEmpty) {
+      // Cache the products
+      await _cacheManager.setCachedData(
+        CacheConfig.searchedKey,
+        products,
+        expiry: CacheConfig.productsExpiry,
+      );
+      debugPrint('ApiService: Cached searched products');
+    }
+
+    return products;
+  }
+
+  /// Fetch based on user search history (original method)
   static Future<List<Product>> fetchLastSearched() async {
     final token = await _getToken();
     final uri = Uri.parse('https://api.junctionverse.com/api/history/last-searched');
@@ -111,6 +219,31 @@ class ApiService {
     return [];
   }
 
+  /// Fetch ad URLs with caching
+  static Future<List<String>> fetchAdUrlsWithCache() async {
+    // Check cache first
+    final cachedAds = await _cacheManager.getCachedData<List<String>>(CacheConfig.adsKey);
+    if (cachedAds != null) {
+      debugPrint('ApiService: Returning cached ad URLs');
+      return cachedAds;
+    }
+
+    // Fetch from API if not cached
+    final ads = await fetchAdUrls();
+    if (ads.isNotEmpty) {
+      // Cache the ads
+      await _cacheManager.setCachedData(
+        CacheConfig.adsKey,
+        ads,
+        expiry: CacheConfig.adsExpiry,
+      );
+      debugPrint('ApiService: Cached ad URLs');
+    }
+
+    return ads;
+  }
+
+  /// Fetch ad URLs (original method)
   static Future<List<String>> fetchAdUrls() async {
     final token = await _getToken();
     final uri = Uri.parse('https://api.junctionverse.com/api/ad/allids');
@@ -132,5 +265,129 @@ class ApiService {
       }
     }
     return [];
+  }
+
+  /// Cache management methods
+  static Future<void> clearProductCaches() async {
+    await _cacheManager.invalidateCache(CacheConfig.productsKey);
+    await _cacheManager.invalidateCache(CacheConfig.lastViewedKey);
+    await _cacheManager.invalidateCache(CacheConfig.trendingKey);
+    await _cacheManager.invalidateCache(CacheConfig.searchedKey);
+    debugPrint('ApiService: Cleared all product caches');
+  }
+
+  static Future<void> clearAdCache() async {
+    await _cacheManager.invalidateCache(CacheConfig.adsKey);
+    debugPrint('ApiService: Cleared ad cache');
+  }
+
+  static Future<void> clearAllCaches() async {
+    await _cacheManager.clearAllCaches();
+    debugPrint('ApiService: Cleared all caches');
+  }
+
+  static Future<Map<String, dynamic>> getCacheStats() async {
+    return await _cacheManager.getCacheStats();
+  }
+
+  /// Search products using the search API
+  static Future<List<Product>> searchProducts(String query) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        throw Exception('Authentication required for search');
+      }
+
+      final uri = Uri.parse('https://api.junctionverse.com/user/search/current');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'query': query}),
+      );
+
+      debugPrint('🔍 Search API Response: ${response.statusCode}');
+      debugPrint('🔍 Search Query: $query');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['products'] is List) {
+          final products = (data['products'] as List)
+              .map((e) => Product.fromJson(e))
+              .toList();
+          debugPrint('✅ Search successful: ${products.length} results found');
+          return products;
+        }
+      } else {
+        debugPrint('❌ Search API Error: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to search products: ${response.statusCode}');
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('❌ Search Error: $e');
+      throw Exception('Search failed: $e');
+    }
+  }
+
+  /// Save search history
+  static Future<void> saveSearchHistory(String query) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return;
+
+      final uri = Uri.parse('https://api.junctionverse.com/user/search-history');
+      await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'query': query}),
+      );
+      debugPrint('✅ Search history saved: $query');
+    } catch (e) {
+      debugPrint('❌ Save search history error: $e');
+      // Queue for offline execution if network fails
+      try {
+        await AppCacheService.queueTrackSearch(query);
+        debugPrint('📱 Search history queued for offline execution');
+      } catch (offlineError) {
+        debugPrint('❌ Failed to queue search history: $offlineError');
+      }
+    }
+  }
+
+  /// Fetch seller details by ID
+  static Future<Map<String, dynamic>?> fetchSellerDetails(String sellerId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return null;
+
+      final uri = Uri.parse('https://api.junctionverse.com/user/$sellerId');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      debugPrint('🔍 Fetch seller details: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('✅ Seller details fetched: $data');
+        return data;
+      } else {
+        debugPrint('❌ Failed to fetch seller details: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching seller details: $e');
+      return null;
+    }
   }
 }
