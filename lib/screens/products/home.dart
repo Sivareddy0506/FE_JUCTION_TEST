@@ -27,7 +27,13 @@ class _HomePageState extends State<HomePage> {
   List<Product> trendingProducts = [];
   String adUrl1 = '';
   String adUrl2 = '';
-  bool isLoading = true;
+  
+  // Separate flags for different data sources
+  bool _favoritesReady = false;
+  bool _productsReady = false;
+  
+  // Computed getter to check if all data is ready
+  bool get _allDataReady => _favoritesReady && _productsReady;
 
   void handleTabChange(String selected) {
     debugPrint('HomePage: handleTabChange called with "$selected"');
@@ -44,20 +50,54 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _initializeApp() async {
-    // Initialize favorites service first
-    await FavoritesService().initialize();
-    // Then fetch home data
-    await fetchHomeData();
+    debugPrint('HomePage: Starting parallel initialization');
+    await Future.wait([
+      _initializeFavorites(),
+      _initializeProducts(),
+    ]);
+    debugPrint('HomePage: All data initialization completed');
+  }
+
+  Future<void> _initializeFavorites() async {
+    debugPrint('HomePage: Initializing favorites service');
+    try {
+      await FavoritesService().initialize();
+      setState(() {
+        _favoritesReady = true;
+      });
+      debugPrint('HomePage: Favorites service initialized successfully');
+    } catch (e) {
+      debugPrint('HomePage: Error initializing favorites service - $e');
+      setState(() {
+        _favoritesReady = true; // Set to true even on error to prevent infinite loading
+      });
+    }
+  }
+
+  Future<void> _initializeProducts() async {
+    debugPrint('HomePage: Initializing products data');
+    try {
+      await fetchHomeData();
+      setState(() {
+        _productsReady = true;
+      });
+      debugPrint('HomePage: Products data initialized successfully');
+    } catch (e) {
+      debugPrint('HomePage: Error initializing products data - $e');
+      setState(() {
+        _productsReady = true; // Set to true even on error to prevent infinite loading
+      });
+    }
   }
 
   Future<void> fetchHomeData() async {
     debugPrint('HomePage: fetchHomeData started');
     try {
-      final lastViewed = await ApiService.fetchLastOpened();
-      final latest = await ApiService.fetchAllProducts();
-      final trending = await ApiService.fetchMostClicked();
-      final searched = await ApiService.fetchLastSearched();
-      final ads = await ApiService.fetchAdUrls();
+      final lastViewed = await ApiService.fetchLastOpenedWithCache();
+      final latest = await ApiService.fetchAllProductsWithCache();
+      final trending = await ApiService.fetchMostClickedWithCache();
+      final searched = await ApiService.fetchLastSearchedWithCache();
+      final ads = await ApiService.fetchAdUrlsWithCache();
 
       debugPrint("HomePage: API data fetched successfully");
       debugPrint("📦 lastViewedProducts: ${lastViewed.length}");
@@ -75,14 +115,12 @@ class _HomePageState extends State<HomePage> {
           adUrl1 = ads[0];
           adUrl2 = ads.length > 1 ? ads[1] : ads[0];
         }
-        isLoading = false;
       });
     } catch (e, stacktrace) {
       debugPrint('HomePage: Exception in fetchHomeData - $e');
       debugPrint(stacktrace.toString());
-      setState(() {
-        isLoading = false;
-      });
+      // Don't set isLoading to false here, let _initializeProducts handle it
+      rethrow; // Re-throw to be caught by _initializeProducts
     }
   }
 
@@ -90,117 +128,113 @@ class _HomePageState extends State<HomePage> {
   void _refreshFavorites() {
     debugPrint('HomePage: Refreshing favorites state');
     setState(() {
-      // This will trigger a rebuild of all ProductGridWidget instances
-      // which will reload their favorite states from the API
+      // Triggers rebuild so ProductGridWidgets reload favourite state
     });
   }
-@override
-Widget build(BuildContext context) {
-  debugPrint('HomePage: build called. isLoading=$isLoading');
 
-  if (isLoading) {
-    debugPrint('HomePage: showing loading indicator');
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    debugPrint('HomePage: build called. _allDataReady=$_allDataReady, _favoritesReady=$_favoritesReady, _productsReady=$_productsReady');
 
-  return Scaffold(
-    body: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            debugLogWidget('LogoAndIconsWidget'),
-            const LogoAndIconsWidget(),
-            const SizedBox(height: 16),
-            debugLogWidget('SearchBarWidget'),
-            const SearchBarWidget(),
+    Widget content;
+    
+    if (!_allDataReady) {
+      debugPrint('HomePage: showing loading indicator - waiting for data to be ready');
+      content = const Center(
+        child: CircularProgressIndicator(),
+      );
+    } else {
+      content = SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              debugLogWidget('LogoAndIconsWidget'),
+              const LogoAndIconsWidget(),
+              const SizedBox(height: 16),
+              debugLogWidget('SearchBarWidget'),
+              const SearchBarWidget(),
 
-            const SizedBox(height: 16),
-            const SizedBox(height: 16),
-            
-            // Correct usage: CategoryGrid wrapped in SizedBox with fixed height
-            const SizedBox(
-              height: 120, // Reduced from 150 to 120 to match CategoryGrid height
-              child: CategoryGrid(),
-            ),
+              const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 8),
-
-            debugLogWidget('CrewCrashBanner'),
-            const CrewCrashBanner(),
-
-            const SizedBox(height: 16),
-
-            if (lastViewedProducts.isNotEmpty) ...[
-              debugLogWidget('HorizontalProductList: Pick up where you left off'),
-              HorizontalProductList(
-                title: 'Pick up where you left off',
-                products: lastViewedProducts,
-                source: 'lastViewed',
-                onFavoriteChanged: _refreshFavorites,
+              // Category grid (fixed height)
+              const SizedBox(
+                height: 130,
+                child: CategoryGrid(),
               ),
-              const SizedBox(height: 16),
-            ],
 
-            if (adUrl1.isNotEmpty) ...[
-              debugLogWidget('AdBannerWidget: adUrl1'),
-              AdBannerWidget(mediaUrl: adUrl1),
-              const SizedBox(height: 16),
-            ],
+              const SizedBox(height: 8),
 
-            if (allProducts.isNotEmpty) ...[
-              debugLogWidget('HorizontalProductList: Fresh Listings'),
-              HorizontalProductList(
-                title: 'Fresh Listings',
-                products: allProducts,
-                source: 'fresh',
-                onFavoriteChanged: _refreshFavorites,
-              ),
-              const SizedBox(height: 16),
-            ],
+              debugLogWidget('CrewCrashBanner'),
+              const CrewCrashBanner(),
 
-            if (previousSearchProducts.isNotEmpty) ...[
-              debugLogWidget('HorizontalProductList: Based on your Previous Search'),
-              HorizontalProductList(
-                title: 'Based on your Previous Search',
-                products: previousSearchProducts,
-                source: 'searched',
-                onFavoriteChanged: _refreshFavorites,
-              ),
               const SizedBox(height: 16),
-            ],
 
-            if (adUrl2.isNotEmpty) ...[
-              debugLogWidget('AdBannerWidget: adUrl2'),
-              AdBannerWidget(mediaUrl: adUrl2),
-              const SizedBox(height: 16),
-            ],
+              if (lastViewedProducts.isNotEmpty) ...[
+                debugLogWidget('HorizontalProductList: Pick up where you left off'),
+                HorizontalProductList(
+                  title: 'Pick up where you left off',
+                  products: lastViewedProducts,
+                  source: 'lastViewed',
+                  onFavoriteChanged: _refreshFavorites,
+                ),
+                const SizedBox(height: 16),
+              ],
 
-            if (trendingProducts.isNotEmpty) ...[
-              debugLogWidget('HorizontalProductList: Trending in your Locality'),
-              HorizontalProductList(
-                title: 'Trending in your Locality',
-                products: trendingProducts,
-                source: 'trending',
-                onFavoriteChanged: _refreshFavorites,
-              ),
-              const SizedBox(height: 16),
-            ],
+              if (allProducts.isNotEmpty) ...[
+                debugLogWidget('HorizontalProductList: Fresh Listings'),
+                HorizontalProductList(
+                  title: 'Fresh Listings',
+                  products: allProducts,
+                  source: 'fresh',
+                  onFavoriteChanged: _refreshFavorites,
+                ),
+                const SizedBox(height: 16),
+              ],
 
-            const SizedBox(height: 30),
-          ],
+              if (previousSearchProducts.isNotEmpty) ...[
+                debugLogWidget('HorizontalProductList: Based on your Previous Search'),
+                HorizontalProductList(
+                  title: 'Based on your Previous Search',
+                  products: previousSearchProducts,
+                  source: 'searched',
+                  onFavoriteChanged: _refreshFavorites,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              if (adUrl1.isNotEmpty) ...[
+                debugLogWidget('AdBannerWidget: adUrl1'),
+                AdBannerWidget(mediaUrl: adUrl1),
+                const SizedBox(height: 16),
+              ],
+
+              if (trendingProducts.isNotEmpty) ...[
+                debugLogWidget('HorizontalProductList: Trending in your Locality'),
+                HorizontalProductList(
+                  title: 'Trending in your Locality',
+                  products: trendingProducts,
+                  source: 'trending',
+                  onFavoriteChanged: _refreshFavorites,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
-      ),
-    ),
-    bottomNavigationBar: BottomNavBar(
+      );
+    }
+
+    return BottomNavWrapper(
       activeItem: activeTab,
       onTap: handleTabChange,
-    ),
-  );
-}
+      child: content,
+    );
+  }
 
   // Helper method to print logs on widget rendering
   Widget debugLogWidget(String widgetName) {

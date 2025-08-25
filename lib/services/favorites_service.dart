@@ -93,6 +93,7 @@ class FavoritesService extends ChangeNotifier {
       
       if (token == null || token.isEmpty) return false;
 
+      debugPrint('FavoritesService: Removing product $productId from favorites');
       final uri = Uri.parse('https://api.junctionverse.com/user/remove-favourite');
       final response = await http.post(
         uri,
@@ -102,9 +103,11 @@ class FavoritesService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         _favoriteProductIds.remove(productId);
+        debugPrint('FavoritesService: Successfully removed product $productId, notifying listeners');
         notifyListeners();
         return true;
       }
+      debugPrint('FavoritesService: Failed to remove product $productId, status: ${response.statusCode}');
       return false;
     } catch (e) {
       debugPrint('Error removing from favorites: $e');

@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace "com.example.junction"
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.example.junction"
-        minSdkVersion 21
-        targetSdk 35
+        minSdkVersion flutter.minSdkVersion
+        targetSdk 36
         versionCode 1
         versionName "1.0"
         multiDexEnabled true
@@ -20,8 +20,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {

@@ -5,7 +5,37 @@ import '../screens/jauction/main.dart';
 import '../screens/products/category_post.dart';
 //import '../screens/jauction/category_post.dart';
 import '../screens/profile/user_profile.dart';
+import '../services/navigation_manager.dart';
 
+// Wrapper widget that always shows bottom navigation
+class BottomNavWrapper extends StatelessWidget {
+  final Widget child;
+  final String activeItem;
+  final Function(String) onTap;
+
+  const BottomNavWrapper({
+    Key? key,
+    required this.child,
+    required this.activeItem,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        bottom: false, // Don't add bottom safe area since we handle it in BottomNavBar
+        child: child,
+      ),
+      bottomNavigationBar: BottomNavBar(
+        activeItem: activeItem,
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+// Improved BottomNavBar with better navigation handling
 class BottomNavBar extends StatelessWidget {
   final String activeItem;
   final Function(String) onTap;
@@ -89,7 +119,6 @@ class BottomNavBar extends StatelessWidget {
   );
 }
 
-
 static Widget _buildOverlayButton(BuildContext context,
     {required String label, required VoidCallback onPressed}) {
   return SizedBox(
@@ -114,7 +143,6 @@ static Widget _buildOverlayButton(BuildContext context,
   );
 }
 
-
  Widget _buildNavItem(
     BuildContext context, String label, String iconBaseName) {
   final isActive = activeItem.toLowerCase() == label.toLowerCase();
@@ -126,24 +154,25 @@ static Widget _buildOverlayButton(BuildContext context,
         final lowerLabel = label.toLowerCase();
         if (lowerLabel == 'post') {
           _showPostOverlay(context);
-        } else if (lowerLabel == 'home') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const HomePage()),
-          );
-        } else if (lowerLabel == 'junction') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const JauctionHomePage()),
-          );
-        } else if (lowerLabel == 'profile') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const UserProfilePage()),
-          );
-        } else {
-          onTap(lowerLabel);
-        }
+                  } else {
+            // Use NavigationManager to preserve page states
+            final targetRoute = lowerLabel.toLowerCase();
+            
+            // Only navigate if we're not already on the target page
+            if (!isActive) {
+              NavigationManager.setCurrentRoute(targetRoute);
+              final targetPage = NavigationManager.getPreservedPage(targetRoute);
+              
+              Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) => targetPage,
+                  transitionDuration: Duration.zero, // No animation to prevent flickering
+                  reverseTransitionDuration: Duration.zero,
+                ),
+              );
+            }
+          }
       },
       behavior: HitTestBehavior.translucent,
       child: Column(
@@ -168,22 +197,34 @@ static Widget _buildOverlayButton(BuildContext context,
   );
 }
 
-
   @override
   Widget build(BuildContext context) {
+    // Get system navigation bar height to ensure proper spacing
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
     return Container(
-      height: 60,
+      height: 60 + bottomPadding, // Add system navigation bar height
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFDDDDDD))),
         color: Colors.white,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
         children: [
-          _buildNavItem(context, 'home', 'House'),
-          _buildNavItem(context, 'post', 'Plus'),
-          _buildNavItem(context, 'junction', 'Store'),
-          _buildNavItem(context, 'profile', 'User'),
+          // Main navigation bar content
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildNavItem(context, 'home', 'House'),
+                _buildNavItem(context, 'post', 'Plus'),
+                _buildNavItem(context, 'junction', 'Store'),
+                _buildNavItem(context, 'profile', 'User'),
+              ],
+            ),
+          ),
+          // Add padding for system navigation bar
+          if (bottomPadding > 0)
+            SizedBox(height: bottomPadding),
         ],
       ),
     );
