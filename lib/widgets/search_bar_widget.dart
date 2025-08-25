@@ -1,8 +1,40 @@
 import 'package:flutter/material.dart';
 import './filter_widget.dart';
+import '../screens/search/search_results_page.dart';
 
-class SearchBarWidget extends StatelessWidget {
-  const SearchBarWidget({super.key});
+class SearchBarWidget extends StatefulWidget {
+  final String? initialQuery;
+  final Function(String)? onSearch;
+
+  const SearchBarWidget({
+    super.key,
+    this.initialQuery,
+    this.onSearch,
+  });
+
+  @override
+  State<SearchBarWidget> createState() => _SearchBarWidgetState();
+}
+
+class _SearchBarWidgetState extends State<SearchBarWidget> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialQuery != null) {
+      _searchController.text = widget.initialQuery!;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   void _showFilterModal(BuildContext context) {
     showModalBottomSheet(
@@ -13,6 +45,30 @@ class SearchBarWidget extends StatelessWidget {
       ),
       builder: (_) => const FilterModal(), 
     );
+  }
+
+  void _performSearch() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    // Call the onSearch callback if provided
+    widget.onSearch?.call(query);
+
+    // Navigate to search results page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchResultsPage(searchQuery: query),
+      ),
+    ).then((_) {
+      setState(() {
+        _isSearching = false;
+      });
+    });
   }
 
   @override
@@ -29,12 +85,38 @@ class SearchBarWidget extends StatelessWidget {
           const SizedBox(width: 16),
           Image.asset('assets/MagnifyingGlass.png', height: 20, width: 20),
           const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              "Search for 'Books'",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                _searchFocusNode.requestFocus();
+              },
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                decoration: const InputDecoration(
+                  hintText: "Search for 'Books'",
+                  hintStyle: TextStyle(fontSize: 16, color: Colors.grey),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                style: const TextStyle(fontSize: 16),
+                onSubmitted: (_) => _performSearch(),
+                textInputAction: TextInputAction.search,
+                onTap: () {
+                  // Show search history or suggestions when tapped
+                },
+              ),
             ),
           ),
+          if (_isSearching)
+            const Padding(
+              padding: EdgeInsets.only(right: 8.0),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           GestureDetector(
             onTap: () => _showFilterModal(context),
             child: Image.asset('assets/Filter.png', height: 20, width: 20),
