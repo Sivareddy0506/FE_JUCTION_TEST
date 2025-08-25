@@ -9,6 +9,7 @@ import '../../widgets/headding_description.dart';
 import '../profile/user_profile.dart';
 import '../signup/verification_submitted.dart';
 import '../signup/verification_rejected.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OTPVerificationLoginPage extends StatefulWidget {
   final String email;
@@ -74,6 +75,7 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
     if (response.statusCode == 200) {
       final token = responseBody['token'];
       final user = responseBody['user'];
+      final userId = user?['id'] ?? '';
 
       if (user == null) {
         print("User object is missing in response.");
@@ -101,6 +103,7 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
       if (token != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('authToken', token);
+        await prefs.setString('userId', userId);
         print("Token saved to SharedPreferences");
       }
 
@@ -108,11 +111,35 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
       if (userStatus == 'Active') {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLogin', true);
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const UserProfilePage()),
-              (Route<dynamic> route) => false, // removes all previous routes
+        
+        final customTokenResponse = await http.post(Uri.parse('https://api.junctionverse.com/user/firebase/createcustomtoken'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'userId': userId}),
         );
+
+        if (customTokenResponse.statusCode == 200) {
+          final customToken = jsonDecode(customTokenResponse.body)['token'];
+          print("Custom token received: $customToken");
+
+          // Sign in with Firebase using the custom token
+          await FirebaseAuth.instance.signInWithCustomToken(customToken);
+          await prefs.setString('firebaseUserId', FirebaseAuth.instance.currentUser?.uid ?? '');
+          await prefs.setString('firebaseToken', customToken);
+          print("Successfully logged in with Firebase");
+
+           Navigator.pushAndRemoveUntil(
+            context,
+              MaterialPageRoute(builder: (_) => const UserProfilePage()),
+                (Route<dynamic> route) => false, // removes all previous routes
+         );
+        } else {
+          print("Failed to create custom token: ${customTokenResponse.body}");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to login. Please try again.')),
+          );
+          return;
+        }
+
       } else if (userStatus == 'Pending' || userStatus == 'Submitted') {
         Navigator.pushReplacement(
           context,

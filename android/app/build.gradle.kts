@@ -7,11 +7,11 @@ plugins {
 
 android {
     namespace = "com.example.junction"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.junction"
-        minSdk = 23 // Firebase requirement
+        minSdkVersion(flutter.minSdkVersion) // Firebase requirement
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
