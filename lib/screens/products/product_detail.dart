@@ -134,6 +134,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       String buyerId = _chatService.currentUserId;
       String productId = widget.product.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
+      final prefs = await SharedPreferences.getInstance();
+      String buyerName = prefs.getString('fullName') ?? 'You';
 
       showDialog(
         context: context,
@@ -149,7 +151,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           sellerId: sellerId,
           buyerId: buyerId,
           sellerName: widget.product.seller?.fullName ?? 'Seller',
-          buyerName: 'You', // Get from user data
+          buyerName: buyerName,
           productTitle: widget.product.title,
           productImage: widget.product.imageUrl,
           productPrice: widget.product.price?.toString() ?? '0',
@@ -182,7 +184,6 @@ Widget build(BuildContext context) {
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Seller info block (no border, no extra spacing)
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           color: Colors.transparent,
@@ -220,7 +221,6 @@ Widget build(BuildContext context) {
         ),
         const SizedBox(height: 12),
 
-        // Combined block: Images + badges + category + title/price + views/location
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(

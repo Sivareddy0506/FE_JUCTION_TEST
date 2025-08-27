@@ -104,6 +104,7 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('authToken', token);
         await prefs.setString('userId', userId);
+        await prefs.setString('fullName', fullName);
         print("Token saved to SharedPreferences");
       }
 
