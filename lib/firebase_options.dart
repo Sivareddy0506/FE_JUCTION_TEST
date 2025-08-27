@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'junction-testing.firebasestorage.app',
     measurementId: 'G-RZ8DGV3M53',
   );
+
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:junction/screens/Chat/chat_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../widgets/app_button.dart';
@@ -8,6 +9,7 @@ import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
 import '../../services/favorites_service.dart';
 import '../services/api_service.dart';
+import '../services/chat_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -26,6 +28,7 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
   bool isLoadingRelated = true;
+  final ChatService _chatService = ChatService();
   late FavoritesService _favoritesService;
   String? _sellerName;
 
@@ -255,6 +258,51 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       setState(() => isLoadingRelated = false);
     }
   }
+
+  void startChat(BuildContext context) async {
+    try {
+      String sellerId = widget.product.seller?.id ?? '';
+      String buyerId = _chatService.currentUserId;
+      String productId = widget.product.id;
+      String chatId = '${productId}_${sellerId}_$buyerId';
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      bool exists = await _chatService.chatExists(chatId);
+      
+      if (!exists) {
+        await _chatService.createChat(
+          productId: productId,
+          sellerId: sellerId,
+          buyerId: buyerId,
+          sellerName: widget.product.seller?.fullName ?? 'Seller',
+          buyerName: 'You', // Get from user data
+          productTitle: widget.product.title,
+          productImage: widget.product.imageUrl,
+          productPrice: widget.product.price?.toString() ?? '0',
+        );
+      }
+
+      Navigator.pop(context);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatPage(chatId: chatId),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
 
  @override
 Widget build(BuildContext context) {
@@ -584,7 +632,9 @@ Widget build(BuildContext context) {
         const SizedBox(height: 20),
 
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            startChat(context);
+          },
           icon: const Icon(Icons.chat),
           label: const Text('Chat'),
           style: ElevatedButton.styleFrom(
