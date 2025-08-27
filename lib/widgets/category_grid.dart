@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import './catergory_item.dart';
+import '../screens/search/search_results_page.dart';
 
 class CategoryGrid extends StatelessWidget {
   const CategoryGrid({super.key});
@@ -18,17 +19,29 @@ class CategoryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 100, // Adjust height as needed
+      height: 130, // Reduced from 100 to 120 to accommodate smaller icons
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 16),
+        separatorBuilder: (context, index) => const SizedBox(width: 16), // Reduced from 16 to 12
         itemBuilder: (context, index) {
           final category = categories[index];
-          return CategoryItem(
-            imagePath: category['image']!,
-            label: category['label']!,
+          return GestureDetector(
+            onTap: () {
+              final raw = category['label'] ?? '';
+              final query = raw.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SearchResultsPage(searchQuery: query),
+                ),
+              );
+            },
+            child: CategoryItem(
+              imagePath: category['image']!,
+              label: category['label']!,
+            ),
           );
         },
       ),

@@ -77,6 +77,11 @@ class Seller {
   }
 
   get imageUrl => null;
+  
+  @override
+  String toString() {
+    return 'Seller(id: $id, fullName: $fullName, email: $email)';
+  }
 }
 
 class Product {
@@ -137,6 +142,53 @@ class Product {
 
   String? get sellerName => seller?.fullName;
 
+  static Seller? _parseSeller(Map<String, dynamic> json) {
+    
+    // Try different possible seller field names and structures
+    if (json['seller'] is Map<String, dynamic>) {
+      return Seller.fromJson(Map<String, dynamic>.from(json['seller']));
+    }
+    
+    // Check if seller is a string (ID) and we have separate name fields
+    if (json['seller'] is String && json['sellerName'] != null) {
+      return Seller(
+        id: json['seller'],
+        fullName: json['sellerName'],
+        email: json['sellerEmail'] ?? '',
+      );
+    }
+    
+    // Check if owner field contains seller info
+    if (json['owner'] is Map<String, dynamic>) {
+      return Seller.fromJson(Map<String, dynamic>.from(json['owner']));
+    }
+    
+    // Check if user field contains seller info
+    if (json['user'] is Map<String, dynamic>) {
+      return Seller.fromJson(Map<String, dynamic>.from(json['user']));
+    }
+    
+    // If seller is just a string (ID), try to create a basic seller
+    if (json['seller'] is String) {
+      return Seller(
+        id: json['seller'],
+        fullName: json['sellerName'] ?? 'Unknown Seller',
+        email: json['sellerEmail'] ?? '',
+      );
+    }
+    
+    // Check if sellerId exists (common case from API)
+    if (json['sellerId'] is String) {
+      return Seller(
+        id: json['sellerId'],
+        fullName: json['sellerName'] ?? 'Seller ${json['sellerId'].substring(0, 8)}...',
+        email: json['sellerEmail'] ?? '',
+      );
+    }
+    
+    return null;
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) {
   final imageList = (json['images'] as List?)
           ?.map((img) => ProductImage.fromJson(Map<String, dynamic>.from(img)))
@@ -171,9 +223,7 @@ class Product {
     location: json['pickupLocation'] ??
         json['locationName'] ??
         json['location']?['name'],
-    seller: (json['seller'] is Map<String, dynamic>)
-        ? Seller.fromJson(Map<String, dynamic>.from(json['seller']))
-        : null,
+    seller: _parseSeller(json),
     category: json['category'],
     condition: json['condition'],
     usage: json['usage'],
