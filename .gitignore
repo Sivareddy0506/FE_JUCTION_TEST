@@ -9,3 +9,8 @@ build/
 .idea/
 .vscode/
 *.iml
+devtools_options.yaml
+macos/Flutter/GeneratedPluginRegistrant.swift
+pubspec.lock
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugins.cmake
