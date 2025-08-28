@@ -9,6 +9,7 @@ build/
 .idea/
 .vscode/
 *.iml
+pubspec.lock
 
 # Platform-specific generated plugin registrants
 linux/flutter/generated_plugin_registrant.cc

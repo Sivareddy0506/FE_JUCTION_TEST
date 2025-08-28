@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path/path.dart' as path;
 
 class ChatModel {
   final String chatId;
@@ -89,6 +93,7 @@ class MessageModel {
   final bool isRead;
   final Map<String, dynamic>? priceData;
   final Map<String, dynamic>? productData;
+  final Map<String, dynamic>? attachmentData;
 
   MessageModel({
     required this.messageId,
@@ -100,6 +105,7 @@ class MessageModel {
     this.isRead = false,
     this.priceData,
     this.productData,
+    this.attachmentData
   });
 
   factory MessageModel.fromFirestore(Map<String, dynamic> data) {
@@ -113,6 +119,7 @@ class MessageModel {
       isRead: data['isRead'] ?? false,
       priceData: data['priceData'],
       productData: data['productData'],
+      attachmentData: data['attachmentData'],
     );
   }
 
@@ -127,6 +134,7 @@ class MessageModel {
       'isRead': isRead,
       'priceData': priceData,
       'productData': productData,
+      'attachmentData': attachmentData,
     };
   }
 }
@@ -134,6 +142,8 @@ class MessageModel {
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _imagePicker = ImagePicker();
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
@@ -228,16 +238,73 @@ class ChatService {
         .set(productMessage.toFirestore());
   }
 
+  // Upload image to Firebase Storage
+  Future<String> _uploadImage(File imageFile, String chatId) async {
+    try {
+      String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
+      String filePath = 'chat_images/$chatId/$fileName';
+      
+      Reference storageRef = _storage.ref().child(filePath);
+      UploadTask uploadTask = storageRef.putFile(imageFile);
+      
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      return downloadUrl;
+    } catch (e) {
+      throw Exception('Failed to upload image: $e');
+    }
+  }
+
+  // Pick and send image
+  Future<void> pickAndSendImage({
+    required String chatId,
+    required String receiverId,
+    required ImageSource source,
+  }) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        File imageFile = File(pickedFile.path);
+        
+        // Upload image and get URL
+        String imageUrl = await _uploadImage(imageFile, chatId);
+        
+        // Send image message
+        await sendMessage(
+          chatId: chatId,
+          receiverId: receiverId,
+          message: 'Photo',
+          messageType: 'image',
+          attachmentData: {
+            'url': imageUrl,
+            'type': 'image',
+            'fileName': path.basename(pickedFile.path),
+            'size': await imageFile.length(),
+          },
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to send image: $e');
+    }
+  }
+
   Future<void> sendMessage({
     required String chatId,
     required String receiverId,
     required String message,
     String messageType = 'text',
     Map<String, dynamic>? priceData,
+    Map<String, dynamic>? attachmentData,
   }) async {
     try {
       String messageId = DateTime.now().millisecondsSinceEpoch.toString();
-      
       MessageModel newMessage = MessageModel(
         messageId: messageId,
         senderId: currentUserId,
@@ -246,6 +313,7 @@ class ChatService {
         timestamp: DateTime.now(),
         messageType: messageType,
         priceData: priceData,
+        attachmentData: attachmentData,
       );
 
       await _firestore
@@ -256,15 +324,15 @@ class ChatService {
           .set(newMessage.toFirestore());
 
       // Update last message in chat
+      String lastMessageText = messageType == 'image' ? '📷 Photo' : message;
       await _firestore.collection('chats').doc(chatId).update({
-        'lastMessage': message,
+        'lastMessage': lastMessageText,
         'lastMessageTime': Timestamp.fromDate(DateTime.now()),
       });
     } catch (e) {
       throw Exception('Failed to send message: $e');
     }
   }
-
   Future<void> sendPriceQuote({
     required String chatId,
     required String receiverId,
