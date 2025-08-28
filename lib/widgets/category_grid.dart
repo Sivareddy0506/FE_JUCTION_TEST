@@ -10,10 +10,12 @@ class CategoryGrid extends StatelessWidget {
     {'image': 'assets/computers.png', 'label': 'Computers &\nNetworking'},
     {'image': 'assets/furniture.png', 'label': 'Furniture'},
     {'image': 'assets/books.png', 'label': 'Books'},
-    // {'image': 'assets/clothing.png', 'label': 'Clothing'},
-    // {'image': 'assets/toys.png', 'label': 'Toys'},
-    // {'image': 'assets/kitchen.png', 'label': 'Kitchen'},
-    // {'image': 'assets/sports.png', 'label': 'Sports'},
+    {'image': 'assets/sports.png', 'label': 'Sports Equipment'},
+    {'image': 'assets/clothes.png', 'label': 'Clothes &\nAccessories'},
+    {'image': 'assets/gaming.png', 'label': 'Gaming'},
+    {'image': 'assets/hobbies.png', 'label': 'Hobbies &\nActivities'},
+     {'image': 'assets/tickets.png', 'label': 'Tickets &\nVouchers'},
+    
   ];
 
   @override

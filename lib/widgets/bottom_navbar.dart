@@ -152,9 +152,17 @@ static Widget _buildOverlayButton(BuildContext context,
     child: GestureDetector(
       onTap: () {
         final lowerLabel = label.toLowerCase();
+        // if (lowerLabel == 'post') {
+        //   _showPostOverlay(context);
+        //           } else {
         if (lowerLabel == 'post') {
-          _showPostOverlay(context);
-                  } else {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const CategoryPostPage(),
+    ),
+  );
+} else {
             // Use NavigationManager to preserve page states
             final targetRoute = lowerLabel.toLowerCase();
             

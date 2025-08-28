@@ -1,3 +1,6 @@
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -24,6 +27,45 @@ class ProductDetailPage extends StatefulWidget {
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
 }
+
+
+Future<void> _shareProduct(BuildContext context, Product product) async {
+  try {
+    String text = '''
+${product.title}
+${product.price ?? ''}
+
+${product.description ?? ''}
+
+Location: ${product.location ?? 'N/A'}
+
+Check this out on JunctionVerse!
+https://junctionverse.com/product/${product.id}
+''';
+
+    if (product.imageUrl.isNotEmpty) {
+      final response = await http.get(Uri.parse(product.imageUrl));
+      final bytes = response.bodyBytes;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/product_${product.id}.jpg');
+      await file.writeAsBytes(bytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: text,
+      );
+    } else {
+      await Share.share(text);
+    }
+  } catch (e) {
+    debugPrint('❌ Error sharing product: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to share product')),
+    );
+  }
+}
+
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
@@ -570,7 +612,7 @@ Widget build(BuildContext context) {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                    onPressed: () => _shareProduct(context, product),
                   icon: const Icon(Icons.share),
                   label: const Text('Share'),
                 ),
