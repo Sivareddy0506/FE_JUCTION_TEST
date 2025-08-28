@@ -7,12 +7,14 @@ class HorizontalProductList extends StatelessWidget {
   final String title;
   final List<Product> products;
   final String source; // used for navigating to View All screen with API source
+  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
 
   const HorizontalProductList({
     super.key,
     required this.title,
     required this.products,
     required this.source,
+    this.onFavoriteChanged,
   });
 
   @override
@@ -56,7 +58,10 @@ class HorizontalProductList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        ProductGridWidget(products: limitedProducts),
+        ProductGridWidget(
+          products: limitedProducts,
+          onFavoriteChanged: onFavoriteChanged,
+        ),
         const SizedBox(height: 16),
       ],
     );

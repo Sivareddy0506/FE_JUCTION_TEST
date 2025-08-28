@@ -9,8 +9,18 @@ build/
 .idea/
 .vscode/
 *.iml
-devtools_options.yaml
-macos/Flutter/GeneratedPluginRegistrant.swift
 pubspec.lock
+
+# Platform-specific generated plugin registrants
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.h
+linux/flutter/generated_plugins.cmake
+
+macos/Flutter/GeneratedPluginRegistrant.swift
+
 windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
 windows/flutter/generated_plugins.cmake
+
+# Tooling local settings
+devtools_options.yaml

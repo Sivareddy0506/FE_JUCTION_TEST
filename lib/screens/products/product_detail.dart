@@ -7,12 +7,19 @@ import '../../models/product.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
+import '../../services/favorites_service.dart';
+import '../services/api_service.dart';
 import '../services/chat_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
+  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
 
-  const ProductDetailPage({super.key, required this.product});
+  const ProductDetailPage({
+    super.key, 
+    required this.product,
+    this.onFavoriteChanged,
+  });
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
@@ -22,11 +29,135 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
   bool isLoadingRelated = true;
   final ChatService _chatService = ChatService();
+  late FavoritesService _favoritesService;
+  String? _sellerName;
 
   @override
   void initState() {
     super.initState();
+    _favoritesService = FavoritesService();
+    // Defer listener registration to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _favoritesService.addListener(_onFavoritesChanged);
+    });
     _fetchRelatedProducts();
+    _loadSellerName();
+  }
+
+  @override
+  void dispose() {
+    _favoritesService.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    setState(() {
+      // Trigger rebuild when favorites change
+    });
+  }
+
+  Future<void> _loadSellerName() async {
+    debugPrint('🔍 Starting seller name fetch for product: ${widget.product.id}');
+    debugPrint('🔍 Current seller: ${widget.product.seller?.toString()}');
+    
+    if (widget.product.seller != null) {
+      final currentName = widget.product.seller!.fullName;
+      debugPrint('🔍 Current seller name: "$currentName"');
+      
+      // Check if name is just an ID (multiple patterns)
+      final isIdPattern = currentName.startsWith('Seller ') && 
+                         (currentName.contains('...') || currentName.length > 20);
+      
+      if (isIdPattern || currentName.isEmpty || currentName == 'Unknown Seller') {
+        debugPrint('🔍 Detected ID pattern, fetching actual seller name...');
+        await _fetchActualSellerName();
+      } else {
+        debugPrint('🔍 Using existing seller name: $currentName');
+        _sellerName = currentName;
+      }
+    } else {
+      debugPrint('🔍 No seller information available');
+    }
+  }
+
+  Future<void> _fetchActualSellerName() async {
+    try {
+      final sellerId = widget.product.seller!.id;
+      debugPrint('🔍 Fetching seller details for ID: $sellerId');
+      
+      final sellerDetails = await ApiService.fetchSellerDetails(sellerId);
+      
+      if (sellerDetails != null && mounted) {
+        final actualName = sellerDetails['fullName'] ?? 
+                          sellerDetails['name'] ?? 
+                          sellerDetails['firstName'] ?? 
+                          sellerDetails['displayName'] ??
+                          'Unknown Seller';
+        
+        debugPrint('🔍 Fetched seller name: $actualName');
+        
+        setState(() {
+          _sellerName = actualName;
+        });
+      } else {
+        debugPrint('❌ No seller details returned from API');
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching seller details: $e');
+      // Set fallback name
+      if (mounted) {
+        setState(() {
+          _sellerName = 'Seller ${widget.product.seller!.id.substring(0, 8)}...';
+        });
+      }
+    }
+  }
+
+
+  Future<void> _toggleFavorite(String productId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add favorites')),
+      );
+      return;
+    }
+
+    try {
+      if (_favoritesService.isFavorited(productId)) {
+        // Remove from favorites using the global service
+        final success = await _favoritesService.removeFromFavorites(productId);
+        if (success) {
+          widget.onFavoriteChanged?.call(); // Notify parent of change
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Removed from favorites')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to remove from favorites')),
+          );
+        }
+      } else {
+        // Add to favorites using the global service
+        final success = await _favoritesService.addToFavorites(productId);
+        if (success) {
+          widget.onFavoriteChanged?.call(); // Notify parent of change
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Added to favorites')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to add to favorites')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please try again.')),
+      );
+    }
   }
 
   Future<void> _fetchRelatedProducts() async {
@@ -196,10 +327,13 @@ Widget build(BuildContext context) {
                 fit: BoxFit.cover,
               ),
               const SizedBox(width: 8),
-              Text(
-                product.seller?.fullName ?? 'Unknown Seller',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
+                             Text(
+                 _sellerName ?? 
+                 (product.seller?.fullName?.startsWith('Seller ') == true ? 
+                  'Loading seller...' : 
+                  product.seller?.fullName ?? 'Unknown Seller'),
+                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+               ),
               const Spacer(),
               Row(
                 children: [
@@ -412,13 +546,27 @@ Widget build(BuildContext context) {
           ),
           child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.favorite_border),
-                  label: const Text('Favourite'),
-                ),
-              ),
+                             Expanded(
+                 child: OutlinedButton.icon(
+                   onPressed: _favoritesService.isLoading ? null : () => _toggleFavorite(product.id),
+                   icon: _favoritesService.isLoading
+                       ? const SizedBox(
+                           width: 20,
+                           height: 20,
+                           child: CircularProgressIndicator(
+                             strokeWidth: 2,
+                             valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                           ),
+                         )
+                       : Icon(
+                           _favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
+                           color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : null,
+                         ),
+                   label: _favoritesService.isLoading
+                       ? const Text('Loading...')
+                       : Text(_favoritesService.isFavorited(product.id) ? 'Favourited' : 'Favourite'),
+                 ),
+               ),
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(

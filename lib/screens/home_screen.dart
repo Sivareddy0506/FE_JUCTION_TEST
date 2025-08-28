@@ -2,9 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:junction/screens/profile/user_profile.dart';
 import 'package:junction/screens/signup/signup_page.dart';
+import 'package:junction/screens/products/home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_overview.dart';  
 import '../widgets/app_button.dart';
+import '../services/app_cache_service.dart';
+import 'services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,29 +46,30 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Initialize cache system at app startup
+      await AppCacheService.initializeCache();
+      
       final prefs = await SharedPreferences.getInstance();
       bool? isLoggedIn = await prefs.getBool('isLogin');
-      Timer(const Duration(seconds: 3), () async{
-        if(isLoggedIn == null || isLoggedIn == false) {
-          bool? isFirstTime = await prefs.getBool('isFirstTime');
-          if(isFirstTime == false){
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const SignupPage()),
-            );
-          }else {
-            setState(() {
-              _showMainContent = true;
-            });
-          }
-        }else{
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const UserProfilePage()),
-          );
+      // During logo display, validate/refresh token if logged in
+      if (isLoggedIn == true) {
+        final result = await AuthHealthService.refreshAuthToken();
+        if (result['status'] == 'refreshed' && result['token'] != null) {
+          await prefs.setString('authToken', result['token']);
+        } else if (result['status'] == 'expired' || result['status'] == 'invalid') {
+          await prefs.remove('authToken');
+          await prefs.setBool('isLogin', false);
+          isLoggedIn = false; // force login flow below
         }
+      }
+
+      Timer(const Duration(seconds: 3), () async{
+        // Always take user to HomePage on launch
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => HomePage()),
+        );
       });
     });
   }
