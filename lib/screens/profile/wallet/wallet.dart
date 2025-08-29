@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/form_text.dart';
-import 'package:intl/intl.dart';
 
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
@@ -22,11 +23,12 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
   int? _lastPaymentAmount;
 
   int walletBalance = 0;
-  List transactions = [];
+  List<Map<String, dynamic>> transactions = [];
   String activeTab = 'all';
 
-  final TextEditingController _amountController = TextEditingController();
+  bool _isLoading = true;
 
+  final TextEditingController _amountController = TextEditingController();
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   @override
@@ -34,7 +36,6 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     super.initState();
     _initRazorpay();
     _loadAuthData();
-    _fetchWalletData();
   }
 
   void _initRazorpay() {
@@ -46,14 +47,24 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
 
   Future<void> _loadAuthData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      token = prefs.getString("authToken");
-      buyerId = prefs.getString("userId");
-    });
+    final savedToken = prefs.getString("authToken");
+    final savedBuyerId = prefs.getString("userId");
+
+    if (savedToken != null && savedBuyerId != null) {
+      setState(() {
+        token = savedToken;
+        buyerId = savedBuyerId;
+      });
+      await _fetchWalletData();
+    } else {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _fetchWalletData() async {
     if (buyerId == null || token == null) return;
+
+    setState(() => _isLoading = true);
 
     try {
       final res = await http.get(
@@ -64,12 +75,18 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         setState(() {
-          walletBalance = data['walletBalance'] ?? 0;
-          transactions = data['transactions'] ?? [];
+          walletBalance = (data['walletBalance'] as num).toInt();
+          transactions = (data['transactions'] as List)
+              .map<Map<String, dynamic>>((txn) => Map<String, dynamic>.from(txn))
+              .toList();
+          _isLoading = false;
         });
+      } else {
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint("Error fetching wallet data: $e");
+      setState(() => _isLoading = false);
     }
   }
 
@@ -131,13 +148,14 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     if (res.statusCode == 201) {
       final data = jsonDecode(res.body);
 
-      // Update wallet balance instantly
       setState(() {
-        walletBalance = data['updatedWalletBalance'];
+        walletBalance = (data['updatedWalletBalance'] as num).toInt();
       });
 
-      // Add new transaction at top of the list with animation
-      transactions.insert(0, data['transaction']);
+      final txn = Map<String, dynamic>.from(data['transaction']);
+      txn['creditDebitStatus'] = 'credit'; // ensure top-up is credit
+
+      transactions.insert(0, txn);
       _listKey.currentState?.insertItem(0);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -223,7 +241,16 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildTransactionItem(Map txn, Animation<double> animation) {
+  List<Map<String, dynamic>> _filteredTransactions() {
+    return transactions.where((txn) {
+      if (activeTab == 'all') return true;
+      if (activeTab == 'topup' && txn['creditDebitStatus'] == 'credit') return true;
+      if (activeTab == 'withdrawal' && txn['creditDebitStatus'] == 'debit') return true;
+      return false;
+    }).toList();
+  }
+
+  Widget _buildTransactionItem(Map<String, dynamic> txn, Animation<double> animation) {
     final isCredit = txn['creditDebitStatus'] == 'credit';
     final amountPrefix = isCredit ? '+ ₹' : '- ₹';
     final icon = isCredit ? Icons.arrow_upward : Icons.arrow_downward;
@@ -262,103 +289,99 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final filteredTransactions = _filteredTransactions();
+
     return Scaffold(
       appBar: const CustomAppBar(title: "Manage Wallet"),
-      body: RefreshIndicator(
-        onRefresh: _fetchWalletData,
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(14),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2D2D2D),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _fetchWalletData,
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(14),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D2D2D),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text('Available Balance', style: TextStyle(fontSize: 14, color: Color(0xFF8A8894))),
+                                  const SizedBox(height: 4),
+                                  Text('₹$walletBalance', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                                ],
+                              ),
+                              Image.asset('assets/wallet-img1.png', width: 37, height: 37),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text('Transaction History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildTabButton('All Transaction', 'all'),
+                              _buildTabButton('Top-Up', 'topup'),
+                              _buildTabButton('Withdrawal', 'withdrawal'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        filteredTransactions.isEmpty
+                            ? const Center(child: Text("No transactions yet."))
+                            : AnimatedList(
+                                key: _listKey,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                initialItemCount: filteredTransactions.length,
+                                itemBuilder: (context, index, animation) {
+                                  final txn = filteredTransactions[index];
+                                  return _buildTransactionItem(txn, animation);
+                                },
+                              ),
+                        const SizedBox(height: 30),
+                        Row(
                           children: [
-                            const Text('Available Balance', style: TextStyle(fontSize: 14, color: Color(0xFF8A8894))),
-                            const SizedBox(height: 4),
-                            Text('₹$walletBalance', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                            Expanded(
+                              child: AppButton(
+                                label: 'Withdraw',
+                                backgroundColor: const Color(0xFF262626),
+                                onPressed: () {},
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: AppButton(
+                                label: 'Add Balance',
+                                backgroundColor: const Color(0xFF262626),
+                                onPressed: _showAddMoneyBottomSheet,
+                              ),
+                            ),
                           ],
                         ),
-                        Image.asset('assets/wallet-img1.png', width: 37, height: 37),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Transaction History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildTabButton('All Transaction', 'all'),
-                        _buildTabButton('Top-Up', 'topup'),
-                        _buildTabButton('Withdrawal', 'withdrawal'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  AnimatedList(
-                    key: _listKey,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    initialItemCount: transactions
-                        .where((txn) =>
-                            activeTab == 'all' ||
-                            (activeTab == 'topup' && txn['creditDebitStatus'] == 'credit') ||
-                            (activeTab == 'withdrawal' && txn['creditDebitStatus'] == 'debit'))
-                        .length,
-                    itemBuilder: (context, index, animation) {
-                      final txn = transactions
-                          .where((txn) =>
-                              activeTab == 'all' ||
-                              (activeTab == 'topup' && txn['creditDebitStatus'] == 'credit') ||
-                              (activeTab == 'withdrawal' && txn['creditDebitStatus'] == 'debit'))
-                          .toList()[index];
-                      return _buildTransactionItem(txn, animation);
-                    },
-                  ),
-                  const SizedBox(height: 30),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppButton(
-                          label: 'Withdraw',
-                          backgroundColor: const Color(0xFF262626),
-                          onPressed: () {},
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: AppButton(
-                          label: 'Add Balance',
-                          backgroundColor: const Color(0xFF262626),
-                          onPressed: _showAddMoneyBottomSheet,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
