@@ -11,7 +11,6 @@ import '../../widgets/app_button.dart';
 import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
 import '../../services/favorites_service.dart';
-import '../services/api_service.dart';
 import '../services/chat_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
@@ -99,62 +98,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _loadSellerName() async {
-    debugPrint('🔍 Starting seller name fetch for product: ${widget.product.id}');
-    debugPrint('🔍 Current seller: ${widget.product.seller?.toString()}');
-    
-    if (widget.product.seller != null) {
-      final currentName = widget.product.seller!.fullName;
-      debugPrint('🔍 Current seller name: "$currentName"');
-      
-      // Check if name is just an ID (multiple patterns)
-      final isIdPattern = currentName.startsWith('Seller ') && 
-                         (currentName.contains('...') || currentName.length > 20);
-      
-      if (isIdPattern || currentName.isEmpty || currentName == 'Unknown Seller') {
-        debugPrint('🔍 Detected ID pattern, fetching actual seller name...');
-        await _fetchActualSellerName();
-      } else {
-        debugPrint('🔍 Using existing seller name: $currentName');
-        _sellerName = currentName;
-      }
-    } else {
-      debugPrint('🔍 No seller information available');
-    }
+    final name = widget.product.seller?.fullName;
+    setState(() {
+      _sellerName = (name != null && name.isNotEmpty) ? name : 'Unknown Seller';
+    });
   }
-
-  Future<void> _fetchActualSellerName() async {
-    try {
-      final sellerId = widget.product.seller!.id;
-      debugPrint('🔍 Fetching seller details for ID: $sellerId');
-      
-      final sellerDetails = await ApiService.fetchSellerDetails(sellerId);
-      
-      if (sellerDetails != null && mounted) {
-        final actualName = sellerDetails['fullName'] ?? 
-                          sellerDetails['name'] ?? 
-                          sellerDetails['firstName'] ?? 
-                          sellerDetails['displayName'] ??
-                          'Unknown Seller';
-        
-        debugPrint('🔍 Fetched seller name: $actualName');
-        
-        setState(() {
-          _sellerName = actualName;
-        });
-      } else {
-        debugPrint('❌ No seller details returned from API');
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching seller details: $e');
-      // Set fallback name
-      if (mounted) {
-        setState(() {
-          _sellerName = 'Seller ${widget.product.seller!.id.substring(0, 8)}...';
-        });
-      }
-    }
-  }
-
 
   Future<void> _toggleFavorite(String productId) async {
     final prefs = await SharedPreferences.getInstance();

@@ -43,11 +43,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => const FilterModal(), 
+      builder: (_) => FilterModal(searchQuery: _searchController.text.trim()), 
     );
   }
 
-  void _performSearch() {
+  void _performSearch() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
 
@@ -55,20 +55,45 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       _isSearching = true;
     });
 
-    // Call the onSearch callback if provided
-    widget.onSearch?.call(query);
+    try {
+      // Call the onSearch callback if provided
+      widget.onSearch?.call(query);
 
-    // Navigate to search results page
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SearchResultsPage(searchQuery: query),
-      ),
-    ).then((_) {
+      // Navigate to search results page with enhanced search
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SearchResultsPage(
+            searchQuery: query,
+          ),
+        ),
+      ).then((_) {
+        setState(() {
+          _isSearching = false;
+        });
+      });
+    } catch (e) {
       setState(() {
         _isSearching = false;
       });
-    });
+      
+      // Show error dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Search Error'),
+            content: Text('Failed to perform search: ${e.toString()}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   @override

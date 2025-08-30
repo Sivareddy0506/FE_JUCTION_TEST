@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/themes.dart';
 import 'screens/home_screen.dart';
+import 'navigation_service.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -11,6 +12,7 @@ class MyApp extends StatelessWidget {
       title: 'Junction',
       debugShowCheckedModeBanner: false,
       theme: AppThemes.lightTheme,
+      navigatorKey: NavigationService.navigatorKey,
       home: const HomeScreen(),
     );
   }

@@ -8,7 +8,7 @@ class AuctionService {
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    return prefs.getString('authToken');
   }
 
   static Future<List<Product>> fetchUpcomingAuctions() async {
@@ -26,6 +26,10 @@ class AuctionService {
 
   static Future<List<Product>> fetchMyCurrentAuctions() async {
     final token = await _getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Authentication required. Please log in again.");
+    }
+    
     final url = Uri.parse("$baseUrl/my-current");
 
     final response = await http.get(url, headers: {
@@ -36,13 +40,21 @@ class AuctionService {
       final Map<String, dynamic> json = jsonDecode(response.body);
       final List<dynamic> data = json['data'] ?? [];
       return data.map((e) => Product.fromJson(e)).toList();
+    } else if (response.statusCode == 401) {
+      throw Exception("Authentication failed. Please log in again.");
+    } else if (response.statusCode == 403) {
+      throw Exception("Access denied. Please check your permissions.");
     } else {
-      throw Exception("Failed to load my current auctions");
+      throw Exception("Failed to load my current auctions: ${response.statusCode}");
     }
   }
 
   static Future<List<Product>> fetchLiveTodayAuctions() async {
     final token = await _getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Authentication required. Please log in again.");
+    }
+    
     final url = Uri.parse("$baseUrl/live-today");
 
     final response = await http.get(url, headers: {
@@ -53,8 +65,12 @@ class AuctionService {
       final Map<String, dynamic> json = jsonDecode(response.body);
       final List<dynamic> data = json['data'] ?? [];
       return data.map((e) => Product.fromJson(e)).toList();
+    } else if (response.statusCode == 401) {
+      throw Exception("Authentication failed. Please log in again.");
+    } else if (response.statusCode == 403) {
+      throw Exception("Access denied. Please check your permissions.");
     } else {
-      throw Exception("Failed to load live today auctions");
+      throw Exception("Failed to load live today auctions: ${response.statusCode}");
     }
   }
 
@@ -73,6 +89,10 @@ class AuctionService {
 
   static Future<List<Product>> fetchAuctionsByPreviousSearch() async {
     final token = await _getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception("Authentication required. Please log in again.");
+    }
+    
     final url = Uri.parse("$baseUrl/by-previous-search");
 
     final response = await http.get(url, headers: {
@@ -83,8 +103,12 @@ class AuctionService {
       final Map<String, dynamic> json = jsonDecode(response.body);
       final List<dynamic> data = json['data'] ?? [];
       return data.map((e) => Product.fromJson(e)).toList();
+    } else if (response.statusCode == 401) {
+      throw Exception("Authentication failed. Please log in again.");
+    } else if (response.statusCode == 403) {
+      throw Exception("Access denied. Please check your permissions.");
     } else {
-      throw Exception("Failed to load auctions by previous search");
+      throw Exception("Failed to load auctions by previous search: ${response.statusCode}");
     }
   }
 }
