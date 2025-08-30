@@ -197,7 +197,7 @@ class Product {
 
   final imageUrl = imageList.isNotEmpty
       ? imageList[0].fileUrl
-      : (json['imageUrl'] ?? 'assets/images/placeholder.png');
+      : (json['imageUrl'] ?? 'assets/placeholder.png');
 
   final auction = json['auction'] != null && json['auction'] is Map<String, dynamic>
       ? Auction.fromJson(Map<String, dynamic>.from(json['auction']))
@@ -235,7 +235,7 @@ class Product {
     views: int.tryParse(
             (json['views'] ?? json['viewCount'])?.toString() ?? '0') ??
         0,
-    auctionStatus: json['auctionStatus'],
-  );
-}
+         auctionStatus: json['auctionStatus'],
+   );
+ }
 }
