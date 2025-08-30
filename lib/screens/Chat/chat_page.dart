@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:junction/screens/Chat/chat_page.dart';
 import 'package:async/async.dart';
 import 'package:junction/screens/services/chat_service.dart';
+import 'package:image_picker/image_picker.dart';
+
 class ChatPage extends StatefulWidget {
   final String chatId;
 
@@ -37,7 +39,6 @@ class _ChatPageState extends State<ChatPage> {
 
   void _sendMessage(String message) async {
     if (message.trim().isEmpty || _chatData == null) return;
-
     String receiverId = _isSeller ? _chatData!.buyerId : _chatData!.sellerId;
 
     try {
@@ -52,6 +53,259 @@ class _ChatPageState extends State<ChatPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to send message: $e')),
       );
+    }
+  }
+
+  void _showImagePickerBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Select Image',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildImageSourceButton(
+                  icon: Icons.camera_alt,
+                  label: 'Camera',
+                  onTap: () => _pickImage(ImageSource.camera),
+                ),
+                _buildImageSourceButton(
+                  icon: Icons.photo_library,
+                  label: 'Gallery',
+                  onTap: () => _pickImage(ImageSource.gallery),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageSourceButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Icon(
+              icon,
+              size: 30,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _pickImage(ImageSource source) async {
+    Navigator.pop(context); // Close bottom sheet
+    
+    if (_chatData == null) return;
+    String receiverId = _isSeller ? _chatData!.buyerId : _chatData!.sellerId;
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Sending image...', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+        ),
+      );
+
+      await _chatService.pickAndSendImage(
+        chatId: widget.chatId,
+        receiverId: receiverId,
+        source: source,
+      );
+
+      Navigator.pop(context); // Close loading dialog
+      _scrollToBottom();
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send image: $e')),
+      );
+    }
+  }
+
+  Widget _buildImageMessage(MessageModel message, bool isMe) {
+    final attachmentData = message.attachmentData;
+    if (attachmentData == null) return const SizedBox();
+
+    String imageUrl = attachmentData['url'] ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (!isMe) ...[
+            Text(
+              _isSeller ? _chatData?.buyerName ?? 'Buyer' : _chatData?.sellerName ?? 'Seller',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.purple[300],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.7,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: GestureDetector(
+                onTap: () => _showFullScreenImage(imageUrl),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 200,
+                      color: Colors.grey[300],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / 
+                                loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 200,
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.error, color: Colors.red),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            children: [
+              Text(
+                _formatMessageTime(message.timestamp),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey,
+                ),
+              ),
+              if (isMe) ...[
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.done_all,
+                  size: 12,
+                  color: Colors.grey,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Icon(Icons.error, color: Colors.white, size: 50),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+Widget _buildMessage(MessageModel message) {
+    bool isMe = message.senderId == _chatService.currentUserId;
+    
+    switch (message.messageType) {
+      case 'product_card':
+        return _buildProductCard(message);
+      case 'price_quote':
+        return _buildPriceQuoteMessage(message, isMe);
+      case 'deal_locked':
+        return _buildDealLockedMessage(message, isMe);
+      case 'system':
+        return _buildSystemMessage(message);
+      case 'image':
+        return _buildImageMessage(message, isMe);
+      default:
+        return _buildRegularMessage(message, isMe);
+    }
+  }
+
+  String _formatMessageTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+    
+    if (difference.inDays > 0) {
+      return DateFormat('dd/MM').format(time);
+    } else {
+      return DateFormat('HH:mm').format(time);
     }
   }
 
@@ -636,15 +890,14 @@ class _ChatPageState extends State<ChatPage> {
   Widget build(BuildContext context) {
     if (_chatData == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Loading...'),
-        ),
+        appBar: AppBar(title: const Text('Loading...')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     String otherUserName = _isSeller ? _chatData!.buyerName : _chatData!.sellerName;
-    String initials = otherUserName.split(' ').map((name) => name[0]).take(2).join().toUpperCase();
+    String initials = otherUserName.split(' ').map((name) =>
+        name[0]).take(2).join().toUpperCase();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -689,13 +942,11 @@ class _ChatPageState extends State<ChatPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
 
                 List<MessageModel> messages = snapshot.data ?? [];
-
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   _scrollToBottom();
                 });
@@ -705,30 +956,12 @@ class _ChatPageState extends State<ChatPage> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     MessageModel message = messages[index];
-                    bool isMe = message.senderId == _chatService.currentUserId;
-
-                    switch (message.messageType) {
-                      case 'product_card':
-                        return _buildProductCard(message);
-                      case 'price_quote':
-                        return _buildPriceQuoteMessage(message, isMe);
-                      case 'deal_locked':
-                        return _buildDealLockedMessage(message, isMe);
-                      case 'system':
-                        return _buildSystemMessage(message);
-                      default:
-                        return _buildRegularMessage(message, isMe);
-                    }
+                    return _buildMessage(message);
                   },
                 );
               },
             ),
           ),
-
-          // Suggested actions for buyer (only shown at start and if deal is active)
-          if (!_isSeller) _buildSuggestedActions(),
-
-          // Bottom input area
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -783,7 +1016,7 @@ class _ChatPageState extends State<ChatPage> {
         ),
         const SizedBox(width: 8),
         IconButton(
-          onPressed: () {/* Add attachment functionality */},
+          onPressed: () { _showImagePickerBottomSheet(); },
           icon: const Icon(Icons.attach_file),
         ),
         CircleAvatar(
@@ -864,7 +1097,7 @@ class _ChatPageState extends State<ChatPage> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                onPressed: () {/* Add attachment functionality */},
+                onPressed: () { _showImagePickerBottomSheet(); },
                 icon: const Icon(Icons.attach_file),
               ),
               CircleAvatar(
@@ -879,17 +1112,6 @@ class _ChatPageState extends State<ChatPage> {
         ],
       ],
     );
-  }
-
-  String _formatMessageTime(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
-
-    if (difference.inDays > 0) {
-      return DateFormat('dd/MM').format(time);
-    } else {
-      return DateFormat('HH:mm').format(time);
-    }
   }
 
   @override

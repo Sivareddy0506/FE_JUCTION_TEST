@@ -9,14 +9,22 @@ android {
     namespace = "com.example.junction"
     compileSdk = 36
 
-    defaultConfig {
-        applicationId = "com.example.junction"
-        minSdkVersion(flutter.minSdkVersion) // Firebase requirement
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
-        multiDexEnabled = true
+  defaultConfig {
+    applicationId = "com.example.junction"
+    minSdk = 23        // ✅ Kotlin DSL syntax
+    targetSdk = 34     // ✅ Kotlin DSL syntax
+    versionCode = 1
+    versionName = "1.0"
+    multiDexEnabled = true
+}
+configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.google.firebase") {
+                println("Forcing minSdk 23 for Firebase")
+            }
+        }
     }
+
 
     buildTypes {
         getByName("release") {

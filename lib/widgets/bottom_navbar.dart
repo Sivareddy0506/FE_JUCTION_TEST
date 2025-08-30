@@ -154,6 +154,9 @@ class BottomNavBar extends StatelessWidget {
     child: GestureDetector(
       onTap: () {
         final lowerLabel = label.toLowerCase();
+        // if (lowerLabel == 'post') {
+        //   _showPostOverlay(context);
+        //           } else {
         if (lowerLabel == 'post') {
           // TODO: Uncomment when restoring jauction functionality
           // _showPostOverlay(context);

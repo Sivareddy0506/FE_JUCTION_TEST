@@ -1,3 +1,6 @@
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +26,45 @@ class ProductDetailPage extends StatefulWidget {
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
 }
+
+
+Future<void> _shareProduct(BuildContext context, Product product) async {
+  try {
+    String text = '''
+${product.title}
+${product.price ?? ''}
+
+${product.description ?? ''}
+
+Location: ${product.location ?? 'N/A'}
+
+Check this out on JunctionVerse!
+https://junctionverse.com/product/${product.id}
+''';
+
+    if (product.imageUrl.isNotEmpty) {
+      final response = await http.get(Uri.parse(product.imageUrl));
+      final bytes = response.bodyBytes;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/product_${product.id}.jpg');
+      await file.writeAsBytes(bytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: text,
+      );
+    } else {
+      await Share.share(text);
+    }
+  } catch (e) {
+    debugPrint('❌ Error sharing product: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to share product')),
+    );
+  }
+}
+
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
@@ -213,6 +255,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       String buyerId = _chatService.currentUserId;
       String productId = widget.product.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
+      final prefs = await SharedPreferences.getInstance();
+      String buyerName = prefs.getString('fullName') ?? 'You';
 
       showDialog(
         context: context,
@@ -228,7 +272,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           sellerId: sellerId,
           buyerId: buyerId,
           sellerName: widget.product.seller?.fullName ?? 'Seller',
-          buyerName: 'You', // Get from user data
+          buyerName: buyerName,
           productTitle: widget.product.title,
           productImage: widget.product.imageUrl,
           productPrice: widget.product.price?.toString() ?? '0',
@@ -261,7 +305,6 @@ Widget build(BuildContext context) {
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Seller info block (no border, no extra spacing)
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           color: Colors.transparent,
@@ -302,7 +345,6 @@ Widget build(BuildContext context) {
         ),
         const SizedBox(height: 12),
 
-        // Combined block: Images + badges + category + title/price + views/location
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -518,7 +560,7 @@ Widget build(BuildContext context) {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                    onPressed: () => _shareProduct(context, product),
                   icon: const Icon(Icons.share),
                   label: const Text('Share'),
                 ),
