@@ -195,7 +195,7 @@ class _FilterModalState extends State<FilterModal> {
         const Text("Filters", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
         GestureDetector(
           onTap: () => Navigator.pop(context),
-          child: Image.asset('assets/images/x.png', height: 24),
+          child: Image.asset('assets/images/X.png', height: 24),
         ),
       ],
     );

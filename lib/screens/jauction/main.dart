@@ -168,7 +168,10 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
     Widget content = SafeArea(
       child: Column(
         children: [
-          const LogoAndIconsWidget(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: const LogoAndIconsWidget(),
+          ),
           const SizedBox(height: 16),
           // TODO: Uncomment when restoring auction functionality
           // const SearchBarWidget(),
