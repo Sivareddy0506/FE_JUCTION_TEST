@@ -1,0 +1,118 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
+
+class BackendFileUploadService {
+  static const String baseUrl = 'https://api.junctionverse.com';
+  
+  static Future<String> uploadFile({
+    required File file,
+    Function(double)? onProgress,
+  }) async {
+    try {
+      // Create multipart request
+      final uri = Uri.parse('$baseUrl/file/upload');
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Add authentication header if needed
+      final authToken = await _getAuthToken();
+      if (authToken != null) {
+        request.headers['Authorization'] = 'Bearer $authToken';
+      }
+      
+      // Add file to request
+      final multipartFile = await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+        filename: path.basename(file.path),
+      );
+      request.files.add(multipartFile);
+      
+      // Send request with progress tracking
+      final streamedResponse = await request.send();
+      
+      // Get response
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        
+        // Assuming your backend returns the S3 URL in a 'url' field
+        // Adjust this based on your actual API response structure
+        if (responseData['url'] != null) {
+          return responseData['url'] as String;
+        } else if (responseData['data']?['url'] != null) {
+          return responseData['data']['url'] as String;
+        } else {
+          throw Exception('URL not found in response: ${response.body}');
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Upload failed: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+      }
+    } catch (e) {
+      throw Exception('File upload failed: $e');
+    }
+  }
+  
+  // Alternative implementation with progress tracking using Dio (if you prefer)
+  static Future<String> uploadFileWithProgress({
+    required File file,
+    required Function(double) onProgress,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/file/upload');
+      
+      // Read file as bytes
+      final fileBytes = await file.readAsBytes();
+      final fileName = path.basename(file.path);
+      
+      // Create request
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Add auth if needed
+      final authToken = await _getAuthToken();
+      if (authToken != null) {
+        request.headers['Authorization'] = 'Bearer $authToken';
+      }
+      
+      // Add file
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        fileBytes,
+        filename: fileName,
+      ));
+      
+      // Track upload progress (simplified - for detailed progress use Dio package)
+      onProgress(0.5); // Indicate upload started
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      onProgress(1.0); // Upload complete
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return responseData['url'] ?? responseData['data']?['url'] ?? '';
+      } else {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('File upload failed: $e');
+    }
+  }
+  
+  static Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      return token;
+    } catch (e) {
+      print('Error getting auth token: $e');
+      return null;
+    }
+  }
+}
