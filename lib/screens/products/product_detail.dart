@@ -214,10 +214,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       String productId = widget.product.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Opening chat...'), duration: Duration(milliseconds: 800)),
       );
 
       bool exists = await _chatService.chatExists(chatId);
@@ -235,8 +233,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         );
       }
 
-      Navigator.pop(context);
-
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -244,7 +240,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ),
       );
     } catch (e) {
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );

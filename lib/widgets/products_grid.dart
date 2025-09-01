@@ -446,7 +446,7 @@ class _ProductCardState extends State<ProductCard> {
                       fit: BoxFit.cover,
                       filterQuality: FilterQuality.high,
                       errorBuilder: (context, error, stackTrace) =>
-                          Image.asset('assets/images/placeholder.png'),
+                          Image.asset('assets/placeholder.png'),
                     ),
                   ),
                 ),
@@ -497,51 +497,48 @@ class _ProductCardState extends State<ProductCard> {
 
                         const SizedBox(height: 4),
 
-                        // Location (cached to prevent flickering)
-                        if (widget.product.latitude != null && widget.product.longitude != null)
+                        // Location
+                        if (widget.product.location != null && widget.product.location!.isNotEmpty) ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
+                              Expanded(
+                                child: Text(
+                                  widget.product.location!,
+                                  style: const TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else if (widget.product.latitude != null && widget.product.longitude != null) ...[
                           _cachedLocation != null
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.location_on,
-                                      size: 14, color: Color(0xFF8A8894)),
-                                  Expanded(
-                                                                         child: Text(
-                                       _cachedLocation!,
-                                       style: const TextStyle(
-                                           fontSize: 7, color: Color(0xFF8A8894)),
-                                       maxLines: 1,
-                                       overflow: TextOverflow.ellipsis,
-                                     ),
-                                  ),
-                                  if (widget.product.isAuction &&
-                                      widget.product.bidStartDate != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(left: 6),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEEEFF0),
-                                        borderRadius: BorderRadius.circular(6),
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
+                                    Expanded(
+                                      child: Text(
+                                        _cachedLocation!,
+                                        style: const TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                                                             child: Text(
-                                         _formatDate(widget.product.bidStartDate!),
-                                         style: const TextStyle(
-                                             fontSize: 7, color: Colors.black87),
-                                       ),
                                     ),
-                                ],
-                              )
-                                                         : const Text(
-                                 'Loading location...',
-                                 style: TextStyle(
-                                     fontSize: 7, color: Color(0xFF8A8894)),
-                               )
-                         else
-                           const Text(
-                             'Location not set',
-                             style: TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
-                           ),
+                                  ],
+                                )
+                              : const Text(
+                                  'Loading location...',
+                                  style: TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+                                ),
+                        ] else ...[
+                          const Text(
+                            'Location not set',
+                            style: TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+                          ),
+                        ],
                       ],
                     ),
                   ),
