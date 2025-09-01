@@ -250,6 +250,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
  @override
 Widget build(BuildContext context) {
   final product = widget.product;
+  // Hide chat bar if current user is the seller
+  final bool _isSellerViewing = product.seller?.id == _chatService.currentUserId;
 
   return Scaffold(
     appBar: AppBar(title: Text(product.title)),
@@ -574,7 +576,7 @@ Widget build(BuildContext context) {
 
       ],
     ),
-    bottomNavigationBar: SafeArea(
+    bottomNavigationBar: _isSellerViewing ? null : SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

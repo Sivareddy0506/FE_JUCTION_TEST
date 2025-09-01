@@ -51,9 +51,15 @@ class CacheManager {
       final timestampsData = _prefs!.getString('cache_timestamps');
       final expiriesData = _prefs!.getString('cache_expiries');
 
-      if (cacheData != null) {
+      // Safety: skip oversized blob (>5 MB) to avoid OOM
+      const int _maxPersistentBytes = 5 * 1024 * 1024; // 5 MB
+      if (cacheData != null && cacheData.length < _maxPersistentBytes) {
         final Map<String, dynamic> decoded = json.decode(cacheData);
         _memoryCache.addAll(decoded);
+      } else if (cacheData != null) {
+        debugPrint('CacheManager: persistent cache_data too large (${cacheData.length} bytes). Clearing…');
+        // Clear persistent keys to free space
+        await clearAllCaches();
       }
 
       if (timestampsData != null) {
