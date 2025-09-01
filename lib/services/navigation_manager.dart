@@ -30,7 +30,7 @@ class NavigationManager {
       case 'profile':
         page = const UserProfilePage();
         break;
-      case 'junction':
+      case 'jauction':
         page = const JauctionHomePage();
         break;
       default:

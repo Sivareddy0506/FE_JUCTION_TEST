@@ -39,7 +39,6 @@ String _timeAgo(DateTime? date) {
   void initState() {
     super.initState();
     fetchSectionProducts();
-    _fetchSellerNames();
   }
 
   Future<void> fetchSectionProducts() async {
@@ -78,56 +77,7 @@ String _timeAgo(DateTime? date) {
     );
   }
 
-  Future<void> _fetchSellerNames() async {
-    debugPrint('🔍 Starting to fetch seller names for ${products.length} products');
-    
-    for (final product in products) {
-      if (product.seller != null) {
-        final currentName = product.seller!.fullName;
-        debugPrint('🔍 Product ${product.id}: Current seller name = "$currentName"');
-        
-        // Check if name is just an ID (multiple patterns)
-        final isIdPattern = currentName.startsWith('Seller ') && 
-                           (currentName.contains('...') || currentName.length > 20);
-        
-        debugPrint('🔍 Product ${product.id}: Is ID pattern = $isIdPattern');
-        
-        if (isIdPattern || currentName.isEmpty || currentName == 'Unknown Seller') {
-          debugPrint('🔍 Fetching actual seller name for product ${product.id}, seller ID: ${product.seller!.id}');
-          await _fetchActualSellerName(product.seller!.id);
-        } else {
-          debugPrint('🔍 Using existing seller name for product ${product.id}: $currentName');
-        }
-      } else {
-        debugPrint('🔍 Product ${product.id}: No seller information');
-      }
-    }
-  }
-
-  Future<void> _fetchActualSellerName(String sellerId) async {
-    try {
-      debugPrint('🔍 Fetching seller details for ID: $sellerId');
-      final sellerDetails = await ApiService.fetchSellerDetails(sellerId);
-      
-      if (sellerDetails != null && mounted) {
-        final actualName = sellerDetails['fullName'] ?? 
-                          sellerDetails['name'] ?? 
-                          sellerDetails['firstName'] ?? 
-                          sellerDetails['displayName'] ??
-                          'Unknown Seller';
-        
-        debugPrint('🔍 Fetched seller name for $sellerId: $actualName');
-        
-        setState(() {
-          _sellerNames[sellerId] = actualName;
-        });
-      } else {
-        debugPrint('❌ No seller details found for ID: $sellerId');
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching seller details for $sellerId: $e');
-    }
-  }
+  // Removed external seller fetch; rely on product.seller.fullName
 
   @override
   Widget build(BuildContext context) {

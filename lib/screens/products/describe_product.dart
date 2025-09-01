@@ -49,7 +49,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
   final TextEditingController brandController = TextEditingController();
 
   final List<String> usageOptions = ['Normal Usage', 'Heavy Usage', 'Like New'];
-  final List<String> conditionOptions = ['Good', 'Fair', 'Excellent'];
+  final List<String> conditionOptions = ['Like New', 'Gently Used', 'Fair', 'Needs Fixing'];
 
   String? selectedUsage;
   String? selectedCondition;

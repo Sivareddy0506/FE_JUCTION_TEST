@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../models/product.dart';
 import '../../widgets/search_bar_widget.dart';
+import '../../services/search_service.dart';
+import '../../services/filter_state_service.dart';
 import '../services/api_service.dart';
 import '../products/product_detail.dart';
 
 class SearchResultsPage extends StatefulWidget {
   final String searchQuery;
+  final Map<String, dynamic>? appliedFilters;
+  final String? sortBy;
 
   const SearchResultsPage({
     super.key,
     required this.searchQuery,
+    this.appliedFilters,
+    this.sortBy,
   });
 
   @override
@@ -29,6 +35,13 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     _performSearch();
   }
 
+  @override
+  void dispose() {
+    // Clear filter state when user exits search results page
+    FilterStateService.forceClearFilterState();
+    super.dispose();
+  }
+
   Future<void> _performSearch() async {
     setState(() {
       isLoading = true;
@@ -37,18 +50,27 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     });
 
     try {
-      // Save search history first
-      await ApiService.saveSearchHistory(widget.searchQuery);
+      // Always use enhanced search service with location-based filtering
+      final searchResult = await SearchService.searchProducts(
+        query: widget.searchQuery.isNotEmpty ? widget.searchQuery : null,
+        listingType: widget.appliedFilters?['listingType'],
+        category: widget.appliedFilters?['category'],
+        condition: widget.appliedFilters?['condition'],
+        pickupMethod: widget.appliedFilters?['pickupMethod'],
+        minPrice: widget.appliedFilters?['minPrice']?.toDouble(),
+        maxPrice: widget.appliedFilters?['maxPrice']?.toDouble(),
+        sortBy: widget.sortBy ?? 'Distance',
+      );
       
-      // Then perform the search
-      final results = await ApiService.searchProducts(widget.searchQuery);
+      // Save search history if query was provided
+      if (widget.searchQuery.isNotEmpty) {
+        await ApiService.saveSearchHistory(widget.searchQuery);
+      }
+      
       setState(() {
-        searchResults = results;
+        searchResults = searchResult.products;
         isLoading = false;
       });
-      
-      // Fetch seller names for products that need them
-      _fetchSellerNames();
     } catch (e) {
       setState(() {
         hasError = true;
@@ -58,56 +80,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
   }
 
-  Future<void> _fetchSellerNames() async {
-    debugPrint('🔍 Starting to fetch seller names for ${searchResults.length} products');
-    
-    for (final product in searchResults) {
-      if (product.seller != null) {
-        final currentName = product.seller!.fullName;
-        debugPrint('🔍 Product ${product.id}: Current seller name = "$currentName"');
-        
-        // Check if name is just an ID (multiple patterns)
-        final isIdPattern = currentName.startsWith('Seller ') && 
-                           (currentName.contains('...') || currentName.length > 20);
-        
-        debugPrint('🔍 Product ${product.id}: Is ID pattern = $isIdPattern');
-        
-        if (isIdPattern || currentName.isEmpty || currentName == 'Unknown Seller') {
-          debugPrint('🔍 Fetching actual seller name for product ${product.id}, seller ID: ${product.seller!.id}');
-          await _fetchActualSellerName(product.seller!.id);
-        } else {
-          debugPrint('🔍 Using existing seller name for product ${product.id}: $currentName');
-        }
-      } else {
-        debugPrint('🔍 Product ${product.id}: No seller information');
-      }
-    }
-  }
-
-  Future<void> _fetchActualSellerName(String sellerId) async {
-    try {
-      debugPrint('🔍 Fetching seller details for ID: $sellerId');
-      final sellerDetails = await ApiService.fetchSellerDetails(sellerId);
-      
-      if (sellerDetails != null && mounted) {
-        final actualName = sellerDetails['fullName'] ?? 
-                          sellerDetails['name'] ?? 
-                          sellerDetails['firstName'] ?? 
-                          sellerDetails['displayName'] ??
-                          'Unknown Seller';
-        
-        debugPrint('🔍 Fetched seller name for $sellerId: $actualName');
-        
-        setState(() {
-          _sellerNames[sellerId] = actualName;
-        });
-      } else {
-        debugPrint('❌ No seller details returned for $sellerId');
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching seller details for $sellerId: $e');
-    }
-  }
+  // Removed external seller fetch; rely on product.seller.fullName
 
   void _handleProductClick(Product product) async {
     await ApiService.trackProductClick(product.id);
@@ -311,7 +284,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                           width: double.infinity,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Image.asset(
-                            'assets/images/placeholder.png',
+                            'assets/placeholder.png',
                             height: 200,
                             width: double.infinity,
                             fit: BoxFit.cover,
@@ -358,21 +331,21 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
                       const SizedBox(height: 6),
 
-                      // Views & location row
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.remove_red_eye, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Text('Viewed by ${product.views ?? 0} others', style: const TextStyle(fontSize: 12)),
-                            const Spacer(),
-                            const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Text(product.location ?? 'Unknown', style: const TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
+                                             // Views & location row
+                       Padding(
+                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                         child: Row(
+                           children: [
+                             const Icon(Icons.remove_red_eye, size: 16, color: Colors.grey),
+                             const SizedBox(width: 4),
+                             Text('Viewed by ${product.views ?? 0} others', style: const TextStyle(fontSize: 12)),
+                             const Spacer(),
+                             const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                             const SizedBox(width: 4),
+                             Text(product.location ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+                           ],
+                         ),
+                       ),
                     ],
                   ),
                 ),

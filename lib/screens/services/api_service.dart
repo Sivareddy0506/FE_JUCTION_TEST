@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../services/cache_manager.dart';
 import '../../services/app_cache_service.dart';
+import '../../services/search_service.dart';
+import '../../navigation_service.dart';
+import '../login/login_page.dart';
 
 class ApiService {
   static final CacheManager _cacheManager = CacheManager();
@@ -292,42 +296,21 @@ class ApiService {
     return await _cacheManager.getCacheStats();
   }
 
-  /// Search products using the search API
+  /// Search products using the enhanced search API with location support
   static Future<List<Product>> searchProducts(String query) async {
     try {
-      final token = await _getToken();
-      if (token == null) {
-        throw Exception('Authentication required for search');
-      }
-
-      final uri = Uri.parse('https://api.junctionverse.com/user/search/current');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'query': query}),
-      );
-
-      debugPrint('🔍 Search API Response: ${response.statusCode}');
       debugPrint('🔍 Search Query: $query');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['products'] is List) {
-          final products = (data['products'] as List)
-              .map((e) => Product.fromJson(e))
-              .toList();
-          debugPrint('✅ Search successful: ${products.length} results found');
-          return products;
-        }
-      } else {
-        debugPrint('❌ Search API Error: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to search products: ${response.statusCode}');
-      }
-
-      return [];
+      
+      // Use the enhanced search service which handles location and authentication
+      final searchResult = await SearchService.searchProducts(
+        query: query,
+        sortBy: 'Distance',
+        limit: 50,
+        radius: 50,
+      );
+      
+      debugPrint('✅ Search successful: ${searchResult.products.length} results found');
+      return searchResult.products;
     } catch (e) {
       debugPrint('❌ Search Error: $e');
       throw Exception('Search failed: $e');
@@ -338,7 +321,10 @@ class ApiService {
   static Future<void> saveSearchHistory(String query) async {
     try {
       final token = await _getToken();
-      if (token == null) return;
+      if (token == null || token.isEmpty) {
+        debugPrint('❌ Save search history: No auth token found');
+        return;
+      }
 
       final uri = Uri.parse('https://api.junctionverse.com/user/search-history');
       await http.post(
@@ -362,36 +348,7 @@ class ApiService {
     }
   }
 
-  /// Fetch seller details by ID
-  static Future<Map<String, dynamic>?> fetchSellerDetails(String sellerId) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return null;
-
-      final uri = Uri.parse('https://api.junctionverse.com/user/$sellerId');
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      debugPrint('🔍 Fetch seller details: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        debugPrint('✅ Seller details fetched: $data');
-        return data;
-      } else {
-        debugPrint('❌ Failed to fetch seller details: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching seller details: $e');
-      return null;
-    }
-  }
+  // Removed fetchSellerDetails; product.seller is now populated by backend
 }
 
 /// Lightweight auth helpers used at app launch
@@ -404,6 +361,14 @@ class AuthHealthService {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
       if (token == null || token.isEmpty) {
+        // No token saved → redirect to login
+        final nav = NavigationService.navigatorKey.currentState;
+        if (nav != null) {
+          nav.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+          );
+        }
         return {'status': 'invalid'};
       }
 
@@ -432,8 +397,15 @@ class AuthHealthService {
         return {'status': 'refreshed'}; // proceed; no new token provided
       }
 
-      // 401 payload contains { status: 'expired' | 'invalid' }
+      // 401 payload contains { status: 'expired' | 'invalid' } → redirect to login
       if (res.statusCode == 401) {
+        final nav = NavigationService.navigatorKey.currentState;
+        if (nav != null) {
+          nav.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+          );
+        }
         try {
           final data = json.decode(res.body);
           final status = data['status']?.toString() ?? 'invalid';
