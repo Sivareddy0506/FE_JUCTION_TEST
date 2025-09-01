@@ -1,6 +1,3 @@
-import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -26,45 +23,6 @@ class ProductDetailPage extends StatefulWidget {
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
 }
-
-
-Future<void> _shareProduct(BuildContext context, Product product) async {
-  try {
-    String text = '''
-${product.title}
-${product.price ?? ''}
-
-${product.description ?? ''}
-
-Location: ${product.location ?? 'N/A'}
-
-Check this out on JunctionVerse!
-https://junctionverse.com/product/${product.id}
-''';
-
-    if (product.imageUrl.isNotEmpty) {
-      final response = await http.get(Uri.parse(product.imageUrl));
-      final bytes = response.bodyBytes;
-
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/product_${product.id}.jpg');
-      await file.writeAsBytes(bytes);
-
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: text,
-      );
-    } else {
-      await Share.share(text);
-    }
-  } catch (e) {
-    debugPrint('❌ Error sharing product: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Failed to share product')),
-    );
-  }
-}
-
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
@@ -205,7 +163,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       Map<String, dynamic>.from(imgRaw);
                   return ProductImage(
                     fileUrl: img['fileUrl']?.toString() ??
-                        'assets/images/placeholder.png',
+                        'assets/placeholder.png',
                     fileType: img['fileType']?.toString(),
                     filename: img['filename']?.toString(),
                   );
@@ -216,7 +174,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         final String imageUrl = imageList.isNotEmpty
             ? imageList.first.fileUrl
             : (map['imageUrl']?.toString() ??
-                'assets/images/placeholder.png');
+                'assets/placeholder.png');
 
         final Seller? seller = (map['seller'] is Map<String, dynamic>)
             ? Seller.fromJson(Map<String, dynamic>.from(map['seller']))
@@ -255,8 +213,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       String buyerId = _chatService.currentUserId;
       String productId = widget.product.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
-      final prefs = await SharedPreferences.getInstance();
-      String buyerName = prefs.getString('fullName') ?? 'You';
 
       showDialog(
         context: context,
@@ -272,7 +228,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           sellerId: sellerId,
           buyerId: buyerId,
           sellerName: widget.product.seller?.fullName ?? 'Seller',
-          buyerName: buyerName,
+          buyerName: 'You', // Get from user data
           productTitle: widget.product.title,
           productImage: widget.product.imageUrl,
           productPrice: widget.product.price?.toString() ?? '0',
@@ -303,8 +259,9 @@ Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(title: Text(product.title)),
     body: ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16,16,16,MediaQuery.of(context).padding.bottom + 80),
       children: [
+        // Seller info block (no border, no extra spacing)
         Container(
           padding: const EdgeInsets.symmetric(vertical: 4),
           color: Colors.transparent,
@@ -345,6 +302,7 @@ Widget build(BuildContext context) {
         ),
         const SizedBox(height: 12),
 
+        // Combined block: Images + badges + category + title/price + views/location
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -369,7 +327,7 @@ Widget build(BuildContext context) {
                                   img.fileUrl,
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => Image.asset(
-                                    'assets/images/placeholder.png',
+                                    'assets/placeholder.png',
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -379,7 +337,7 @@ Widget build(BuildContext context) {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.asset(
-                              'assets/images/placeholder.png',
+                              'assets/placeholder.png',
                               fit: BoxFit.cover,
                             ),
                           )
@@ -560,7 +518,7 @@ Widget build(BuildContext context) {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                    onPressed: () => _shareProduct(context, product),
+                  onPressed: () {},
                   icon: const Icon(Icons.share),
                   label: const Text('Share'),
                 ),
@@ -619,19 +577,28 @@ Widget build(BuildContext context) {
         else
           ProductGridWidget(products: relatedProducts),
 
-        const SizedBox(height: 20),
-
-        ElevatedButton.icon(
-          onPressed: () {
-            startChat(context);
-          },
-          icon: const Icon(Icons.chat),
-          label: const Text('Chat'),
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
+      ],
+    ),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SizedBox(
+          height: 56,
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => startChat(context),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Chat'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              side: const BorderSide(color: Color(0xFFE3E3E3)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ),
-      ],
+      ),
     ),
   );
 }

@@ -343,108 +343,114 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildSellerInput() {
-    return Column(
-      children: [
-        // Quote Price button for seller
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isUploading ? null : _showQuotePriceBottomSheet,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isUploading ? Colors.grey : Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+    return SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          // Quote Price button for seller
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isUploading ? null : _showQuotePriceBottomSheet,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isUploading ? Colors.grey : Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-            ),
-            child: const Text(
-              'Quote Price',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              child: const Text(
+                'Quote Price',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                enabled: !_isUploading,
-                decoration: InputDecoration(
-                  hintText: _isUploading ? 'Uploading...' : 'Write a message...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  enabled: !_isUploading,
+                  decoration: InputDecoration(
+                    hintText: _isUploading ? 'Uploading...' : 'Write a message...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 20,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 20,
-                  ),
+                  onSubmitted: _isUploading ? null : _sendMessage,
                 ),
-                onSubmitted: _isUploading ? null : _sendMessage,
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _isUploading ? null : _showImagePickerBottomSheet,
-              icon: Icon(
-                Icons.camera_alt,
-                color: _isUploading ? Colors.grey : Colors.black,
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _isUploading ? null : _showImagePickerBottomSheet,
+                icon: Icon(
+                  Icons.camera_alt,
+                  color: _isUploading ? Colors.grey : Colors.black,
+                ),
               ),
-            ),
-            CircleAvatar(
-              backgroundColor: _isUploading ? Colors.grey : Colors.black,
-              child: IconButton(
-                icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                onPressed: _isUploading ? null : () => _sendMessage(_messageController.text),
+              CircleAvatar(
+                backgroundColor: _isUploading ? Colors.grey : Colors.black,
+                child: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                  onPressed: _isUploading ? null : () => _sendMessage(_messageController.text),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBuyerInput() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _messageController,
-            enabled: !_isUploading,
-            decoration: InputDecoration(
-              hintText: _isUploading ? 'Uploading...' : 'Write a message...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+    return SafeArea(
+      top: false,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              enabled: !_isUploading,
+              decoration: InputDecoration(
+                hintText: _isUploading ? 'Uploading...' : 'Write a message...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 20,
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: 20,
-              ),
+              onSubmitted: _isUploading ? null : _sendMessage,
             ),
-            onSubmitted: _isUploading ? null : _sendMessage,
           ),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          onPressed: _isUploading ? null : _showImagePickerBottomSheet,
-          icon: Icon(
-            Icons.camera_alt,
-            color: _isUploading ? Colors.grey : Colors.black,
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: _isUploading ? null : _showImagePickerBottomSheet,
+            icon: Icon(
+              Icons.camera_alt,
+              color: _isUploading ? Colors.grey : Colors.black,
+            ),
           ),
-        ),
-        CircleAvatar(
-          backgroundColor: _isUploading ? Colors.grey : Colors.black,
-          child: IconButton(
-            icon: const Icon(Icons.send, color: Colors.white, size: 20),
-            onPressed: _isUploading ? null : () => _sendMessage(_messageController.text),
+          CircleAvatar(
+            backgroundColor: _isUploading ? Colors.grey : Colors.black,
+            child: IconButton(
+              icon: const Icon(Icons.send, color: Colors.white, size: 20),
+              onPressed: _isUploading ? null : () => _sendMessage(_messageController.text),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
