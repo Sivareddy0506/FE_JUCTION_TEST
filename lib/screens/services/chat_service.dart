@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:junction/screens/services/api_service.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
+import 'backend_file_upload_service';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class ChatModel {
   final String chatId;
@@ -139,10 +143,53 @@ class MessageModel {
   }
 }
 
+class AttachmentModel {
+  final String url;
+  final String type; // 'image', 'video', 'document'
+  final String fileName;
+  final int size;
+  final int? width;
+  final int? height;
+  final String? thumbnailUrl;
+  
+  AttachmentModel({
+    required this.url,
+    required this.type,
+    required this.fileName,
+    required this.size,
+    this.width,
+    this.height,
+    this.thumbnailUrl,
+  });
+  
+  factory AttachmentModel.fromMap(Map<String, dynamic> map) {
+    return AttachmentModel(
+      url: map['url'] ?? '',
+      type: map['type'] ?? '',
+      fileName: map['fileName'] ?? '',
+      size: map['size'] ?? 0,
+      width: map['width'],
+      height: map['height'],
+      thumbnailUrl: map['thumbnailUrl'],
+    );
+  }
+  
+  Map<String, dynamic> toMap() {
+    return {
+      'url': url,
+      'type': type,
+      'fileName': fileName,
+      'size': size,
+      'width': width,
+      'height': height,
+      'thumbnailUrl': thumbnailUrl,
+    };
+  }
+}
+
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
@@ -238,25 +285,32 @@ class ChatService {
         .set(productMessage.toFirestore());
   }
 
-  // Upload image to Firebase Storage
-  Future<String> _uploadImage(File imageFile, String chatId) async {
+  Future<Map<String, dynamic>> _uploadImageToBackend({
+    required File imageFile,
+    Function(double)? onProgress,
+  }) async {
     try {
-      String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
-      String filePath = 'chat_images/$chatId/$fileName';
+      final String fileName = path.basename(imageFile.path);
+      final int fileSize = await imageFile.length();
       
-      Reference storageRef = _storage.ref().child(filePath);
-      UploadTask uploadTask = storageRef.putFile(imageFile);
+      // Upload file to backend
+      final String s3Url = await BackendFileUploadService.uploadFile(
+        file: imageFile,
+        onProgress: onProgress,
+      );
       
-      TaskSnapshot snapshot = await uploadTask;
-      String downloadUrl = await snapshot.ref.getDownloadURL();
-      
-      return downloadUrl;
+      return {
+        'url': s3Url,
+        'type': 'image',
+        'fileName': fileName,
+        'size': fileSize,
+      };
     } catch (e) {
       throw Exception('Failed to upload image: $e');
     }
   }
-
-  // Pick and send image
+  
+  // Enhanced image picker and sender with backend upload
   Future<void> pickAndSendImage({
     required String chatId,
     required String receiverId,
@@ -267,14 +321,19 @@ class ChatService {
         source: source,
         maxWidth: 1920,
         maxHeight: 1080,
-        imageQuality: 80,
+        imageQuality: 85,
       );
-
+      
       if (pickedFile != null) {
         File imageFile = File(pickedFile.path);
         
-        // Upload image and get URL
-        String imageUrl = await _uploadImage(imageFile, chatId);
+        // Upload image to backend
+        final Map<String, dynamic> attachmentData = await _uploadImageToBackend(
+          imageFile: imageFile,
+          onProgress: (progress) {
+            print('Upload progress: ${(progress * 100).toStringAsFixed(1)}%');
+          },
+        );
         
         // Send image message
         await sendMessage(
@@ -282,19 +341,86 @@ class ChatService {
           receiverId: receiverId,
           message: 'Photo',
           messageType: 'image',
-          attachmentData: {
-            'url': imageUrl,
-            'type': 'image',
-            'fileName': path.basename(pickedFile.path),
-            'size': await imageFile.length(),
-          },
+          attachmentData: attachmentData,
         );
       }
     } catch (e) {
       throw Exception('Failed to send image: $e');
     }
   }
+  
+  // Enhanced version with progress callbacks for UI
+  Future<void> pickAndSendImageWithProgress({
+    required String chatId,
+    required String receiverId,
+    required ImageSource source,
+    required Function(String) onUploadStart,
+    required Function(double) onUploadProgress,
+    required Function() onUploadComplete,
+    required Function(String) onError,
+  }) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile != null) {
+        File imageFile = File(pickedFile.path);
+        
+        onUploadStart('Uploading image...');
+        
+        // Upload image with progress tracking
+        final Map<String, dynamic> attachmentData = await _uploadImageToBackend(
+          imageFile: imageFile,
+          onProgress: onUploadProgress,
+        );
+        
+        // Send image message
+        await sendMessage(
+          chatId: chatId,
+          receiverId: receiverId,
+          message: 'Photo',
+          messageType: 'image',
+          attachmentData: attachmentData,
+        );
+        
+        onUploadComplete();
+      }
+    } catch (e) {
+      onError('Failed to send image: $e');
+    }
+  }
 
+  // Generic file upload method for future use (documents, videos, etc.)
+  Future<Map<String, dynamic>> uploadFile({
+    required File file,
+    required String fileType, // 'image', 'document', 'video', etc.
+    Function(double)? onProgress,
+  }) async {
+    try {
+      final String fileName = path.basename(file.path);
+      final int fileSize = await file.length();
+      
+      final String s3Url = await BackendFileUploadService.uploadFile(
+        file: file,
+        onProgress: onProgress,
+      );
+      
+      return {
+        'url': s3Url,
+        'type': fileType,
+        'fileName': fileName,
+        'size': fileSize,
+      };
+    } catch (e) {
+      throw Exception('Failed to upload file: $e');
+    }
+  }
+  
+  // Send regular message
   Future<void> sendMessage({
     required String chatId,
     required String receiverId,
@@ -333,6 +459,7 @@ class ChatService {
       throw Exception('Failed to send message: $e');
     }
   }
+
   Future<void> sendPriceQuote({
     required String chatId,
     required String receiverId,
@@ -356,8 +483,17 @@ class ChatService {
     required String chatId,
     required String receiverId,
     required double finalPrice,
+    required String productId,
+    required String buyerId,
   }) async {
     try {
+
+      // Mark product as sold when deal is confirmed by buyer
+      await markProductAsSold(
+        productId: productId,
+        buyerId: buyerId,
+      );
+
       // Send deal locked message
       await sendMessage(
         chatId: chatId,
@@ -397,6 +533,38 @@ class ChatService {
           .set(systemMessage.toFirestore());
     } catch (e) {
       throw Exception('Failed to confirm deal: $e');
+    }
+  }
+
+   // Mark product as sold when deal is confirmed by buyer
+  static Future<bool> markProductAsSold({
+    required String productId,
+    required String buyerId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final authToken = prefs.getString('authToken');
+      
+      final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/api/products/mark-sold'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({
+          'productId': productId,
+          'buyerId': buyerId,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Failed to mark product as sold: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+      }
+    } catch (e) {
+      throw Exception('API call failed: $e');
     }
   }
 

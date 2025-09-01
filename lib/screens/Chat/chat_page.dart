@@ -22,6 +22,9 @@ class _ChatPageState extends State<ChatPage> {
   final ScrollController _scrollController = ScrollController();
   ChatModel? _chatData;
   bool _isSeller = false;
+  bool _isUploading = false;
+  double _uploadProgress = 0.0;
+  String _uploadStatus = '';
 
   @override
   void initState() {
@@ -130,42 +133,319 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _pickImage(ImageSource source) async {
-    Navigator.pop(context); // Close bottom sheet
+    Navigator.pop(context); // Close the bottom sheet
     
     if (_chatData == null) return;
+    
     String receiverId = _isSeller ? _chatData!.buyerId : _chatData!.sellerId;
-
+    
     try {
-      // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Sending image...', style: TextStyle(color: Colors.white)),
-            ],
-          ),
-        ),
-      );
-
-      await _chatService.pickAndSendImage(
+      await _chatService.pickAndSendImageWithProgress(
         chatId: widget.chatId,
         receiverId: receiverId,
         source: source,
+        onUploadStart: (status) {
+          setState(() {
+            _isUploading = true;
+            _uploadProgress = 0.0;
+            _uploadStatus = status;
+          });
+          _showUploadProgressDialog();
+        },
+        onUploadProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+          });
+        },
+        onUploadComplete: () {
+          setState(() {
+            _isUploading = false;
+            _uploadProgress = 0.0;
+            _uploadStatus = '';
+          });
+          Navigator.of(context).pop(); // Close progress dialog
+          _scrollToBottom();
+        },
+        onError: (error) {
+          setState(() {
+            _isUploading = false;
+            _uploadProgress = 0.0;
+            _uploadStatus = '';
+          });
+          Navigator.of(context).pop(); // Close progress dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error)),
+          );
+        },
       );
-
-      Navigator.pop(context); // Close loading dialog
-      _scrollToBottom();
     } catch (e) {
-      Navigator.pop(context); // Close loading dialog
+      setState(() {
+        _isUploading = false;
+        _uploadProgress = 0.0;
+        _uploadStatus = '';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to send image: $e')),
       );
     }
+  }
+
+  void _showUploadProgressDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  // Upload icon
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.cloud_upload_outlined,
+                      size: 30,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Upload status
+                  Text(
+                    _uploadStatus,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Progress bar
+                  LinearProgressIndicator(
+                    value: _uploadProgress,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                    minHeight: 6,
+                  ),
+                  const SizedBox(height: 10),
+                  // Progress percentage
+                  Text(
+                    '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInputArea() {
+    if (_chatData?.dealStatus != 'active') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Deal has been closed',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Upload progress indicator (shown when uploading)
+        if (_isUploading) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    value: _uploadProgress,
+                    strokeWidth: 2,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _uploadStatus,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: _uploadProgress,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                        minHeight: 3,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        
+        // Main input area
+        if (_isSeller) _buildSellerInput() else _buildBuyerInput(),
+      ],
+    );
+  }
+
+  Widget _buildSellerInput() {
+    return Column(
+      children: [
+        // Quote Price button for seller
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isUploading ? null : _showQuotePriceBottomSheet,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isUploading ? Colors.grey : Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Quote Price',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                enabled: !_isUploading,
+                decoration: InputDecoration(
+                  hintText: _isUploading ? 'Uploading...' : 'Write a message...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(25),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 20,
+                  ),
+                ),
+                onSubmitted: _isUploading ? null : _sendMessage,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _isUploading ? null : _showImagePickerBottomSheet,
+              icon: Icon(
+                Icons.camera_alt,
+                color: _isUploading ? Colors.grey : Colors.black,
+              ),
+            ),
+            CircleAvatar(
+              backgroundColor: _isUploading ? Colors.grey : Colors.black,
+              child: IconButton(
+                icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                onPressed: _isUploading ? null : () => _sendMessage(_messageController.text),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBuyerInput() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _messageController,
+            enabled: !_isUploading,
+            decoration: InputDecoration(
+              hintText: _isUploading ? 'Uploading...' : 'Write a message...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(25),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 10,
+                horizontal: 20,
+              ),
+            ),
+            onSubmitted: _isUploading ? null : _sendMessage,
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: _isUploading ? null : _showImagePickerBottomSheet,
+          icon: Icon(
+            Icons.camera_alt,
+            color: _isUploading ? Colors.grey : Colors.black,
+          ),
+        ),
+        CircleAvatar(
+          backgroundColor: _isUploading ? Colors.grey : Colors.black,
+          child: IconButton(
+            icon: const Icon(Icons.send, color: Colors.white, size: 20),
+            onPressed: _isUploading ? null : () => _sendMessage(_messageController.text),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildImageMessage(MessageModel message, bool isMe) {
@@ -344,7 +624,7 @@ Widget _buildMessage(MessageModel message) {
                 controller: priceController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  hintText: '₹ 23,500',
+                  hintText: 'Enter price',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -439,7 +719,7 @@ Widget _buildMessage(MessageModel message) {
                 controller: priceController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  hintText: '₹ 23,000',
+                  hintText: '₹ ${priceController.text}',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -472,6 +752,8 @@ Widget _buildMessage(MessageModel message) {
                             chatId: widget.chatId,
                             receiverId: receiverId,
                             finalPrice: finalPrice,
+                            productId: _chatData!.productId,
+                            buyerId: _chatData!.buyerId,
                           );
                           
                           Navigator.pop(context);
@@ -896,7 +1178,7 @@ Widget _buildMessage(MessageModel message) {
     }
 
     String otherUserName = _isSeller ? _chatData!.buyerName : _chatData!.sellerName;
-    String initials = otherUserName.split(' ').map((name) =>
+    String initials = otherUserName.split(' ').map((name) => 
         name[0]).take(2).join().toUpperCase();
 
     return Scaffold(
@@ -942,15 +1224,17 @@ Widget _buildMessage(MessageModel message) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
-
+                
                 List<MessageModel> messages = snapshot.data ?? [];
+                
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   _scrollToBottom();
                 });
-
+                
                 return ListView.builder(
                   controller: _scrollController,
                   itemCount: messages.length,
@@ -962,155 +1246,18 @@ Widget _buildMessage(MessageModel message) {
               },
             ),
           ),
+          
+          // Bottom input area with upload progress
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Colors.grey[300]!)),
             ),
-            child: _isSeller ? _buildSellerInput() : _buildBuyerInput(),
+            child: _buildInputArea(),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSellerInput() {
-    if (_chatData?.dealStatus != 'active') {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Text(
-          'Deal has been closed',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _messageController,
-            decoration: InputDecoration(
-              hintText: 'Write a message...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: 20,
-              ),
-            ),
-            onSubmitted: _sendMessage,
-          ),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          onPressed: () { _showImagePickerBottomSheet(); },
-          icon: const Icon(Icons.attach_file),
-        ),
-        CircleAvatar(
-          backgroundColor: Colors.black,
-          child: IconButton(
-            icon: const Icon(Icons.send, color: Colors.white, size: 20),
-            onPressed: () => _sendMessage(_messageController.text),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBuyerInput() {
-    if (_chatData?.dealStatus != 'active') {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Text(
-          'Deal has been closed',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Quote Price button for seller
-        if (_isSeller) ...[
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _showQuotePriceBottomSheet,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Quote Price',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ] else ...[
-          // Regular chat input for buyer
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  decoration: InputDecoration(
-                    hintText: 'Write a message...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(25),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 20,
-                    ),
-                  ),
-                  onSubmitted: _sendMessage,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () { _showImagePickerBottomSheet(); },
-                icon: const Icon(Icons.attach_file),
-              ),
-              CircleAvatar(
-                backgroundColor: Colors.black,
-                child: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                  onPressed: () => _sendMessage(_messageController.text),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
     );
   }
 
