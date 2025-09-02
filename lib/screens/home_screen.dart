@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_overview.dart';  
 import '../widgets/app_button.dart';
 import '../services/app_cache_service.dart';
+import '../services/memory_monitor_service.dart';
 import 'services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -49,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Initialize cache system at app startup
       await AppCacheService.initializeCache();
+      MemoryMonitorService().startMonitoring();
       
       final prefs = await SharedPreferences.getInstance();
       bool? isLoggedIn = await prefs.getBool('isLogin');
@@ -72,6 +74,12 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       });
     });
+  }
+
+  @override
+  void dispose() {
+    MemoryMonitorService().stopMonitoring();
+    super.dispose();
   }
 
   Widget _logoImage(String asset, {double size = 30}) {

@@ -13,6 +13,15 @@ class CacheManager {
   final Map<String, dynamic> _memoryCache = {};
   final Map<String, DateTime> _cacheTimestamps = {};
   final Map<String, Duration> _cacheExpiries = {};
+  // Size tracking for each entry (approximate bytes)
+  final Map<String, int> _cacheSizes = {};
+
+  // Runtime memory usage counters
+  int _currentCacheSizeBytes = 0;
+
+  // Memory limits
+  static const int _maxCacheSizeBytes = 50 * 1024 * 1024; // 50 MB
+  static const int _maxCacheEntries = 100;
   
   // SharedPreferences instance for persistent storage
   SharedPreferences? _prefs;
@@ -42,9 +51,15 @@ class CacheManager {
       final timestampsData = _prefs!.getString('cache_timestamps');
       final expiriesData = _prefs!.getString('cache_expiries');
 
-      if (cacheData != null) {
+      // Safety: skip oversized blob (>5 MB) to avoid OOM
+      const int _maxPersistentBytes = 5 * 1024 * 1024; // 5 MB
+      if (cacheData != null && cacheData.length < _maxPersistentBytes) {
         final Map<String, dynamic> decoded = json.decode(cacheData);
         _memoryCache.addAll(decoded);
+      } else if (cacheData != null) {
+        debugPrint('CacheManager: persistent cache_data too large (${cacheData.length} bytes). Clearing…');
+        // Clear persistent keys to free space
+        await clearAllCaches();
       }
 
       if (timestampsData != null) {
@@ -60,6 +75,16 @@ class CacheManager {
           decoded.map((key, value) => MapEntry(key, Duration(milliseconds: value)))
         );
       }
+
+      // Load sizes map if present
+      final sizesData = _prefs!.getString('cache_sizes');
+      if (sizesData != null) {
+        final Map<String, dynamic> decoded = json.decode(sizesData);
+        _cacheSizes.addAll(decoded.map((k, v) => MapEntry(k, v as int)));
+      }
+
+      // Re-calculate current size based on loaded sizes
+      _currentCacheSizeBytes = _cacheSizes.values.fold(0, (p, c) => p + c);
 
       // Clean expired entries on load
       await _cleanExpiredEntries();
@@ -90,6 +115,10 @@ class CacheManager {
       await _prefs!.setString('cache_timestamps', timestampsData);
       await _prefs!.setString('cache_expiries', expiriesData);
       
+      // Persist sizes
+      final sizesData = json.encode(_cacheSizes);
+      await _prefs!.setString('cache_sizes', sizesData);
+
       debugPrint('CacheManager: Saved ${_memoryCache.length} cache entries to persistent storage');
     } catch (e) {
       debugPrint('CacheManager: Error saving persistent cache: $e');
@@ -135,18 +164,34 @@ class CacheManager {
   /// Set data in cache with optional expiry
   Future<void> setCachedData<T>(String key, T data, {Duration? expiry}) async {
     await _ensureInitialized();
-    
+
+    // Estimate size of new entry
+    final int newSize = _estimateObjectSize(data);
+
+    // If single entry exceeds max size, skip caching
+    if (newSize > _maxCacheSizeBytes) {
+      debugPrint('CacheManager: Entry for $key (size $newSize) exceeds max cache size – skipping');
+      return;
+    }
+
+    // Add/replace entry
     _memoryCache[key] = data;
     _cacheTimestamps[key] = DateTime.now();
-    
+    _cacheSizes[key] = newSize;
+
     if (expiry != null) {
       _cacheExpiries[key] = expiry;
     }
-    
+
+    _currentCacheSizeBytes = _cacheSizes.values.fold(0, (p, c) => p + c);
+
+    // Enforce limits
+    await _evictLRUEntries();
+
     // Save to persistent storage
     await _savePersistentCache();
-    
-    debugPrint('CacheManager: Cached data for key $key');
+
+    debugPrint('CacheManager: Cached data for key $key (size $newSize bytes)');
   }
 
   /// Check if cache exists and is valid
@@ -178,6 +223,8 @@ class CacheManager {
     _memoryCache.remove(key);
     _cacheTimestamps.remove(key);
     _cacheExpiries.remove(key);
+    _currentCacheSizeBytes -= _cacheSizes[key] ?? 0;
+    _cacheSizes.remove(key);
     
     // Update persistent storage
     await _savePersistentCache();
@@ -192,12 +239,15 @@ class CacheManager {
     _memoryCache.clear();
     _cacheTimestamps.clear();
     _cacheExpiries.clear();
+    _cacheSizes.clear();
+    _currentCacheSizeBytes = 0;
     
     // Clear persistent storage
     if (_prefs != null) {
       await _prefs!.remove('cache_data');
       await _prefs!.remove('cache_timestamps');
       await _prefs!.remove('cache_expiries');
+      await _prefs!.remove('cache_sizes'); // Also clear sizes
     }
     
     debugPrint('CacheManager: Cleared all caches');
@@ -212,7 +262,9 @@ class CacheManager {
       'cacheKeys': _memoryCache.keys.toList(),
       'expiredEntries': _memoryCache.keys.where((key) => isCacheExpired(key)).length,
       'persistentStorage': _prefs != null,
-      'memoryUsage': _estimateMemoryUsage(),
+      'memoryUsageBytes': _currentCacheSizeBytes,
+      'maxCacheSizeBytes': _maxCacheSizeBytes,
+      'maxEntries': _maxCacheEntries,
     };
   }
 
@@ -246,6 +298,44 @@ class CacheManager {
       }
     }
     return size;
+  }
+
+  // Estimate generic object size (rough)
+  int _estimateObjectSize(dynamic value) {
+    if (value == null) return 0;
+    if (value is String) {
+      return value.length;
+    } else if (value is Map || value is List) {
+      try {
+        return json.encode(value).length;
+      } catch (_) {
+        return 256; // fallback for complex objects
+      }
+    } else {
+      return 64; // fallback rough estimate
+    }
+  }
+
+  /// Evict least-recently-used entries until limits are within bounds
+  Future<void> _evictLRUEntries() async {
+    // Evict by entry count first
+    while (_memoryCache.length > _maxCacheEntries) {
+      final lruKey = _leastRecentlyUsedKey();
+      if (lruKey == null) break;
+      await invalidateCache(lruKey);
+    }
+
+    // Evict by size
+    while (_currentCacheSizeBytes > _maxCacheSizeBytes) {
+      final lruKey = _leastRecentlyUsedKey();
+      if (lruKey == null) break;
+      await invalidateCache(lruKey);
+    }
+  }
+
+  String? _leastRecentlyUsedKey() {
+    if (_cacheTimestamps.isEmpty) return null;
+    return _cacheTimestamps.entries.reduce((a, b) => a.value.isBefore(b.value) ? a : b).key;
   }
 
   /// Get cache entry age

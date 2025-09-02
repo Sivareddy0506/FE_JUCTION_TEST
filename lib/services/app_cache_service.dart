@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'cache_manager.dart';
+import 'image_cache_service.dart';
+import 'memory_monitor_service.dart';
 import 'network_service.dart';
 import 'smart_refresh_service.dart';
 import 'offline_service.dart';
@@ -10,6 +12,8 @@ class AppCacheService {
   static final NetworkService _networkService = NetworkService();
   static final SmartRefreshService _smartRefreshService = SmartRefreshService();
   static final OfflineService _offlineService = OfflineService();
+  static final ImageCacheService _imageCacheService = ImageCacheService();
+  static final MemoryMonitorService _memoryMonitorService = MemoryMonitorService();
   static bool _isInitialized = false;
 
   /// Initialize the cache system at app startup
@@ -24,6 +28,7 @@ class AppCacheService {
       
       // Initialize the cache manager with persistent storage
       await _cacheManager.initialize();
+      await _imageCacheService.initialize();
       
       // Initialize Phase 3 services
       await _networkService.initialize();
@@ -53,7 +58,17 @@ class AppCacheService {
   static Future<void> clearAllCaches() async {
     await _ensureInitialized();
     await _cacheManager.clearAllCaches();
+    await _imageCacheService.clearCache();
     debugPrint('AppCacheService: All caches cleared');
+  }
+
+  /// Force cleanup (LRU eviction) on both caches
+  static Future<void> forceCleanup() async {
+    await _ensureInitialized();
+    // CacheManager eviction happens when limits exceeded; we just persist.
+    await _cacheManager.forceSave();
+    // ImageCacheService has internal limits already enforced.
+    debugPrint('AppCacheService: forceCleanup triggered');
   }
 
   /// Force save current cache to persistent storage
@@ -198,11 +213,13 @@ class AppCacheService {
     
     try {
       final cacheStats = await _cacheManager.getCacheStats();
+      final imageStats = _imageCacheService.stats();
       final refreshRecommendations = await _smartRefreshService.getRefreshRecommendations();
       final offlineStatus = _offlineService.getOfflineStatus();
       
       return {
         'cache': cacheStats,
+        'imageCache': imageStats,
         'network': {
           'isOnline': _networkService.isConnected,
           'isInitialized': _networkService.isInitialized,

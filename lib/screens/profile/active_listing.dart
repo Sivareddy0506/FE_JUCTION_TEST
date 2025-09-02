@@ -45,7 +45,7 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
       return;
     }
 
-    final uri = Uri.parse('https://api.junctionverse.com/product/active');
+    final uri = Uri.parse('https://api.junctionverse.com/product/me/active');
 
     try {
       final response = await http.get(uri, headers: {
@@ -92,7 +92,7 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
                   final Map<String, dynamic> img =
                       imgRaw is Map<String, dynamic> ? imgRaw : Map<String, dynamic>.from(imgRaw as Map);
                   return ProductImage(
-                    fileUrl: img['fileUrl']?.toString() ?? 'assets/images/placeholder.png',
+                    fileUrl: img['fileUrl']?.toString() ?? 'assets/placeholder.png',
                     fileType: img['fileType']?.toString(),
                     filename: img['filename']?.toString(),
                   );
@@ -103,7 +103,7 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
 
         final String imageUrl = imageList.isNotEmpty
             ? imageList.first.fileUrl
-            : (item['imageUrl']?.toString() ?? 'assets/images/placeholder.png');
+            : (item['imageUrl']?.toString() ?? 'assets/placeholder.png');
 
         final bool isAuction = item['isAuction'] == true;
 
