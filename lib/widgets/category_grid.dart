@@ -20,8 +20,9 @@ class CategoryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final itemSize = (MediaQuery.of(context).size.width * 0.18).clamp(48.0, 96.0);
     return SizedBox(
-      height: 130, // Reduced from 100 to 120 to accommodate smaller icons
+      height: itemSize + 34, // image + label + padding
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),

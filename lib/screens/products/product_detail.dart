@@ -12,6 +12,7 @@ import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
 import '../../services/favorites_service.dart';
 import '../services/chat_service.dart';
+import '../../services/view_tracker.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -72,11 +73,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   final ChatService _chatService = ChatService();
   late FavoritesService _favoritesService;
   String? _sellerName;
+  late int _displayViews;
+  bool _registeredView = false;
 
   @override
   void initState() {
     super.initState();
     _favoritesService = FavoritesService();
+    _displayViews = widget.product.views ?? 0;
+    // Increment view count locally once per session
+    if (!ViewTracker.instance.isViewed(widget.product.id)) {
+      _displayViews += 1;
+      ViewTracker.instance.markViewed(widget.product.id);
+      _registeredView = true;
+    }
     // Defer listener registration to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
@@ -235,6 +245,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       map['locationName']?.toString(),
   seller: seller,
   isAuction: map['isAuction'] == true, // ✅ required param fix
+  views: int.tryParse((map['views'] ?? map['viewCount'] ?? '0').toString()) ?? 0,
 );
       }).toList();
 
@@ -355,11 +366,8 @@ Widget build(BuildContext context) {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Product images
-              Container(
-                height: 250,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.35, // ~35% of screen height
                 child: PageView(
                   children: product.images.isNotEmpty
                       ? product.images
@@ -508,7 +516,7 @@ Widget build(BuildContext context) {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Viewed by ${product.views} others',
+                      'Viewed by $_displayViews others',
                       style: const TextStyle(fontSize: 14),
                     ),
                     const Spacer(),
