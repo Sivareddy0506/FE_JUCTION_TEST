@@ -18,8 +18,8 @@ class CategoryItem extends StatelessWidget {
           ),
           child: Image.asset(
             imagePath,
-            height: 70, // Increased from 60 to 70
-            width: 70,  // Increased from 60 to 70
+            height: (MediaQuery.of(context).size.width * 0.18).clamp(48.0, 96.0),
+            width: (MediaQuery.of(context).size.width * 0.18).clamp(48.0, 96.0),
             fit: BoxFit.contain,
           ),
         ),

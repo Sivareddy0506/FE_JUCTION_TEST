@@ -133,19 +133,28 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      itemCount: widget.products.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.72,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemBuilder: (context, index) {
-        final product = widget.products[index];
-        return _buildProductCard(product);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Aim for tiles ~170dp wide; ensure at least 2 columns
+        final tileWidth = 170.0;
+        int crossAxisCount = (constraints.maxWidth / tileWidth).floor();
+        if (crossAxisCount < 2) crossAxisCount = 2;
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: widget.products.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: 0.72,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemBuilder: (context, index) {
+            final product = widget.products[index];
+            return _buildProductCard(product);
+          },
+        );
       },
     );
   }
