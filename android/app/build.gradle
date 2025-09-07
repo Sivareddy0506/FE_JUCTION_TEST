@@ -13,6 +13,7 @@ android {
         applicationId "com.example.junction"
         minSdkVersion flutter.minSdkVersion
         minSdkVersion flutter.minSdkVersion
+        minSdkVersion 23
         targetSdk 36
         versionCode 1
         versionName "1.0"

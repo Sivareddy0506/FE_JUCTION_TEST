@@ -568,6 +568,40 @@ class ChatService {
     }
   }
 
+static Future<bool> lockDeal({
+  required String productId,
+  required double finalPrice,
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+
+    final response = await http.post(
+      Uri.parse('https://api.junctionverse.com/product/deal-lock'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({
+        'productId': productId,
+        'finalPrice': finalPrice,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(
+          'Failed to lock deal: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+    }
+  } catch (e) {
+    throw Exception('API call failed: $e');
+  }
+}
+
+
+
   Future<ChatModel?> getChat(String chatId) async {
     try {
       DocumentSnapshot doc = await _firestore.collection('chats').doc(chatId).get();
