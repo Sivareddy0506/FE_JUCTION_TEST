@@ -224,6 +224,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       String buyerId = _chatService.currentUserId;
       String productId = widget.product.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
+      final prefs = await SharedPreferences.getInstance();
+      String buyerName = prefs.getString('fullName') ?? 'You';
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Opening chat...'), duration: Duration(milliseconds: 800)),
@@ -237,7 +239,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           sellerId: sellerId,
           buyerId: buyerId,
           sellerName: widget.product.seller?.fullName ?? 'Seller',
-          buyerName: 'You', // Get from user data
+          buyerName: buyerName,
           productTitle: widget.product.title,
           productImage: widget.product.imageUrl,
           productPrice: widget.product.price?.toString() ?? '0',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ReviewScreen extends StatefulWidget {
   final String ratedUserId;
@@ -69,24 +70,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
     }
 
     setState(() => isLoading = true);
-
-    final url = Uri.parse("https://api.junctionverse.com/ratings/");
-    final body = {
-      "ratedUserId": widget.ratedUserId,
-      "ratedById": widget.ratedById,
-      "communication": q1,
-      "reliability": q2,
-      "tradeAgain": q3,
-      "overallVibe": vibeController.text,
-      "comments": vibeController.text,
-      "stars": stars,
-    };
-
     try {
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: json.encode(body),
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+
+    final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/ratings/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({
+          "ratedUserId": widget.ratedUserId,
+          "ratedById": widget.ratedById,
+          "communication": q1,
+          "reliability": q2,
+          "tradeAgain": q3,
+          "overallVibe": vibeController.text,
+          "comments": vibeController.text,
+          "stars": stars,
+        }),
       );
 
       if (response.statusCode == 201) {
