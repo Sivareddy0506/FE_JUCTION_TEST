@@ -475,6 +475,7 @@ class ChatService {
         'price': price,
         'isConfirmed': false,
         'offerNumber': offerNumber,
+        'quotedBy': currentUserId,  // Track who made the quote
       },
     );
   }
@@ -503,6 +504,7 @@ class ChatService {
         priceData: {
           'price': finalPrice,
           'isConfirmed': true,
+          'confirmedBy': currentUserId,  // Track who confirmed
         },
       );
 
@@ -513,24 +515,25 @@ class ChatService {
         'lastMessage': 'Deal locked at ₹${finalPrice.toStringAsFixed(0)}',
         'lastMessageTime': Timestamp.fromDate(DateTime.now()),
       });
-
-      // Send system message for buyer
+      
+      // Send system message
       String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_system';
       MessageModel systemMessage = MessageModel(
         messageId: systemMessageId,
         senderId: 'system',
         receiverId: receiverId,
-        message: 'Congratulations! Buyer has locked the deal',
+        message: 'Congratulations! Deal has been locked',
         timestamp: DateTime.now(),
         messageType: 'system',
       );
-
+      
       await _firestore
           .collection('messages')
           .doc(chatId)
           .collection('messages')
           .doc(systemMessageId)
           .set(systemMessage.toFirestore());
+          
     } catch (e) {
       throw Exception('Failed to confirm deal: $e');
     }
