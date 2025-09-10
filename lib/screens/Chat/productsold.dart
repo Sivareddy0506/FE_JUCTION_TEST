@@ -1,9 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:junction/screens/Chat/user_rating.dart';
 
-class ProductSoldScreen extends StatelessWidget {
+class ProductSoldScreen extends StatefulWidget {
   final String productName;
+  final String ratedUserId;
+  final String ratedById;
+  final bool fromProductSold;
 
-  ProductSoldScreen({required this.productName});
+  ProductSoldScreen({
+    required this.productName,
+    required this.ratedUserId,
+    required this.ratedById,
+    this.fromProductSold = false,
+    });
+
+  @override
+  State<ProductSoldScreen> createState() => _ProductSoldScreenState();
+}
+
+class _ProductSoldScreenState extends State<ProductSoldScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _navigateToRatingsPage();
+  }
+
+void _navigateToRatingsPage() {
+  Future.delayed(const Duration(seconds: 3), () {
+    Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReviewScreen(
+              ratedUserId: widget.ratedUserId,
+              ratedById: widget.ratedById,
+              fromProductSold: widget.fromProductSold,
+            ),
+          ),
+        );
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +70,7 @@ class ProductSoldScreen extends StatelessWidget {
 
                 // Subtitle
                 Text(
-                  "You've successfully sold your product $productName.",
+                  "You've successfully sold your product ${widget.productName}.",
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey[700],

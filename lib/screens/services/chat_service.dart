@@ -204,6 +204,19 @@ class ChatService {
     }
   }
 
+Stream<ChatModel?> getChatStream(String chatId) {
+  return _firestore
+      .collection('chats')
+      .doc(chatId)
+      .snapshots()
+      .map((doc) {
+        if (doc.exists && doc.data() != null) {
+          return ChatModel.fromFirestore(doc.data() as Map<String, dynamic>);
+        }
+        return null;
+      });
+}
+
   Future<ChatModel> createChat({
   required String productId,
   required String sellerId,

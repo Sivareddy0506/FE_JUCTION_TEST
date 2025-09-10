@@ -74,6 +74,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final prefs = await SharedPreferences.getInstance();
     final authToken = prefs.getString('authToken');
 
+    String comments = vibeController.text;
+    if (comments.isEmpty == true) {
+      comments = "N/A";
+    }
+
     final response = await http.post(
         Uri.parse('https://api.junctionverse.com/ratings/'),
         headers: {
@@ -86,8 +91,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
           "communication": q1,
           "reliability": q2,
           "tradeAgain": q3,
-          "overallVibe": vibeController.text,
-          "comments": vibeController.text,
+          "overallVibe": comments,
+          "comments": comments,
           "stars": stars,
         }),
       );
