@@ -204,6 +204,19 @@ class ChatService {
     }
   }
 
+Stream<ChatModel?> getChatStream(String chatId) {
+  return _firestore
+      .collection('chats')
+      .doc(chatId)
+      .snapshots()
+      .map((doc) {
+        if (doc.exists && doc.data() != null) {
+          return ChatModel.fromFirestore(doc.data() as Map<String, dynamic>);
+        }
+        return null;
+      });
+}
+
   Future<ChatModel> createChat({
   required String productId,
   required String sellerId,
@@ -488,11 +501,11 @@ class ChatService {
     required String buyerId,
   }) async {
     try {
-
-      // Mark product as sold when deal is confirmed by buyer
-      await markProductAsSold(
+      await _callConfirmDealAPI(
         productId: productId,
         buyerId: buyerId,
+        finalPrice: finalPrice,
+        chatId: chatId,
       );
 
       // Send deal locked message
@@ -504,42 +517,110 @@ class ChatService {
         priceData: {
           'price': finalPrice,
           'isConfirmed': true,
-          'confirmedBy': currentUserId,  // Track who confirmed
+          'confirmedBy': currentUserId, // Track who confirmed
         },
       );
 
-      // Update chat status
       await _firestore.collection('chats').doc(chatId).update({
-        'dealStatus': 'locked',
+        'dealStatus': 'confirmed', 
         'finalPrice': finalPrice,
-        'lastMessage': 'Deal locked at ₹${finalPrice.toStringAsFixed(0)}',
+        'lastMessage': 'Deal confirmed at ₹${finalPrice.toStringAsFixed(0)}',
         'lastMessageTime': Timestamp.fromDate(DateTime.now()),
       });
-      
-      // Send system message
+
       String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_system';
       MessageModel systemMessage = MessageModel(
         messageId: systemMessageId,
         senderId: 'system',
         receiverId: receiverId,
-        message: 'Congratulations! Deal has been locked',
+        message: 'Congratulations! Deal has been locked.',
         timestamp: DateTime.now(),
         messageType: 'system',
       );
-      
+
       await _firestore
           .collection('messages')
           .doc(chatId)
           .collection('messages')
           .doc(systemMessageId)
           .set(systemMessage.toFirestore());
-          
     } catch (e) {
       throw Exception('Failed to confirm deal: $e');
     }
   }
 
-   // Mark product as sold when deal is confirmed by buyer
+  Future<void> _callConfirmDealAPI({
+    required String productId,
+    required String buyerId,
+    required double finalPrice,
+    required String chatId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final authToken = prefs.getString('authToken');
+      
+      final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/product/deal-lock'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({
+          'productId': productId,
+          'finalPrice': finalPrice,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Failed to confirm deal: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+      }
+    } catch (e) {
+      throw Exception('API call failed: $e');
+    }
+  }
+
+  Future<void> markAsSold({
+    required String chatId,
+    required String receiverId,
+    required String productId,
+    required String buyerId,
+    required double finalPrice,
+  }) async {
+    try {
+      await markProductAsSold(
+        productId: productId,
+        buyerId: buyerId,
+      );
+
+      await _firestore.collection('chats').doc(chatId).update({
+        'dealStatus': 'locked', // ★ FINAL STATUS: product sold
+        'lastMessage': 'Product marked as sold',
+        'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+      });
+
+      String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_sold';
+      MessageModel systemMessage = MessageModel(
+        messageId: systemMessageId,
+        senderId: 'system',
+        receiverId: receiverId,
+        message: 'Product has been marked as sold. Transaction completed!',
+        timestamp: DateTime.now(),
+        messageType: 'system',
+      );
+
+      await _firestore
+          .collection('messages')
+          .doc(chatId)
+          .collection('messages')
+          .doc(systemMessageId)
+          .set(systemMessage.toFirestore());
+
+    } catch (e) {
+      throw Exception('Failed to mark product as sold: $e');
+    }
+  }
+
   static Future<bool> markProductAsSold({
     required String productId,
     required String buyerId,
@@ -549,7 +630,7 @@ class ChatService {
       final authToken = prefs.getString('authToken');
       
       final response = await http.post(
-        Uri.parse('https://api.junctionverse.com/api/products/mark-sold'),
+        Uri.parse('https://api.junctionverse.com/product/mark-sold'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $authToken',

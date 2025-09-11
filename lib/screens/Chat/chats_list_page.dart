@@ -67,7 +67,17 @@ class ChatListPage extends StatelessWidget {
                   : chat.sellerName;
 
               // Generate avatar based on name
-              String initials = otherUserName.split(' ').map((name) => name[0]).take(2).join().toUpperCase();
+              String initials = otherUserName.trim().split(' ')
+                       .where((name) => name.isNotEmpty)
+                        .take(2)
+                        .map((name) => name[0])
+                        .join()
+                        .toUpperCase();
+
+// Fallback for empty names or edge cases
+if (initials.isEmpty) {
+  initials = otherUserName.isNotEmpty ? otherUserName[0].toUpperCase() : 'U';
+}
               Color avatarColor = _getAvatarColor(otherUserName);
 
               return ListTile(
