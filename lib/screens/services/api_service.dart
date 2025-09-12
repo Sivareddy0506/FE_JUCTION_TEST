@@ -7,8 +7,6 @@ import '../../models/product.dart';
 import '../../services/cache_manager.dart';
 import '../../services/app_cache_service.dart';
 import '../../services/search_service.dart';
-import '../../navigation_service.dart';
-import '../login/login_page.dart';
 
 class ApiService {
   static final CacheManager _cacheManager = CacheManager();
@@ -357,68 +355,48 @@ class AuthHealthService {
   /// Returns a map with keys: status ('refreshed' | 'expired' | 'invalid' | 'error'),
   /// and 'token' when refreshed.
   static Future<Map<String, dynamic>> refreshAuthToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('authToken');
-      if (token == null || token.isEmpty) {
-        // No token saved → redirect to login
-        final nav = NavigationService.navigatorKey.currentState;
-        if (nav != null) {
-          nav.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-            (route) => false,
-          );
-        }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
+    if (token == null || token.isEmpty) {
+      return {'status': 'invalid'};
+    }
+
+    final uri = Uri.parse('https://api.junctionverse.com/auth/token/refresh');
+    final res = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    ).timeout(const Duration(seconds: 30)); // Add timeout
+
+    debugPrint('🔐 refreshAuthToken: ${res.statusCode}');
+
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body);
+      final newToken = data['token']?.toString();
+      if (newToken != null && newToken.isNotEmpty) {
+        return {'status': 'refreshed', 'token': newToken};
+      }
+      return {'status': 'invalid'};
+    }
+
+    // Remove 404 special case - treat as error
+    if (res.statusCode == 401) {
+      try {
+        final data = json.decode(res.body);
+        final status = data['status']?.toString() ?? 'invalid';
+        return {'status': status};
+      } catch (_) {
         return {'status': 'invalid'};
       }
-
-      final uri = Uri.parse('https://api.junctionverse.com/auth/token/refresh');
-      final res = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      debugPrint('🔐 refreshAuthToken: ${res.statusCode}');
-
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-        final newToken = data['token']?.toString();
-        if (newToken != null && newToken.isNotEmpty) {
-          return {'status': 'refreshed', 'token': newToken};
-        }
-        return {'status': 'error'};
-      }
-
-      // Treat 404 (endpoint not deployed yet) as OK to proceed without changes
-      if (res.statusCode == 404) {
-        return {'status': 'refreshed'}; // proceed; no new token provided
-      }
-
-      // 401 payload contains { status: 'expired' | 'invalid' } → redirect to login
-      if (res.statusCode == 401) {
-        final nav = NavigationService.navigatorKey.currentState;
-        if (nav != null) {
-          nav.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-            (route) => false,
-          );
-        }
-        try {
-          final data = json.decode(res.body);
-          final status = data['status']?.toString() ?? 'invalid';
-          return {'status': status};
-        } catch (_) {
-          return {'status': 'invalid'};
-        }
-      }
-
-      return {'status': 'error'};
-    } catch (e) {
-      debugPrint('🔐 refreshAuthToken error: $e');
-      return {'status': 'error'};
     }
+
+    return {'status': 'invalid'}; // All other cases = invalid
+  } catch (e) {
+    debugPrint('🔐 refreshAuthToken error: $e');
+    return {'status': 'invalid'}; // Simplify error handling
   }
+}
 }

@@ -9,6 +9,7 @@ import '../widgets/app_button.dart';
 import '../services/app_cache_service.dart';
 import '../services/memory_monitor_service.dart';
 import 'services/api_service.dart';
+import 'login/login_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,34 +48,53 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Initialize cache system at app startup
-      await AppCacheService.initializeCache();
-      MemoryMonitorService().startMonitoring();
-      
-      final prefs = await SharedPreferences.getInstance();
-      bool? isLoggedIn = await prefs.getBool('isLogin');
-      // During logo display, validate/refresh token if logged in
-      if (isLoggedIn == true) {
-        final result = await AuthHealthService.refreshAuthToken();
-        if (result['status'] == 'refreshed' && result['token'] != null) {
-          await prefs.setString('authToken', result['token']);
-        } else if (result['status'] == 'expired' || result['status'] == 'invalid') {
-          await prefs.remove('authToken');
-          await prefs.setBool('isLogin', false);
-          isLoggedIn = false; // force login flow below
-        }
-      }
-
-      Timer(const Duration(seconds: 3), () async{
-        // Always take user to HomePage on launch
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomePage()),
-        );
-      });
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initializeApp());
   }
+
+  Future<void> _initializeApp() async {
+  try {
+    await AppCacheService.initializeCache();
+    MemoryMonitorService().startMonitoring();
+    
+    final prefs = await SharedPreferences.getInstance();
+    bool? isLoggedIn = prefs.getBool('isLogin');
+    bool shouldGoToHome = false;
+    
+    if (isLoggedIn == true) {
+      final result = await AuthHealthService.refreshAuthToken();
+      if (result['status'] == 'refreshed') {
+        if (result['token'] != null) {
+          await prefs.setString('authToken', result['token']);
+        }
+        shouldGoToHome = true;
+      } else {
+        await prefs.remove('authToken');
+        await prefs.setBool('isLogin', false);
+        shouldGoToHome = false;
+      }
+    }
+
+    await Future.delayed(const Duration(seconds: 3));
+    
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => shouldGoToHome ? HomePage() : LoginPage(),
+        ),
+      );
+    }
+  } catch (e) {
+    debugPrint('Initialization error: $e');
+    // On any error, go to login
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => LoginPage()),
+      );
+    }
+  }
+}
 
   @override
   void dispose() {
