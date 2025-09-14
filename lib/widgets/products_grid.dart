@@ -146,7 +146,7 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
           itemCount: widget.products.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.72,
+            childAspectRatio: 0.70, //Adjusted to avoid content overflow
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
