@@ -3,7 +3,7 @@ import '../../models/product.dart';
 import '../../widgets/search_bar_widget.dart';
 import '../services/api_service.dart';
 import './product_detail.dart';
-
+import '../services/location_helper.dart';
 class ProductListingPage extends StatefulWidget {
   final String title;
   final String source; // "fresh", "trending", "lastViewed", "searched"
@@ -23,6 +23,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
   List<Product> products = [];
   bool isLoading = true;
   Map<String, String> _sellerNames = {}; // Cache for seller names
+  Map<String, String> _locationCache = {}; //Cache for location (productId -> location string)
 
 
 String _timeAgo(DateTime? date) {
@@ -67,6 +68,26 @@ String _timeAgo(DateTime? date) {
     });
   }
 
+  Future<void> _loadLocation(Product product) async {
+  if (product.latitude != null &&
+      product.longitude != null &&
+      !_locationCache.containsKey(product.id)) {
+    try {
+      final location = await getAddressFromLatLng(
+        product.latitude!,
+        product.longitude!,
+      );
+      if (mounted) {
+        setState(() {
+          _locationCache[product.id] = location;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+}
+
   Future<void> _handleProductClick(Product product) async {
     await ApiService.trackProductClick(product.id); // 🔥 track the click
     Navigator.push(
@@ -110,6 +131,9 @@ String _timeAgo(DateTime? date) {
   final ageText = product.yearOfPurchase != null
       ? '${DateTime.now().year - product.yearOfPurchase!} Y'
       : 'N/A';
+//Load location
+_loadLocation(product);
+final locationString = _locationCache[product.id] ?? product.location ?? 'Unknown';
 
   return GestureDetector(
     onTap: () => _handleProductClick(product),
@@ -222,7 +246,7 @@ String _timeAgo(DateTime? date) {
                 const Spacer(),
                 const Icon(Icons.location_on, size: 16, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text(product.location ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+                Text(locationString, style: const TextStyle(fontSize: 12)),
               ],
             ),
           ),
