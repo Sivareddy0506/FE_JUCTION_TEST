@@ -14,26 +14,31 @@ class CategoryGrid extends StatelessWidget {
     {'image': 'assets/clothes.png', 'label': 'Clothes &\nAccessories'},
     {'image': 'assets/gaming.png', 'label': 'Gaming'},
     {'image': 'assets/hobbies.png', 'label': 'Hobbies &\nActivities'},
-     {'image': 'assets/tickets.png', 'label': 'Tickets &\nVouchers'},
-    
+    {'image': 'assets/tickets.png', 'label': 'Tickets &\nVouchers'},
   ];
 
   @override
   Widget build(BuildContext context) {
-    final itemSize = (MediaQuery.of(context).size.width * 0.18).clamp(48.0, 96.0);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final itemSize = (screenWidth * 0.18).clamp(48.0, 96.0);
+
     return SizedBox(
-      height: itemSize + 34, // image + label + padding
+      height: itemSize + 40, // image + label + padding
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 16), // Reduced from 16 to 12
+        separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final category = categories[index];
           return GestureDetector(
             onTap: () {
               final raw = category['label'] ?? '';
-              final query = raw.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+              final query = raw
+                  .replaceAll('\n', ' ')
+                  .replaceAll(RegExp(r'\s+'), ' ')
+                  .trim();
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -41,9 +46,28 @@ class CategoryGrid extends StatelessWidget {
                 ),
               );
             },
-            child: CategoryItem(
-              imagePath: category['image']!,
-              label: category['label']!,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 🔥 High-quality responsive image
+                Image.asset(
+                  category['image']!,
+                  width: itemSize,
+                  height: itemSize,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+                const SizedBox(height: 6),
+                // 🔠 Responsive label
+                Text(
+                  category['label']!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: (screenWidth * 0.035).clamp(12.0, 16.0),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           );
         },

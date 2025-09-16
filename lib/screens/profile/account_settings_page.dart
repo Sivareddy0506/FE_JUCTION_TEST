@@ -183,14 +183,14 @@ class AccountSettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const ReferralsPage()),
                     ),
                   ),
-                  _buildSettingItem(
-                    icon: Icons.groups_2_outlined,
-                    title: "Crew Clash",
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CrewClashPage()),
-                    ),
-                  ),
+                  // _buildSettingItem(
+                  //   icon: Icons.groups_2_outlined,
+                  //   title: "Crew Clash",
+                  //   onTap: () => Navigator.push(
+                  //     context,
+                  //     MaterialPageRoute(builder: (_) => const CrewClashPage()),
+                  //   ),
+                  // ),
                   _buildSectionTitle("Help and Support"),
                   _buildSettingItem(
                     icon: Icons.help_outline,
@@ -208,14 +208,14 @@ class AccountSettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const TermsPage()),
                     ),
                   ),
-                  _buildSettingItem(
-                    icon: Icons.headset_mic_outlined,
-                    title: "Contact Support",
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SupportPage()),
-                    ),
-                  ),
+                  // _buildSettingItem(
+                  //   icon: Icons.headset_mic_outlined,
+                  //   title: "Contact Support",
+                  //   onTap: () => Navigator.push(
+                  //     context,
+                  //     MaterialPageRoute(builder: (_) => const SupportPage()),
+                  //   ),
+                  // ),
                   _buildSettingItem(
                     icon: Icons.report_gmailerrorred_outlined,
                     title: "Report Issue",

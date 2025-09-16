@@ -365,7 +365,7 @@ void _navigateToRateSellerScreen(ChatModel chatData) {
                   controller: priceController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    hintText: '₹ 23,500',
+                    hintText: 'Enter Final Price',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -1109,7 +1109,7 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
                   keyboardType: TextInputType.number,
                   enabled: !_isConfirmingDeal,
                   decoration: InputDecoration(
-                    hintText: '₹ 23,000',
+                    hintText: 'Enter Final Price',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
