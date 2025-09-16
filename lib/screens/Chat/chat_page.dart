@@ -1373,7 +1373,7 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
                       ),
                     ),
                     Text(
-                      '₹${productData['price']}',
+                      '${productData['price']}',
                       style: const TextStyle(
                         color: Colors.orange,
                         fontWeight: FontWeight.bold,
