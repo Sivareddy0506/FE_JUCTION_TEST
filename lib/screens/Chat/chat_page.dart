@@ -25,21 +25,31 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
-  // ★ REMOVED: ChatModel? _chatData; (now comes from StreamBuilder)
-  // ★ REMOVED: bool _isSeller = false; (now computed in StreamBuilder)
-  
   // Upload progress state
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   String _uploadStatus = '';
+
+  bool _isImageUploading = false;
+  double _imageUploadProgress = 0.0;
+  String _imageUploadStatus = '';
   
   // Deal confirmation loading state
   bool _isConfirmingDeal = false;
 
+  late FocusNode _messageFocusNode;
+  bool _isKeyboardVisible = false;
+
   @override
   void initState() {
     super.initState();
-    // ★ REMOVED: _loadChatData(); (no longer needed)
+    _messageFocusNode = FocusNode();
+    _messageFocusNode.addListener(() {
+    setState(() {
+      _isKeyboardVisible = _messageFocusNode.hasFocus;
+    });
+  });
+
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -49,27 +59,32 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // ★ UPDATED: All methods now receive chatData as parameter instead of using _chatData
   void _sendMessage(String message, ChatModel chatData) async {
-    if (message.trim().isEmpty) return;
+  if (message.trim().isEmpty) return;
 
-    bool isSeller = chatData.sellerId == _chatService.currentUserId;
-    String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
+  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
 
-    try {
-      await _chatService.sendMessage(
-        chatId: widget.chatId,
-        receiverId: receiverId,
-        message: message.trim(),
-      );
-      _messageController.clear();
+  try {
+    await _chatService.sendMessage(
+      chatId: widget.chatId,
+      receiverId: receiverId,
+      message: message.trim(),
+    );
+    _messageController.clear();
+    if (!_isKeyboardVisible) {
       _scrollToBottom();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e')),
-      );
+    } else {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollToBottom();
+      });
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to send message: $e')),
+    );
   }
+}
 
   Widget _buildInputArea(ChatModel chatData) {
   bool isSeller = chatData.sellerId == _chatService.currentUserId;
@@ -271,28 +286,49 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: TextField(
               controller: _messageController,
+              focusNode: _messageFocusNode, // Add this line
               enabled: !_isUploading && !_isConfirmingDeal,
+              textInputAction: TextInputAction.send,
+              maxLines: null, // Allow multiline
+              textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: (_isUploading || _isConfirmingDeal) ? 'Processing...' : 'Write a message...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
                   borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+               enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 20,
-                ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(25),
+                borderSide: const BorderSide(color: Colors.black, width: 1.5),
               ),
-              onSubmitted: (_isUploading || _isConfirmingDeal) ? null : (text) => _sendMessage(text, chatData),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 10,
+              horizontal: 20,
             ),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+            onSubmitted: (_isUploading || _isConfirmingDeal) ? null : (text) {
+              _sendMessage(text, chatData);
+              _messageFocusNode.requestFocus(); // Keep focus after sending
+            },
+          ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            onPressed: (_isUploading || _isConfirmingDeal) ? null : () => _showImagePickerBottomSheet(chatData),
-            icon: Icon(
-              Icons.camera_alt,
-              color: (_isUploading || _isConfirmingDeal) ? Colors.grey : Colors.black,
-            ),
+              onPressed: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                ? null 
+                : () => _showImagePickerBottomSheet(chatData),
+              icon: Icon(
+                  Icons.camera_alt_rounded,
+                  color: (_isUploading || _isConfirmingDeal || _isImageUploading)
+                      ? Colors.grey
+                      : Colors.black,
+              ),
           ),
           CircleAvatar(
             backgroundColor: (_isUploading || _isConfirmingDeal) ? Colors.grey : Colors.black,
@@ -639,132 +675,357 @@ void _navigateToRateSellerScreen(ChatModel chatData) {
         ),
       ),
     );
-
-    // Timer(const Duration(seconds: 3), () {
-    //   if (mounted) {
-    //     Navigator.pushReplacement(
-    //       context,
-    //       MaterialPageRoute(
-    //         builder: (context) => ReviewScreen(
-    //           ratedUserId: chatData.buyerId,
-    //           ratedById: chatData.sellerId,
-    //           fromProductSold: true,
-    //         ),
-    //       ),
-    //     );
-    //   }
-    // });
   }
 
   void _showImagePickerBottomSheet(ChatModel chatData) {
   showModalBottomSheet(
     context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
     builder: (context) => Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Select Image',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildImageSourceButton(
-                icon: Icons.camera_alt,
-                label: 'Camera',
-                onTap: () => _pickImage(ImageSource.camera, chatData),
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              _buildImageSourceButton(
-                icon: Icons.photo_library,
-                label: 'Gallery',
-                onTap: () => _pickImage(ImageSource.gallery, chatData),
+              
+              // Title
+              const Text(
+                'Add Photo',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Subtitle
+              Text(
+                'Choose how you want to add a photo',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Options
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildImageSourceOption(
+                      icon: Icons.camera_alt_rounded,
+                      label: 'Camera',
+                      onTap: () => _handleImageSelection(ImageSource.camera, chatData),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildImageSourceOption(
+                      icon: Icons.photo_library_rounded,
+                      label: 'Gallery',
+                      onTap: () => _handleImageSelection(ImageSource.gallery, chatData),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Cancel button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-        ],
+        ),
       ),
     ),
   );
 }
 
-Widget _buildImageSourceButton({
+Widget _buildImageSourceOption({
   required IconData icon,
   required String label,
   required VoidCallback onTap,
 }) {
   return GestureDetector(
     onTap: onTap,
-    child: Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(
-            icon,
-            size: 30,
-            color: Colors.black,
-          ),
+    child: Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey[200]!,
+          width: 1,
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14),
-        ),
-      ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              icon,
+              size: 24,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
 
-void _pickImage(ImageSource source, ChatModel chatData) async {
-  Navigator.pop(context);
+void _handleImageSelection(ImageSource source, ChatModel chatData) async {
+  Navigator.pop(context); // Close the bottom sheet first
   
   final bool isSeller = chatData.sellerId == _chatService.currentUserId;
   String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
 
+  // Set initial upload state
+  setState(() {
+    _isImageUploading = true;
+    _imageUploadProgress = 0.0;
+    _imageUploadStatus = 'Selecting image...';
+  });
+
   try {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Sending image...', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-      ),
-    );
+    // Show upload overlay
+    _showUploadOverlay();
     
-    await _chatService.pickAndSendImage(
+    await _chatService.pickAndSendImageWithProgress(
       chatId: widget.chatId,
       receiverId: receiverId,
       source: source,
+      onUploadStart: (status) {
+        setState(() {
+          _imageUploadStatus = status;
+          _imageUploadProgress = 0.0;
+        });
+      },
+      onUploadProgress: (progress) {
+        setState(() {
+          _imageUploadProgress = progress;
+          _imageUploadStatus = 'Uploading... ${(progress * 100).toInt()}%';
+        });
+      },
+      onUploadComplete: () {
+        setState(() {
+          _isImageUploading = false;
+          _imageUploadProgress = 1.0;
+          _imageUploadStatus = 'Upload complete';
+        });
+        Navigator.of(context, rootNavigator: true).pop(); // Close overlay
+        _scrollToBottom();
+        
+        // Show success feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Photo sent successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      onError: (error) {
+        setState(() {
+          _isImageUploading = false;
+          _imageUploadProgress = 0.0;
+          _imageUploadStatus = '';
+        });
+        Navigator.of(context, rootNavigator: true).pop(); // Close overlay
+        
+        // Show error feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Failed to send photo: $error')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      },
     );
-    
-    Navigator.pop(context);
-    _scrollToBottom();
   } catch (e) {
-    Navigator.pop(context);
+    setState(() {
+      _isImageUploading = false;
+      _imageUploadProgress = 0.0;
+      _imageUploadStatus = '';
+    });
+    Navigator.of(context, rootNavigator: true).pop(); // Close overlay if still open
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to send image: $e')),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Failed to send image: $e')),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
+}
+
+void _showUploadOverlay() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black54,
+    builder: (BuildContext context) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Progress indicator
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: CircularProgressIndicator(
+                          value: _imageUploadProgress,
+                          strokeWidth: 4,
+                          backgroundColor: Colors.grey[200],
+                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.black),
+                        ),
+                      ),
+                      Text(
+                        '${(_imageUploadProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Status text
+                  Text(
+                    _imageUploadStatus,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  Text(
+                    'Please wait while we process your image',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
 
   void _scrollToBottom() {
@@ -881,13 +1142,20 @@ void _pickImage(ImageSource source, ChatModel chatData) async {
                         return Center(child: Text('Error: ${messageSnapshot.error}'));
                       }
                       List<MessageModel> messages = messageSnapshot.data ?? [];
+      
                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _scrollToBottom();
+                        if (!_isKeyboardVisible && _scrollController.hasClients) {
+                          _scrollToBottom();
+                        }
                       });
+      
                       return ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(bottom: 8),
                         itemCount: messages.length,
+                        addAutomaticKeepAlives: true,
+                        addRepaintBoundaries: true,
+                        addSemanticIndexes: true,
                         itemBuilder: (context, index) {
                           MessageModel message = messages[index];
                           return _buildMessage(message, chatData);
@@ -1390,12 +1658,13 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
   }
 
   Widget _buildImageMessage(MessageModel message, bool isMe) {
-    final attachmentData = message.attachmentData;
-    if (attachmentData == null) return const SizedBox();
+  final attachmentData = message.attachmentData;
+  if (attachmentData == null) return const SizedBox();
 
-    String imageUrl = attachmentData['url'] ?? '';
+  String imageUrl = attachmentData['url'] ?? '';
 
-    return Container(
+  return RepaintBoundary( // Add this wrapper
+    child: Container(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       child: Column(
         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -1411,6 +1680,9 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
+                  // Add caching and error handling to prevent rebuilds
+                  cacheWidth: 400, // Limit cache size
+                  cacheHeight: 400,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
                     return Container(
@@ -1460,8 +1732,9 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSystemMessage(MessageModel message) {
     return Container(
@@ -1587,6 +1860,7 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _messageFocusNode.dispose();
     super.dispose();
   }
 }
