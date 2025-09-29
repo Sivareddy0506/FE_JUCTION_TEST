@@ -5,7 +5,7 @@ import 'dart:ui';
 
 import './active_listing.dart';
 import './purchased.dart';
-import 'sold.dart';
+import './sold.dart';
 import './about.dart';
 import './favourites.dart';
 import 'package:flutter/material.dart';

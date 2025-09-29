@@ -21,6 +21,7 @@ class ChatModel {
   final String productTitle;
   final String productImage;
   final String productPrice;
+  final String? orderId; // Nullable orderId
   final String lastMessage;
   final DateTime lastMessageTime;
   final DateTime createdAt;
@@ -38,6 +39,7 @@ class ChatModel {
     required this.productTitle,
     required this.productImage,
     required this.productPrice,
+    this.orderId, // Nullable orderId
     required this.lastMessage,
     required this.lastMessageTime,
     required this.createdAt,
@@ -57,6 +59,7 @@ class ChatModel {
       productTitle: data['productTitle'] ?? '',
       productImage: data['productImage'] ?? '',
       productPrice: data['productPrice'] ?? '',
+      orderId: data['orderId'], // Nullable orderId
       lastMessage: data['lastMessage'] ?? '',
       lastMessageTime: (data['lastMessageTime'] as Timestamp).toDate(),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
@@ -77,6 +80,7 @@ class ChatModel {
       'productTitle': productTitle,
       'productImage': productImage,
       'productPrice': productPrice,
+      'orderId': orderId, // Nullable orderId
       'lastMessage': lastMessage,
       'lastMessageTime': Timestamp.fromDate(lastMessageTime),
       'createdAt': Timestamp.fromDate(createdAt),
@@ -226,6 +230,7 @@ Stream<ChatModel?> getChatStream(String chatId) {
   required String productTitle,
   required String productImage,
   required String productPrice,
+
 }) async {
   try {
     String chatId = '${productId}_${sellerId}_$buyerId';
@@ -492,168 +497,52 @@ Stream<ChatModel?> getChatStream(String chatId) {
       },
     );
   }
-
-  Future<void> confirmDeal({
-    required String chatId,
-    required String receiverId,
-    required double finalPrice,
-    required String productId,
-    required String buyerId,
-  }) async {
-    try {
-      await _callConfirmDealAPI(
-        productId: productId,
-        buyerId: buyerId,
-        finalPrice: finalPrice,
-        chatId: chatId,
-      );
-
-      // Send deal locked message
-      await sendMessage(
-        chatId: chatId,
-        receiverId: receiverId,
-        message: 'Deal locked at ₹${finalPrice.toStringAsFixed(0)}',
-        messageType: 'deal_locked',
-        priceData: {
-          'price': finalPrice,
-          'isConfirmed': true,
-          'confirmedBy': currentUserId, // Track who confirmed
-        },
-      );
-
-      await _firestore.collection('chats').doc(chatId).update({
-        'dealStatus': 'confirmed', 
-        'finalPrice': finalPrice,
-        'lastMessage': 'Deal confirmed at ₹${finalPrice.toStringAsFixed(0)}',
-        'lastMessageTime': Timestamp.fromDate(DateTime.now()),
-      });
-
-      String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_system';
-      MessageModel systemMessage = MessageModel(
-        messageId: systemMessageId,
-        senderId: 'system',
-        receiverId: receiverId,
-        message: 'Congratulations! Deal has been locked.',
-        timestamp: DateTime.now(),
-        messageType: 'system',
-      );
-
-      await _firestore
-          .collection('messages')
-          .doc(chatId)
-          .collection('messages')
-          .doc(systemMessageId)
-          .set(systemMessage.toFirestore());
-    } catch (e) {
-      throw Exception('Failed to confirm deal: $e');
-    }
-  }
-
-  Future<void> _callConfirmDealAPI({
-    required String productId,
-    required String buyerId,
-    required double finalPrice,
-    required String chatId,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final authToken = prefs.getString('authToken');
-      
-      final response = await http.post(
-        Uri.parse('https://api.junctionverse.com/product/deal-lock'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-        body: jsonEncode({
-          'productId': productId,
-          'finalPrice': finalPrice,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        final errorData = jsonDecode(response.body);
-        throw Exception('Failed to confirm deal: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
-      }
-    } catch (e) {
-      throw Exception('API call failed: $e');
-    }
-  }
-
-  Future<void> markAsSold({
-    required String chatId,
-    required String receiverId,
-    required String productId,
-    required String buyerId,
-    required double finalPrice,
-  }) async {
-    try {
-      await markProductAsSold(
-        productId: productId,
-        buyerId: buyerId,
-      );
-
-      await _firestore.collection('chats').doc(chatId).update({
-        'dealStatus': 'locked', // ★ FINAL STATUS: product sold
-        'lastMessage': 'Product marked as sold',
-        'lastMessageTime': Timestamp.fromDate(DateTime.now()),
-      });
-
-      String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_sold';
-      MessageModel systemMessage = MessageModel(
-        messageId: systemMessageId,
-        senderId: 'system',
-        receiverId: receiverId,
-        message: 'Product has been marked as sold. Transaction completed!',
-        timestamp: DateTime.now(),
-        messageType: 'system',
-      );
-
-      await _firestore
-          .collection('messages')
-          .doc(chatId)
-          .collection('messages')
-          .doc(systemMessageId)
-          .set(systemMessage.toFirestore());
-
-    } catch (e) {
-      throw Exception('Failed to mark product as sold: $e');
-    }
-  }
-
-  static Future<bool> markProductAsSold({
-    required String productId,
-    required String buyerId,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final authToken = prefs.getString('authToken');
-      
-      final response = await http.post(
-        Uri.parse('https://api.junctionverse.com/product/mark-sold'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-        body: jsonEncode({
-          'productId': productId,
-          'buyerId': buyerId,
-        }),
-      );
-      
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception('Failed to mark product as sold: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
-      }
-    } catch (e) {
-      throw Exception('API call failed: $e');
-    }
-  }
-
-static Future<bool> lockDeal({
+Future<String> confirmDeal({
+  required String chatId,
+  required String receiverId,
+  required double finalPrice,
   required String productId,
+  required String buyerId,
+}) async {
+  try {
+    // Call API and get orderId
+    final String orderId = await _callConfirmDealAPI(
+      productId: productId,
+      buyerId: buyerId,
+      finalPrice: finalPrice,
+    );
+
+    // Send deal locked message
+    await sendMessage(
+      chatId: chatId,
+      receiverId: receiverId,
+      message: 'Deal locked at ₹${finalPrice.toStringAsFixed(0)}',
+      messageType: 'deal_locked',
+      priceData: {
+        'price': finalPrice,
+        'isConfirmed': true,
+        'confirmedBy': currentUserId,
+      },
+    );
+
+    // Update chat
+    await _firestore.collection('chats').doc(chatId).update({
+      'dealStatus': 'confirmed',
+      'finalPrice': finalPrice,
+      'lastMessage': 'Deal confirmed at ₹${finalPrice.toStringAsFixed(0)}',
+      'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+      'orderId': orderId, // store orderId
+    });
+
+    return orderId; // ✅ Return orderId
+  } catch (e) {
+    throw Exception('Failed to confirm deal: $e');
+  }
+}
+
+Future<String> _callConfirmDealAPI({
+  required String productId,
+  required String buyerId,
   required double finalPrice,
 }) async {
   try {
@@ -668,6 +557,119 @@ static Future<bool> lockDeal({
       },
       body: jsonEncode({
         'productId': productId,
+        'buyerId': buyerId,
+        'finalPrice': finalPrice,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['orderId']; // ✅ Return orderId from API response
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(
+        'Failed to confirm deal: ${response.statusCode} - ${errorData['error'] ?? 'Unknown error'}'
+      );
+    }
+  } catch (e) {
+    throw Exception('API call failed: $e');
+  }
+}
+
+Future<void> markAsSold({
+  required String chatId,
+  required String receiverId,
+  required String productId,
+  required String buyerId,
+  required double finalPrice,
+  String? orderId, // nullable
+}) async {
+  try {
+    await markProductAsSold(
+      productId: productId,
+      buyerId: buyerId,
+      orderId: orderId, // pass nullable
+    );
+
+    await _firestore.collection('chats').doc(chatId).update({
+      'dealStatus': 'locked', // ★ FINAL STATUS: product sold
+      'lastMessage': 'Product marked as sold',
+      'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+    });
+
+    String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_sold';
+    MessageModel systemMessage = MessageModel(
+      messageId: systemMessageId,
+      senderId: 'system',
+      receiverId: receiverId,
+      message: 'Product has been marked as sold. Transaction completed!',
+      timestamp: DateTime.now(),
+      messageType: 'system',
+    );
+
+    await _firestore
+        .collection('messages')
+        .doc(chatId)
+        .collection('messages')
+        .doc(systemMessageId)
+        .set(systemMessage.toFirestore());
+
+  } catch (e) {
+    throw Exception('Failed to mark product as sold: $e');
+  }
+}
+
+static Future<bool> markProductAsSold({
+  required String productId,
+  required String buyerId,
+  String? orderId, // ✅ Added orderId
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+
+    final response = await http.post(
+      Uri.parse('https://api.junctionverse.com/product/mark-sold'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({
+        'productId': productId,
+        'buyerId': buyerId,
+        'orderId': orderId, // ✅ Send orderId
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception('Failed to mark product as sold: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+    }
+  } catch (e) {
+    throw Exception('API call failed: $e');
+  }
+}
+
+static Future<bool> lockDeal({
+  required String productId,
+  required String buyerId,
+  required double finalPrice,
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+
+    final response = await http.post(
+      Uri.parse('https://api.junctionverse.com/product/deal-lock'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({
+        'productId': productId,
+        'buyerId': buyerId,       // ✅ required
         'finalPrice': finalPrice,
       }),
     );
@@ -677,12 +679,13 @@ static Future<bool> lockDeal({
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(
-          'Failed to lock deal: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+          'Failed to lock deal: ${response.statusCode} - ${errorData['error'] ?? 'Unknown error'}');
     }
   } catch (e) {
     throw Exception('API call failed: $e');
   }
 }
+
 
 
 

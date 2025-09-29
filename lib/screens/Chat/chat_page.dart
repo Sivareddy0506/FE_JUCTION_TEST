@@ -314,9 +314,9 @@ class _ChatPageState extends State<ChatPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (_isUploading || _isConfirmingDeal) 
-                      ? null 
-                      : () => _showMarkAsSoldConfirmation(chatData),
+                  onPressed: (_isUploading || _isConfirmingDeal)
+    ? null
+    : () => _showMarkAsSoldConfirmation(chatData, chatData.orderId ?? ''),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: (_isUploading || _isConfirmingDeal) 
                         ? Colors.grey 
@@ -720,207 +720,6 @@ void _showQuotePriceBottomSheet(ChatModel chatData) async {
   );
 }
 
-void _showMarkAsSoldConfirmation(ChatModel chatData) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: StatefulBuilder(
-          builder: (context, setModalState) => Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Mark as Sold',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'This will mark the product as sold and complete the transaction.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        chatData.productTitle,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Final Price: ₹${chatData.finalPrice?.toStringAsFixed(0) ?? '0'}',
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Buyer: ${chatData.buyerName}',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isConfirmingDeal ? null : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isConfirmingDeal ? null : () async {
-                          setModalState(() {
-                            _isConfirmingDeal = true;
-                          });
-                          setState(() {
-                            _isConfirmingDeal = true;
-                          });
-
-                          try {
-                            await _chatService.markAsSold(
-                              chatId: widget.chatId,
-                              receiverId: chatData.buyerId,
-                              productId: chatData.productId,
-                              buyerId: chatData.buyerId,
-                              finalPrice: chatData.finalPrice ?? 0,
-                            );
-
-                            Navigator.pop(context);
-                            _navigateToProductSoldFlow(chatData);
-
-                          } catch (e) {
-                            setModalState(() {
-                              _isConfirmingDeal = false;
-                            });
-                            setState(() {
-                              _isConfirmingDeal = false;
-                            });
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to mark as sold: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isConfirmingDeal 
-                              ? Colors.grey 
-                              : const Color(0xFF2D2D2D),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _isConfirmingDeal
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(Icons.check, color: Colors.white, size: 18),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Mark as Sold',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (!_isConfirmingDeal) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.warning_amber_outlined,
-                          color: Colors.orange[700],
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'This action cannot be undone. The product will be marked as sold.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange[700],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 void _navigateToProductSoldFlow(ChatModel chatData) {
   Navigator.pushReplacement(
     context,
@@ -1273,6 +1072,7 @@ void _showImageUploadOverlay() {
     },
   );
 }
+
 Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatData) {
   final priceData = message.priceData;
   if (priceData == null) return const SizedBox();
@@ -1366,7 +1166,7 @@ Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatDa
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _isConfirmingDeal ? null : () => _showConfirmPriceBottomSheet(price, chatData),
+                   onPressed: _isConfirmingDeal ? null : () => _showConfirmPriceBottomSheet(chatData, price),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _isConfirmingDeal ? Colors.grey : Colors.black,
                       shape: RoundedRectangleBorder(
@@ -1397,10 +1197,10 @@ Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatDa
   );
 }
 
-void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
-  final TextEditingController priceController = TextEditingController(
-    text: price.toStringAsFixed(0),
-  );
+Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, double price) async { 
+
+  final TextEditingController priceController =
+      TextEditingController(text: price.toStringAsFixed(0));
   bool isSeller = chatData.sellerId == _chatService.currentUserId;
 
   showModalBottomSheet(
@@ -1418,168 +1218,213 @@ void _showConfirmPriceBottomSheet(double price, ChatModel chatData) {
           top: 16,
         ),
         child: StatefulBuilder(
-          builder: (context, setModalState) => Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Confirm Deal',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+          builder: (context, setModalState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Confirm Deal',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Lock this deal at the final price',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                enabled: !_isConfirmingDeal,
+                decoration: InputDecoration(
+                  hintText: 'Enter Final Price',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  prefixText: '₹ ',
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Lock this deal at the final price',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: priceController,
-                  keyboardType: TextInputType.number,
-                  enabled: !_isConfirmingDeal,
-                  decoration: InputDecoration(
-                    hintText: 'Enter Final Price',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isConfirmingDeal ? null : () => Navigator.pop(context),
+                      child: const Text('Cancel'),
                     ),
-                    prefixText: '₹ ',
                   ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isConfirmingDeal ? null : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isConfirmingDeal ? null : () async {
-                          if (priceController.text.isNotEmpty) {
-                            setModalState(() {
-                              _isConfirmingDeal = true;
-                            });
-                            setState(() {
-                              _isConfirmingDeal = true;
-                            });
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isConfirmingDeal
+                          ? null
+                          : () async {
+                              if (priceController.text.isEmpty) return;
 
-                            try {
-                              double finalPrice = double.tryParse(
-                                priceController.text.replaceAll(',', ''),
-                              ) ?? price;
-                              String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
+                              setModalState(() => _isConfirmingDeal = true);
+                              setState(() => _isConfirmingDeal = true);
 
-                              await _chatService.confirmDeal(
-                                chatId: widget.chatId,
-                                receiverId: receiverId,
-                                finalPrice: finalPrice,
-                                productId: chatData.productId,
-                                buyerId: chatData.buyerId,
-                              );
+                              double finalPrice =
+                                  double.tryParse(priceController.text.replaceAll(',', '')) ??
+                                      price;
+                              String receiverId =
+                                  isSeller ? chatData.buyerId : chatData.sellerId;
 
-                              _isConfirmingDeal = false;
-                              setModalState(() {});
-                              setState(() {});
+                              try {
+                                // Lock deal and get orderId
+                                bool locked = await ChatService.lockDeal(
+                                  productId: chatData.productId,
+                                  buyerId: chatData.buyerId,
+                                  finalPrice: finalPrice,
+                                );
 
-                              Navigator.pop(context);
-                              _scrollToBottom();
+                                if (locked) {
+                                  // After locking deal, update Firestore
+                                  await _chatService.confirmDeal(
+                                    chatId: chatData.chatId,
+                                    receiverId: receiverId,
+                                    finalPrice: finalPrice,
+                                    productId: chatData.productId,
+                                    buyerId: chatData.buyerId,
+                                  );
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Deal confirmed successfully!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
+                                  // Assume orderId returned by API or generate locally
+                                  String orderId = DateTime.now().millisecondsSinceEpoch.toString();
 
-                            } catch (e) {
-                              setModalState(() {
-                                _isConfirmingDeal = false;
-                              });
-                              setState(() {
-                                _isConfirmingDeal = false;
-                              });
+                                  // Close price sheet
+                                  Navigator.pop(context);
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to confirm deal: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isConfirmingDeal ? Colors.grey : Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: _isConfirmingDeal
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                'Lock Deal',
-                                style: TextStyle(color: Colors.white),
+                                  // Open Mark as Sold
+                                  _showMarkAsSoldConfirmation(chatData, orderId);
+
+                                  _scrollToBottom();
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Deal confirmed successfully!'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                setModalState(() => _isConfirmingDeal = false);
+                                setState(() => _isConfirmingDeal = false);
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to confirm deal: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                      child: _isConfirmingDeal
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (!_isConfirmingDeal) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.amber[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.amber[700],
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'This will lock the deal and mark the product as sold',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.amber[700],
-                            ),
-                          ),
-                        ),
-                      ],
+                            )
+                          : const Text('Lock Deal', style: TextStyle(color: Colors.white)),
                     ),
                   ),
                 ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     ),
   );
 }
+
+void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
+  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Mark as Sold',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Are you sure you want to mark this product as sold?',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      setState(() => _isConfirmingDeal = true);
+
+                      try {
+                        await _chatService.markAsSold(
+                          chatId: chatData.chatId,
+                          receiverId: isSeller ? chatData.buyerId : chatData.sellerId,
+                          productId: chatData.productId,
+                          buyerId: chatData.buyerId,
+                          finalPrice: chatData.finalPrice ?? 0,
+                          orderId: orderId,
+                        );
+
+                        setState(() => _isConfirmingDeal = false);
+                        _scrollToBottom();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Product marked as sold!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e) {
+                        setState(() => _isConfirmingDeal = false);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to mark as sold: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Mark as Sold'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
+
+
 
 Widget _buildRegularMessage(MessageModel message, bool isMe, ChatModel chatData) {
   bool isSeller = chatData.sellerId == _chatService.currentUserId;
