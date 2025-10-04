@@ -21,12 +21,12 @@ class ChatModel {
   final String productTitle;
   final String productImage;
   final String productPrice;
-  final String? orderId; // Nullable orderId
+  String? orderId; // Nullable orderId
   final String lastMessage;
   final DateTime lastMessageTime;
   final DateTime createdAt;
   final String dealStatus;
-  final double? finalPrice;
+  double? finalPrice;
   final List<String> participants;
 
   ChatModel({
@@ -197,6 +197,7 @@ class ChatService {
   final ImagePicker _imagePicker = ImagePicker();
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
+  String orderId = '';
 
   Future<bool> chatExists(String chatId) async {
     try {
@@ -503,14 +504,15 @@ Future<String> confirmDeal({
   required double finalPrice,
   required String productId,
   required String buyerId,
+  required String orderId,
 }) async {
   try {
     // Call API and get orderId
-    final String orderId = await _callConfirmDealAPI(
-      productId: productId,
-      buyerId: buyerId,
-      finalPrice: finalPrice,
-    );
+    // final String orderId = await _callConfirmDealAPI(
+    //   productId: productId,
+    //   buyerId: buyerId,
+    //   finalPrice: finalPrice,
+    // );
 
     // Send deal locked message
     await sendMessage(
@@ -575,6 +577,38 @@ Future<String> _callConfirmDealAPI({
     throw Exception('API call failed: $e');
   }
 }
+
+static Future<bool> cancelDeal({
+  required String orderId,
+}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+
+    final response = await http.post(
+      Uri.parse('https://api.junctionverse.com/product/cancel-deal'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({
+        'orderId': orderId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(
+        'Failed to cancel deal: ${response.statusCode} - ${errorData['error'] ?? 'Unknown error'}'
+      );
+    }
+  } catch (e) {
+    throw Exception('API call failed: $e');
+  }
+}
+
 
 Future<void> markAsSold({
   required String chatId,
@@ -652,7 +686,7 @@ static Future<bool> markProductAsSold({
   }
 }
 
-static Future<bool> lockDeal({
+static Future<String> lockDeal({
   required String productId,
   required String buyerId,
   required double finalPrice,
@@ -675,7 +709,8 @@ static Future<bool> lockDeal({
     );
 
     if (response.statusCode == 200) {
-      return true;
+      final data = jsonDecode(response.body);
+      return data['order']['orderId'];
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(

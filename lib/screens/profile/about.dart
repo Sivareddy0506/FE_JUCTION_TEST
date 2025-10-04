@@ -37,8 +37,17 @@ class _AboutTabState extends State<AboutTab> {
         return;
       }
 
+      final authToken = prefs.getString('authToken');
+
       final url = Uri.parse("https://api.junctionverse.com/ratings/$userId");
-      final response = await http.get(url);
+      // final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
