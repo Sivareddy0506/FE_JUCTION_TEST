@@ -53,10 +53,12 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
 
   String? selectedUsage;
   String? selectedCondition;
+  String? priceError;
+  String? yearError;
 
   bool get isFormValid {
-    final isYearValid = RegExp(r'^\d{4}$').hasMatch(yearController.text);
-    final isPriceValid = double.tryParse(priceController.text) != null;
+    final isYearValid = _validateYear(yearController.text) == null;
+    final isPriceValid = _validatePrice(priceController.text) == null;
 
     return titleController.text.isNotEmpty &&
         priceController.text.isNotEmpty &&
@@ -67,6 +69,170 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
         brandController.text.isNotEmpty &&
         selectedUsage != null &&
         selectedCondition != null;
+  }
+
+  String? _validatePrice(String value) {
+  if (value.isEmpty) return null;
+
+  // Remove any commas, spaces, and rupee symbols
+  final cleanedValue = value
+      .replaceAll(',', '')
+      .replaceAll(' ', '')
+      .replaceAll('₹', '')
+      .replaceAll('Rs', '')
+      .replaceAll('rs', '')
+      .trim();
+
+  // Check if starts with invalid characters
+  if (cleanedValue.startsWith('.') || cleanedValue.startsWith(',')) {
+    return 'Price cannot start with a decimal point';
+  }
+
+  // Check if starts with 0 followed by digits (like 0123)
+  if (RegExp(r'^0\d+').hasMatch(cleanedValue)) {
+    return 'Invalid price format';
+  }
+
+  // Check if it's a valid number
+  final price = double.tryParse(cleanedValue);
+  if (price == null) {
+    return 'Please enter a valid price';
+  }
+
+  // Check if price is positive (handles 0 and negative)
+  if (price <= 0) {
+    return 'Price must be greater than 0';
+  }
+
+  return null;
+}
+
+  String? _validateYear(String value) {
+    if (value.isEmpty) return null;
+
+    final year = int.tryParse(value);
+    final currentYear = DateTime.now().year;
+
+    if (year == null) {
+      return 'Please enter a valid year';
+    }
+
+    if (year < 1900) {
+      return 'Year cannot be before 1900';
+    }
+
+    if (year > currentYear) {
+      return 'Year cannot be in the future';
+    }
+
+    return null;
+  }
+
+  void _onPriceChanged(String value) {
+    setState(() {
+      priceError = _validatePrice(value);
+    });
+  }
+
+  void _onYearChanged(String value) {
+    setState(() {
+      yearError = _validateYear(value);
+    });
+  }
+
+  Future<void> _showYearPicker() async {
+    final currentYear = DateTime.now().year;
+    final selectedYear = await showDialog<int>(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            height: 450,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const Text(
+                  'Select Year of Purchase',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF262626),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: currentYear - 1899,
+                    reverse: true,
+                    itemBuilder: (context, index) {
+                      final year = currentYear - index;
+                      final isSelected = yearController.text == year.toString();
+                      return InkWell(
+                        onTap: () => Navigator.of(context).pop(year),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFF262626).withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            year.toString(),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isSelected
+                                  ? const Color(0xFF262626)
+                                  : const Color(0xFF212121),
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: const BorderSide(color: Color(0xFF262626)),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF262626),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selectedYear != null) {
+      yearController.text = selectedYear.toString();
+      _onYearChanged(selectedYear.toString());
+      _updateFormState();
+    }
   }
 
   void _updateFormState() => setState(() {});
@@ -93,10 +259,35 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
   }
 
   void _goToNextPage() {
+    final priceValidation = _validatePrice(priceController.text);
+    final yearValidation = _validateYear(yearController.text);
+
+    if (priceValidation != null || yearValidation != null) {
+      setState(() {
+        priceError = priceValidation;
+        yearError = yearValidation;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fix the errors before proceeding'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final cleanedPrice = priceController.text
+        .replaceAll(',', '')
+        .replaceAll(' ', '')
+        .replaceAll('₹', '')
+        .replaceAll('Rs', '')
+        .replaceAll('rs', '')
+        .trim();
+
     final productDetails = ProductDetails(
       category: widget.selectedCategory,
       title: titleController.text.trim(),
-      price: priceController.text.trim(),
+      price: cleanedPrice,
       description: descriptionController.text.trim(),
       productName: productNameController.text.trim(),
       year: yearController.text.trim(),
@@ -104,42 +295,42 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
       condition: selectedCondition!,
       brandName: brandController.text.trim(),
     );
-  if(AppState.instance.isJuction == true){
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TuneAuctionWidget(
-          selectedCategory: productDetails.category,
-          title: productDetails.title,
-          price: productDetails.price,
-          description: productDetails.description,
-          productName: productDetails.productName,
-          yearOfPurchase: productDetails.year,
-          brandName: productDetails.brandName,
-          usage: productDetails.usage,
-          condition: productDetails.condition,
-        ),
-      ),
-    );
-  }else{
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddProductImagesPage(
-          selectedCategory: productDetails.category,
-          title: productDetails.title,
-          price: productDetails.price,
-          description: productDetails.description,
-          productName: productDetails.productName,
-          yearOfPurchase: productDetails.year,
-          brandName: productDetails.brandName,
-          usage: productDetails.usage,
-          condition: productDetails.condition,
-        ),
-      ),
-    );
-  }
 
+    if (AppState.instance.isJuction == true) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TuneAuctionWidget(
+            selectedCategory: productDetails.category,
+            title: productDetails.title,
+            price: productDetails.price,
+            description: productDetails.description,
+            productName: productDetails.productName,
+            yearOfPurchase: productDetails.year,
+            brandName: productDetails.brandName,
+            usage: productDetails.usage,
+            condition: productDetails.condition,
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddProductImagesPage(
+            selectedCategory: productDetails.category,
+            title: productDetails.title,
+            price: productDetails.price,
+            description: productDetails.description,
+            productName: productDetails.productName,
+            yearOfPurchase: productDetails.year,
+            brandName: productDetails.brandName,
+            usage: productDetails.usage,
+            condition: productDetails.condition,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -161,16 +352,26 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                         children: [
                           const Text(
                             "Describe Your Product",
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF262626)),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF262626),
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             "Selected Category: ${widget.selectedCategory}",
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF323537)),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF323537),
+                            ),
                           ),
                           const SizedBox(height: 32),
 
-                          const Text("Ad Details", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text(
+                            "Ad Details",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           const SizedBox(height: 16),
                           AppTextField(
                             label: 'Title *',
@@ -178,12 +379,33 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                             controller: titleController,
                           ),
                           const SizedBox(height: 16),
-                          AppTextField(
-                            label: 'Price *',
-                            placeholder: '₹ 34,000',
-                            controller: priceController,
+                          
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppTextField(
+                                label: 'Price *',
+                                placeholder: '34000',
+                                controller: priceController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                onChanged: _onPriceChanged,
+                                prefixText: '₹ ',
+                              ),
+                              if (priceError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4, left: 12),
+                                  child: Text(
+                                    priceError!,
+                                    style: const TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 16),
+                          
                           AppTextField(
                             label: 'Product Description',
                             placeholder: 'Good condition, box included',
@@ -192,18 +414,63 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           ),
                           const SizedBox(height: 32),
 
-                          const Text("Product Details", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text(
+                            "Product Details",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           const SizedBox(height: 16),
                           AppTextField(
-                            label: 'Product Name',
+                            label: 'Product Name *',
                             placeholder: 'Eg: Product Name',
                             controller: productNameController,
                           ),
                           const SizedBox(height: 16),
-                          AppTextField(
-                            label: 'Year of Purchase',
-                            placeholder: 'Eg: 2020',
-                            controller: yearController,
+                          
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              GestureDetector(
+                                onTap: _showYearPicker,
+                                child: AbsorbPointer(
+                                  child: AppTextField(
+                                    label: 'Year of Purchase *',
+                                    placeholder: 'Eg: 2020',
+                                    controller: yearController,
+                                  ),
+                                ),
+                              ),
+                              if (yearError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4, left: 12),
+                                  child: Text(
+                                    yearError!,
+                                    style: const TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4, left: 12),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_today,
+                                      size: 12,
+                                      color: Color(0xFF8A8894),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Tap to select year',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
 
@@ -224,7 +491,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           const SizedBox(height: 16),
 
                           AppTextField(
-                            label: 'Brand Name',
+                            label: 'Brand Name *',
                             placeholder: 'Eg: Samsung, Apple, etc.',
                             controller: brandController,
                           ),
