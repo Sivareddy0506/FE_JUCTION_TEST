@@ -173,56 +173,148 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
   void _handleExternalWallet(ExternalWalletResponse response) {}
 
   void _showAddMoneyBottomSheet() {
-    _amountController.clear();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          top: 20,
-          left: 20,
-          right: 20,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppTextField(
-              label: 'Amount',
-              placeholder: 'Enter Amount',
-              isMandatory: true,
-              keyboardType: TextInputType.number,
-              controller: _amountController,
-              onChanged: (val) {},
-            ),
-            const SizedBox(height: 20),
-            AppButton(
-              label: 'Add Amount',
-              backgroundColor: const Color(0xFF262626),
-              onPressed: () {
-                final amount = int.tryParse(_amountController.text);
-                if (amount != null && amount > 0) {
-                  Navigator.pop(context);
-                  _createOrder(amount);
-                }
-              },
-            ),
-            const SizedBox(height: 10),
-            AppButton(
-              label: 'Cancel',
-              backgroundColor: const Color(0xFF262626),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  _amountController.clear();
+  
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => StatefulBuilder(
+      builder: (BuildContext context, StateSetter setModalState) {
+        String? amountError;
+        bool isValidAmount = false;
+
+        String? validateAmount(String value) {
+          if (value.isEmpty) return null;
+
+          // Remove any spaces and commas
+          final cleanedValue = value.replaceAll(',', '').replaceAll(' ', '').trim();
+
+          // Check if it contains only digits
+          if (!RegExp(r'^\d+$').hasMatch(cleanedValue)) {
+            return 'Amount can only contain digits';
+          }
+
+          // Check if it's a valid number
+          final amount = int.tryParse(cleanedValue);
+          if (amount == null) {
+            return 'Please enter a valid amount';
+          }
+
+          // Check if amount is positive
+          if (amount <= 0) {
+            return 'Amount must be greater than 0';
+          }
+
+          // Check minimum amount (e.g., ₹10)
+          if (amount < 10) {
+            return 'Minimum amount is ₹10';
+          }
+
+          // Check maximum amount (e.g., ₹1,00,000)
+          if (amount > 100000) {
+            return 'Maximum amount is ₹1,00,000';
+          }
+
+          return null;
+        }
+
+        void _onAmountChanged(String value) {
+          setModalState(() {
+            amountError = validateAmount(value);
+            isValidAmount = amountError == null && value.isNotEmpty;
+          });
+        }
+
+        return Container(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add Money to Wallet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF262626),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppTextField(
+                    label: 'Amount',
+                    placeholder: 'Enter Amount',
+                    isMandatory: true,
+                    keyboardType: TextInputType.number,
+                    controller: _amountController,
+                    onChanged: _onAmountChanged,
+                    prefixText: '₹ ',
+                  ),
+                  if (amountError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 12),
+                      child: Text(
+                        amountError!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  if (amountError == null && _amountController.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 12),
+                      child: Text(
+                        'Amount between ₹10 and ₹1,00,000',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              AppButton(
+                label: 'Add Amount',
+                backgroundColor: isValidAmount 
+                    ? const Color(0xFF262626) 
+                    : const Color(0xFFBDBDBD),
+                onPressed: isValidAmount
+                    ? () {
+                        final amount = int.tryParse(_amountController.text);
+                        if (amount != null && amount > 0) {
+                          Navigator.pop(context);
+                          _createOrder(amount);
+                        }
+                      }
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              AppButton(
+                label: 'Cancel',
+                backgroundColor: const Color(0xFFBDBDBD),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
 
   Widget _buildTabButton(String label, String value) {
     final bool selected = activeTab == value;
