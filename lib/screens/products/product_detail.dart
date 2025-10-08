@@ -10,6 +10,7 @@ import '../profile/empty_state.dart';
 import '../../services/favorites_service.dart';
 import '../services/chat_service.dart';
 import '../../services/view_tracker.dart';
+import '../services/location_helper.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -33,6 +34,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   String? _sellerName;
   late int _displayViews;
   bool _registeredView = false;
+  String? _cachedLocation;
+  bool _isLoadingLocation = false; 
 
   @override
   void initState() {
@@ -51,6 +54,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     });
     _fetchRelatedProducts();
     _loadSellerName();
+    _loadProductLocation();
   }
 
   @override
@@ -71,6 +75,41 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       _sellerName = (name != null && name.isNotEmpty) ? name : 'Unknown Seller';
     });
   }
+
+  Future<void> _loadProductLocation() async {
+  if ((widget.product.location == null || widget.product.location!.isEmpty) &&
+      widget.product.latitude != null && 
+      widget.product.longitude != null && 
+      _cachedLocation == null &&
+      !_isLoadingLocation) {
+    
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      final location = await getAddressFromLatLng(
+        widget.product.latitude!, 
+        widget.product.longitude!
+      );
+      
+      if (mounted) {
+        setState(() {
+          _cachedLocation = location;
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading location for product ${widget.product.id}: $e');
+      if (mounted) {
+        setState(() {
+          _cachedLocation = 'Location unavailable';
+          _isLoadingLocation = false;
+        });
+      }
+    }
+  }
+}
 
   Future<void> _toggleFavorite(String productId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -458,34 +497,48 @@ Widget build(BuildContext context) {
               const SizedBox(height: 12),
 
               // Views and location block
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                 // color: Colors.white,
-                 // borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      'assets/Eye.png',
-                      width: 16,
-                      height: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Viewed by $_displayViews others',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      product.location ?? '',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ],
-                ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Views row
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/Eye.png',
+                    width: 16,
+                    height: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Viewed by $_displayViews others',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
               ),
+              const SizedBox(height: 8),
+              // Location row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: _buildLocationText(product),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Favourite and Share buttons combined in one section with bg color #f9f9f9
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        ),
             ],
           ),
         ),
@@ -561,10 +614,7 @@ Widget build(BuildContext context) {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               const SizedBox(height: 8),
-              Text(
-                product.location ?? '',
-                style: const TextStyle(fontSize: 14),
-              ),
+              _buildLocationText(product),
             ],
           ),
         ),
@@ -617,4 +667,56 @@ String _timeAgo(DateTime date) {
     if (diff.inMinutes > 0) return '${diff.inMinutes} minute(s) ago';
     return 'Just now';
   }
+
+  Widget _buildLocationText(Product product) {
+  // Priority 1: Use product.location if available
+  if (product.location != null && product.location!.isNotEmpty) {
+    return Text(
+      product.location!,
+      style: const TextStyle(fontSize: 14),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+  
+  // Priority 2: Use cached geocoded location
+  if (_cachedLocation != null && _cachedLocation != 'Location unavailable') {
+    return Text(
+      _cachedLocation!,
+      style: const TextStyle(fontSize: 14),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+  
+  // Priority 3: Show loading indicator
+  if (_isLoadingLocation) {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+          ),
+        ),
+        SizedBox(width: 8),
+        Text(
+          'Loading location...',
+          style: TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+  
+  // Fallback
+  return const Text(
+    'Location not set',
+    style: TextStyle(fontSize: 14, color: Colors.grey),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+  );
+}
 }
