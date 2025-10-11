@@ -27,6 +27,8 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
   String activeTab = 'all';
 
   bool _isLoading = true;
+  String? amountError;
+  bool isValidAmount = false;
 
   final TextEditingController _amountController = TextEditingController();
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
@@ -181,43 +183,57 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     backgroundColor: Colors.transparent,
     builder: (context) => StatefulBuilder(
       builder: (BuildContext context, StateSetter setModalState) {
-        String? amountError;
-        bool isValidAmount = false;
 
         String? validateAmount(String value) {
-          if (value.isEmpty) return null;
+  if (value.isEmpty) return null;
 
-          // Remove any spaces and commas
-          final cleanedValue = value.replaceAll(',', '').replaceAll(' ', '').trim();
+  // First check for invalid characters or patterns
+  // Allow only digits, commas, and spaces
+  if (!RegExp(r'^[\d,\s]+$').hasMatch(value)) {
+    return 'Amount can only contain digits';
+  }
 
-          // Check if it contains only digits
-          if (!RegExp(r'^\d+$').hasMatch(cleanedValue)) {
-            return 'Amount can only contain digits';
-          }
+  // Check for consecutive commas or invalid comma usage
+  if (value.contains(',,') || value.startsWith(',') || value.endsWith(',')) {
+    return 'Invalid amount format';
+  }
 
-          // Check if it's a valid number
-          final amount = int.tryParse(cleanedValue);
-          if (amount == null) {
-            return 'Please enter a valid amount';
-          }
+  // Remove spaces and commas for parsing
+  final cleanedValue = value.replaceAll(',', '').replaceAll(' ', '').trim();
 
-          // Check if amount is positive
-          if (amount <= 0) {
-            return 'Amount must be greater than 0';
-          }
+  // After cleaning, check if it's empty (means only commas/spaces were entered)
+  if (cleanedValue.isEmpty) {
+    return 'Please enter a valid amount';
+  }
 
-          // Check minimum amount (e.g., ₹10)
-          if (amount < 10) {
-            return 'Minimum amount is ₹10';
-          }
+  // Check if it contains only digits after cleaning
+  if (!RegExp(r'^\d+$').hasMatch(cleanedValue)) {
+    return 'Amount can only contain digits';
+  }
 
-          // Check maximum amount (e.g., ₹1,00,000)
-          if (amount > 100000) {
-            return 'Maximum amount is ₹1,00,000';
-          }
+  // Parse the amount
+  final amount = int.tryParse(cleanedValue);
+  if (amount == null) {
+    return 'Please enter a valid amount';
+  }
 
-          return null;
-        }
+  // Check if amount is positive
+  if (amount <= 0) {
+    return 'Amount must be greater than 0';
+  }
+
+  // Check minimum amount
+  if (amount < 10) {
+    return 'Minimum amount is ₹10';
+  }
+
+  // Check maximum amount
+  if (amount > 100000) {
+    return 'Maximum amount is ₹1,00,000';
+  }
+
+  return null;
+}
 
         void _onAmountChanged(String value) {
           setModalState(() {

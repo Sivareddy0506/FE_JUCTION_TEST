@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'empty_state.dart';
 import '../../../models/product.dart';
 import 'package:intl/intl.dart';
+import '/screens/products/product_detail.dart';
 
 class PurchasedTab extends StatefulWidget {
   const PurchasedTab({super.key});
@@ -124,6 +125,12 @@ class _PurchasedTabState extends State<PurchasedTab> {
         return GestureDetector(
           onTap: () {
             // TODO: navigate to product details page
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductDetailPage(product: product),
+              ),
+            );
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 16),

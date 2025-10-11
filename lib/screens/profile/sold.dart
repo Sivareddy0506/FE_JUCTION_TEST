@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'empty_state.dart';
 import '../../../models/product.dart';
 import 'package:intl/intl.dart';
+import '/screens/products/product_detail.dart';
 
 class SoldTab extends StatefulWidget {
   const SoldTab({super.key});
@@ -112,98 +113,109 @@ class _SoldTabState extends State<SoldTab> {
             ? DateFormat('dd MMM yyyy').format(product.createdAt!)
             : '';
 
-       return Container(
-  margin: const EdgeInsets.only(bottom: 16),
-  padding: const EdgeInsets.all(12),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.grey.withOpacity(0.2),
-        blurRadius: 4,
-        offset: const Offset(0, 2),
-      ),
-    ],
-  ),
-  child: Row(
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      // Product image
-      ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: product.imageUrl!.isNotEmpty
-            ? Image.network(
-                product.imageUrl!,
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
-              )
-            : Image.asset(
-                'assets/placeholder.png',
-                width: 70,
-                height: 70,
-                fit: BoxFit.cover,
-              ),
-      ),
-      const SizedBox(width: 12),
-
-      // Middle section
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              product.title ?? 'No Title',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+       return GestureDetector(
+        onTap: () {
+          // TODO: navigate to product details page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProductDetailPage(product: product),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Order ID / ${product.orderId ?? ''}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.deepPurple.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                product.status ?? 'Deal Locked',
+          );
+        },
+         child: Container(
+           margin: const EdgeInsets.only(bottom: 16),
+           padding: const EdgeInsets.all(12),
+           decoration: BoxDecoration(
+             color: Colors.white,
+             borderRadius: BorderRadius.circular(16),
+             boxShadow: [
+               BoxShadow(
+          color: Colors.grey.withOpacity(0.2),
+          blurRadius: 4,
+          offset: const Offset(0, 2),
+               ),
+             ],
+           ),
+           child: Row(
+             crossAxisAlignment: CrossAxisAlignment.center,
+             children: [
+               // Product image
+               ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: product.imageUrl!.isNotEmpty
+              ? Image.network(
+                  product.imageUrl!,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                )
+              : Image.asset(
+                  'assets/placeholder.png',
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                ),
+               ),
+               const SizedBox(width: 12),
+         
+               // Middle section
+               Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                product.title ?? 'No Title',
                 style: const TextStyle(
-                  color: Colors.deepPurple,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-
-      // Right side: Date + Arrow
-      Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            dateStr,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+              const SizedBox(height: 4),
+              Text(
+                'Order ID / ${product.orderId ?? ''}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  product.status ?? 'Deal Locked',
+                  style: const TextStyle(
+                    color: Colors.deepPurple,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          const Icon(Icons.chevron_right, color: Colors.black54),
-        ],
-      ),
-    ],
-  ),
-);
+               ),
+         
+               // Right side: Date + Arrow
+               Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              dateStr,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            const Icon(Icons.chevron_right, color: Colors.black54),
+          ],
+               ),
+             ],
+           ),
+         ),
+       );
 
       },
     );
