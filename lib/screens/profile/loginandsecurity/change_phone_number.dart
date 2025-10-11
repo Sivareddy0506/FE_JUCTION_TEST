@@ -31,10 +31,34 @@ class _ChangePhoneNumberPageState extends State<ChangePhoneNumberPage> {
       return;
     }
 
+    // First, check for invalid patterns before cleaning
+    // Check for consecutive special characters
+    if (RegExp(r'[,\s]{2,}').hasMatch(phone)) {
+      errorMessage = 'Invalid phone number format';
+      isValidPhone = false;
+      return;
+    }
+
+    // Check for commas (Indian numbers shouldn't have commas)
+    if (phone.contains(',')) {
+      errorMessage = 'Phone number cannot contain commas';
+      isValidPhone = false;
+      return;
+    }
+
+    // Check for invalid characters (allow only digits, +, and spaces)
+    if (!RegExp(r'^[\d\s+]+$').hasMatch(phone)) {
+      errorMessage = 'Phone number can only contain digits';
+      isValidPhone = false;
+      return;
+    }
+
     final cleaned = _cleanPhoneNumber(phone);
     
     if (!_isValidIndianMobile(phone)) {
-      if (cleaned.length < 10) {
+      if (cleaned.isEmpty) {
+        errorMessage = 'Please enter a phone number';
+      } else if (cleaned.length < 10) {
         errorMessage = 'Phone number must be 10 digits';
       } else if (cleaned.length > 10) {
         errorMessage = 'Phone number should not exceed 10 digits';
@@ -52,6 +76,9 @@ class _ChangePhoneNumberPageState extends State<ChangePhoneNumberPage> {
 
 bool _isValidIndianMobile(String phone) {
   final cleaned = phone.replaceAll(RegExp(r'\s+'), '').replaceAll(RegExp(r'[^\d+]'), '');
+  
+  // Check if cleaned is empty after removing invalid chars
+  if (cleaned.isEmpty) return false;
   
   final RegExp indianMobilePattern = RegExp(r'^(?:\+91|91)?[6-9]\d{9}$');
   
