@@ -125,7 +125,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
       appBar: AppBar(
         title: Text("Review"),
         actions: [
-          TextButton(onPressed: () {}, child: Text("Skip", style: TextStyle(color: Colors.black)))
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+          }, child: Text("Skip", style: TextStyle(color: Colors.black)))
         ],
       ),
       body: Padding(
