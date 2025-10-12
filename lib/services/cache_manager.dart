@@ -44,99 +44,122 @@ class CacheManager {
 
   /// Load persistent cache data from SharedPreferences
   Future<void> _loadPersistentCache() async {
-    if (_prefs == null) return;
+  if (_prefs == null) return;
 
+  try {
+    final cacheData = _prefs!.getString('cache_data');
+    final timestampsData = _prefs!.getString('cache_timestamps');
+    final expiriesData = _prefs!.getString('cache_expiries');
+
+    // Safety: skip oversized blob (>5 MB) to avoid OOM
+    const int _maxPersistentBytes = 5 * 1024 * 1024; // 5 MB
+    if (cacheData != null && cacheData.length > _maxPersistentBytes) {
+      debugPrint('CacheManager: persistent cache_data too large (${cacheData.length} bytes). Clearing...');
+      // Clear persistent keys directly WITHOUT calling clearAllCaches()
+      await _prefs!.remove('cache_data');
+      await _prefs!.remove('cache_timestamps');
+      await _prefs!.remove('cache_expiries');
+      await _prefs!.remove('cache_sizes');
+      // Don't load anything else, just return
+      return;
+    }
+
+    if (cacheData != null) {
+      final Map<String, dynamic> decoded = json.decode(cacheData);
+      _memoryCache.addAll(decoded);
+    }
+
+    if (timestampsData != null) {
+      final Map<String, dynamic> decoded = json.decode(timestampsData);
+      _cacheTimestamps.addAll(
+        decoded.map((key, value) => MapEntry(key, DateTime.parse(value)))
+      );
+    }
+
+    if (expiriesData != null) {
+      final Map<String, dynamic> decoded = json.decode(expiriesData);
+      _cacheExpiries.addAll(
+        decoded.map((key, value) => MapEntry(key, Duration(milliseconds: value)))
+      );
+    }
+
+    // Load sizes map if present
+    final sizesData = _prefs!.getString('cache_sizes');
+    if (sizesData != null) {
+      final Map<String, dynamic> decoded = json.decode(sizesData);
+      _cacheSizes.addAll(decoded.map((k, v) => MapEntry(k, v as int)));
+    }
+
+    // Re-calculate current size based on loaded sizes
+    _currentCacheSizeBytes = _cacheSizes.values.fold(0, (p, c) => p + c);
+
+    // Clean expired entries on load
+    await _cleanExpiredEntriesInternal();
+    debugPrint('CacheManager: Loaded ${_memoryCache.length} persistent cache entries');
+  } catch (e) {
+    debugPrint('CacheManager: Error loading persistent cache: $e');
+    // On error, clear corrupted data directly
     try {
-      final cacheData = _prefs!.getString('cache_data');
-      final timestampsData = _prefs!.getString('cache_timestamps');
-      final expiriesData = _prefs!.getString('cache_expiries');
-
-      // Safety: skip oversized blob (>5 MB) to avoid OOM
-      const int _maxPersistentBytes = 5 * 1024 * 1024; // 5 MB
-      if (cacheData != null && cacheData.length < _maxPersistentBytes) {
-        final Map<String, dynamic> decoded = json.decode(cacheData);
-        _memoryCache.addAll(decoded);
-      } else if (cacheData != null) {
-        debugPrint('CacheManager: persistent cache_data too large (${cacheData.length} bytes). Clearing…');
-        // Clear persistent keys to free space
-        await clearAllCaches();
-      }
-
-      if (timestampsData != null) {
-        final Map<String, dynamic> decoded = json.decode(timestampsData);
-        _cacheTimestamps.addAll(
-          decoded.map((key, value) => MapEntry(key, DateTime.parse(value)))
-        );
-      }
-
-      if (expiriesData != null) {
-        final Map<String, dynamic> decoded = json.decode(expiriesData);
-        _cacheExpiries.addAll(
-          decoded.map((key, value) => MapEntry(key, Duration(milliseconds: value)))
-        );
-      }
-
-      // Load sizes map if present
-      final sizesData = _prefs!.getString('cache_sizes');
-      if (sizesData != null) {
-        final Map<String, dynamic> decoded = json.decode(sizesData);
-        _cacheSizes.addAll(decoded.map((k, v) => MapEntry(k, v as int)));
-      }
-
-      // Re-calculate current size based on loaded sizes
-      _currentCacheSizeBytes = _cacheSizes.values.fold(0, (p, c) => p + c);
-
-      // Clean expired entries on load
-      await _cleanExpiredEntries();
-      debugPrint('CacheManager: Loaded ${_memoryCache.length} persistent cache entries');
-    } catch (e) {
-      debugPrint('CacheManager: Error loading persistent cache: $e');
+      await _prefs!.remove('cache_data');
+      await _prefs!.remove('cache_timestamps');
+      await _prefs!.remove('cache_expiries');
+      await _prefs!.remove('cache_sizes');
+    } catch (clearError) {
+      debugPrint('CacheManager: Error clearing corrupted cache: $clearError');
     }
   }
+}
+
+Future<void> _cleanExpiredEntriesInternal() async {
+  final expiredKeys = _memoryCache.keys.where((key) => isCacheExpired(key)).toList();
+  
+  for (final key in expiredKeys) {
+    _memoryCache.remove(key);
+    _cacheTimestamps.remove(key);
+    _cacheExpiries.remove(key);
+    _currentCacheSizeBytes -= _cacheSizes[key] ?? 0;
+    _cacheSizes.remove(key);
+  }
+  
+  if (expiredKeys.isNotEmpty) {
+    debugPrint('CacheManager: Cleaned ${expiredKeys.length} expired entries');
+  }
+}
 
   /// Save cache data to SharedPreferences
   Future<void> _savePersistentCache() async {
-    if (_prefs == null) return;
+  if (_prefs == null || !_isInitialized) return; // Don't save if not initialized
 
-    try {
-      // Clean expired entries before saving
-      await _cleanExpiredEntries();
+  try {
+    // Clean expired entries before saving (using internal method to avoid recursion)
+    await _cleanExpiredEntriesInternal();
 
-      // Convert data for JSON serialization
-      final cacheData = json.encode(_memoryCache);
-      final timestampsData = json.encode(
-        _cacheTimestamps.map((key, value) => MapEntry(key, value.toIso8601String()))
-      );
-      final expiriesData = json.encode(
-        _cacheExpiries.map((key, value) => MapEntry(key, value.inMilliseconds))
-      );
+    // Convert data for JSON serialization
+    final cacheData = json.encode(_memoryCache);
+    final timestampsData = json.encode(
+      _cacheTimestamps.map((key, value) => MapEntry(key, value.toIso8601String()))
+    );
+    final expiriesData = json.encode(
+      _cacheExpiries.map((key, value) => MapEntry(key, value.inMilliseconds))
+    );
+    final sizesData = json.encode(_cacheSizes);
 
-      await _prefs!.setString('cache_data', cacheData);
-      await _prefs!.setString('cache_timestamps', timestampsData);
-      await _prefs!.setString('cache_expiries', expiriesData);
-      
-      // Persist sizes
-      final sizesData = json.encode(_cacheSizes);
-      await _prefs!.setString('cache_sizes', sizesData);
+    await _prefs!.setString('cache_data', cacheData);
+    await _prefs!.setString('cache_timestamps', timestampsData);
+    await _prefs!.setString('cache_expiries', expiriesData);
+    await _prefs!.setString('cache_sizes', sizesData);
 
-      debugPrint('CacheManager: Saved ${_memoryCache.length} cache entries to persistent storage');
-    } catch (e) {
-      debugPrint('CacheManager: Error saving persistent cache: $e');
-    }
+    debugPrint('CacheManager: Saved ${_memoryCache.length} cache entries to persistent storage');
+  } catch (e) {
+    debugPrint('CacheManager: Error saving persistent cache: $e');
   }
+}
 
   /// Clean expired entries from both memory and persistent storage
   Future<void> _cleanExpiredEntries() async {
-    final expiredKeys = _memoryCache.keys.where((key) => isCacheExpired(key)).toList();
-    
-    for (final key in expiredKeys) {
-      await invalidateCache(key);
-    }
-    
-    if (expiredKeys.isNotEmpty) {
-      debugPrint('CacheManager: Cleaned ${expiredKeys.length} expired entries');
-    }
-  }
+  await _cleanExpiredEntriesInternal();
+  await _savePersistentCache();
+}
 
   /// Get cached data by key
   Future<T?> getCachedData<T>(String key) async {
