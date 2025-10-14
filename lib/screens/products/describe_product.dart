@@ -407,7 +407,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           const SizedBox(height: 16),
                           
                           AppTextField(
-                            label: 'Product Description',
+                            label: 'Product Description *',
                             placeholder: 'Good condition, box included',
                             controller: descriptionController,
                             maxLines: 5,
@@ -483,7 +483,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           // const SizedBox(height: 16),
 
                           AppDropdown(
-                            label: 'Condition',
+                            label: 'Condition *',
                             items: conditionOptions,
                             value: selectedCondition,
                             onChanged: (val) => setState(() => selectedCondition = val),
