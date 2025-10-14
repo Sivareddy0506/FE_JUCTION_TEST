@@ -26,7 +26,7 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
   Future<void> _submitCode() async {
     final code = codeController.text.trim();
     setState(() => isLoading = true);
-
+    //TODO: Implement referral code verification API call here
     try {
       if (!mounted) return;
       Navigator.push(

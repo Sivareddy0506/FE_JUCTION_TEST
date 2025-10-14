@@ -51,7 +51,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
   final List<String> usageOptions = ['Normal Usage', 'Heavy Usage', 'Like New'];
   final List<String> conditionOptions = ['Like New', 'Gently Used', 'Fair', 'Needs Fixing'];
 
-  String? selectedUsage;
+  String? selectedUsage = '';
   String? selectedCondition;
   String? priceError;
   String? yearError;
@@ -474,13 +474,13 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           ),
                           const SizedBox(height: 16),
 
-                          AppDropdown(
-                            label: 'Usage',
-                            items: usageOptions,
-                            value: selectedUsage,
-                            onChanged: (val) => setState(() => selectedUsage = val),
-                          ),
-                          const SizedBox(height: 16),
+                          // AppDropdown(
+                          //   label: 'Usage',
+                          //   items: usageOptions,
+                          //   value: selectedUsage,
+                          //   onChanged: (val) => setState(() => selectedUsage = val),
+                          // ),
+                          // const SizedBox(height: 16),
 
                           AppDropdown(
                             label: 'Condition',

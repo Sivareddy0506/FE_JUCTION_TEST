@@ -156,6 +156,22 @@ class _EduDetailsPageState extends State<EduDetailsPage> {
     return 'Address must be at least 10 characters';
   }
   
+  // Allow only letters, numbers, spaces, and common address punctuation
+  // Allowed: letters, numbers, spaces, comma, period, hyphen, forward slash, apostrophe, hash/number sign, parentheses
+  if (!RegExp(r"^[a-zA-Z0-9\s,.\-/'#()]+$").hasMatch(value)) {
+    return 'Address contains invalid characters';
+  }
+  
+  // Check for excessive repetition of special characters (more than 3 in a row)
+  if (RegExp(r"[,.\-/\'#()]{4,}").hasMatch(value)) {
+    return 'Please enter a valid address format';
+  }
+  
+  // Check for excessive repetition of any single character (more than 4 in a row)
+  if (RegExp(r'(.)\1{4,}').hasMatch(value)) {
+    return 'Please enter a valid address';
+  }
+  
   if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
     return 'Address must contain letters';
   }
@@ -164,10 +180,9 @@ class _EduDetailsPageState extends State<EduDetailsPage> {
     return 'Address must contain at least one number';
   }
   
-  final hasLettersAndNumbers = RegExp(r'[a-zA-Z]').hasMatch(value) && 
-                                RegExp(r'\d').hasMatch(value);
-  
-  if (!hasLettersAndNumbers) {
+  // Ensure there are actual words (at least 2 sequences of 2+ letters)
+  final words = RegExp(r'[a-zA-Z]{2,}').allMatches(value);
+  if (words.length < 2) {
     return 'Please enter a complete address with street number and name';
   }
   

@@ -63,6 +63,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
     // Check if profile is already cached
     final isProfileCached = await ProfileService.isProfileCached();
     
+    if (!mounted) return;
+    
     if (isProfileCached) {
       // If profile is cached, show structure immediately (like before)
       setState(() {
@@ -78,14 +80,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
       _initializeProfile(),
     ]);
     
+    if (!mounted) return;
+    
     // For first load, also wait for active listings to load
     if (_isFirstLoad) {
       await _initializeActiveListings();
     } else {
       // For cached loads, don't wait for active listings
-      setState(() {
-        _activeListingsReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _activeListingsReady = true;
+        });
+      }
     }
     
     debugPrint('UserProfilePage: All initialization completed');
@@ -95,15 +101,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
     debugPrint('UserProfilePage: Initializing favorites service');
     try {
       await FavoritesService().initialize();
-      setState(() {
-        _favoritesReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _favoritesReady = true;
+        });
+      }
       debugPrint('UserProfilePage: Favorites service initialized successfully');
     } catch (e) {
       debugPrint('UserProfilePage: Error initializing favorites service - $e');
-      setState(() {
-        _favoritesReady = true; // Set to true even on error to prevent infinite loading
-      });
+      if (mounted) {
+        setState(() {
+          _favoritesReady = true; // Set to true even on error to prevent infinite loading
+        });
+      }
     }
   }
 
@@ -111,15 +121,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
     debugPrint('UserProfilePage: Loading profile data');
     try {
       await _loadUserProfile();
-      setState(() {
-        _profileReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _profileReady = true;
+        });
+      }
       debugPrint('UserProfilePage: Profile data loaded successfully');
     } catch (e) {
       debugPrint('UserProfilePage: Error loading profile data - $e');
-      setState(() {
-        _profileReady = true; // Set to true even on error to prevent infinite loading
-      });
+      if (mounted) {
+        setState(() {
+          _profileReady = true; // Set to true even on error to prevent infinite loading
+        });
+      }
     }
   }
 
@@ -145,6 +159,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Future<void> _preloadProfileImage(String imageUrl) async {
+    ImageStreamListener? listener;
     try {
       debugPrint('UserProfilePage: Preloading profile image: $imageUrl');
       
@@ -153,22 +168,38 @@ class _UserProfilePageState extends State<UserProfilePage> {
       
       // Create an ImageStreamListener to track when the image is ready
       final imageStream = NetworkImage(imageUrl).resolve(ImageConfiguration.empty);
-      final listener = ImageStreamListener((ImageInfo info, bool synchronousCall) {
-        debugPrint('UserProfilePage: Profile image fully loaded and ready');
-        completer.complete();
-      }, onError: (dynamic exception, StackTrace? stackTrace) {
-        debugPrint('UserProfilePage: Error loading profile image - $exception');
-        completer.complete(); // Complete even on error to prevent hanging
-      });
+      listener = ImageStreamListener(
+        (ImageInfo info, bool synchronousCall) {
+          debugPrint('UserProfilePage: Profile image fully loaded and ready');
+          if (!completer.isCompleted) completer.complete();
+        },
+        onError: (dynamic exception, StackTrace? stackTrace) {
+          debugPrint('UserProfilePage: Error loading profile image - $exception');
+          if (!completer.isCompleted) completer.complete();
+        }
+      );
       
       imageStream.addListener(listener);
       
       // Wait for the image to be fully loaded
       await completer.future;
       
+      // Clean up listener
+      imageStream.removeListener(listener);
+      
       debugPrint('UserProfilePage: Profile image preloaded successfully');
     } catch (e) {
       debugPrint('UserProfilePage: Error preloading profile image - $e');
+    } finally {
+      // Ensure listener is removed even if exception occurs
+      if (listener != null) {
+        try {
+          final imageStream = NetworkImage(imageUrl).resolve(ImageConfiguration.empty);
+          imageStream.removeListener(listener);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
   }
 
@@ -179,12 +210,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
       
+      if (!mounted) return;
+      
       if (token != null) {
         final uri = Uri.parse('https://api.junctionverse.com/product/active');
         final response = await http.get(uri, headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         });
+        
+        if (!mounted) return;
         
         if (response.statusCode == 200) {
           debugPrint('UserProfilePage: Active listings API call successful');
@@ -213,15 +248,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
         }
       }
       
-      setState(() {
-        _activeListingsReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _activeListingsReady = true;
+        });
+      }
       debugPrint('UserProfilePage: Active listings data loaded successfully');
     } catch (e) {
       debugPrint('UserProfilePage: Error loading active listings data - $e');
-      setState(() {
-        _activeListingsReady = true; // Set to true even on error to prevent infinite loading
-      });
+      if (mounted) {
+        setState(() {
+          _activeListingsReady = true; // Set to true even on error to prevent infinite loading
+        });
+      }
     }
   }
 
@@ -244,38 +283,68 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ),
     );
 
+    if (!mounted) return;
     if (source == null) return;
 
-    final pickedFile = await picker.pickImage(source: source);
-    if (pickedFile == null) return;
+    try {
+      final pickedFile = await picker.pickImage(source: source);
+      if (!mounted) return;
+      if (pickedFile == null) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('authToken');
-    if (token == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      if (!mounted) return;
+      if (token == null) return;
 
-    final uri = Uri.parse('https://api.junctionverse.com/user/update-profile-image');
-    final request = http.MultipartRequest('PUT', uri);
-    request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(await http.MultipartFile.fromPath('profileImage', pickedFile.path));
+      final uri = Uri.parse('https://api.junctionverse.com/user/update-profile-image');
+      final request = http.MultipartRequest('PUT', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(await http.MultipartFile.fromPath('profileImage', pickedFile.path));
 
-    final response = await request.send();
+      final response = await request.send();
+      if (!mounted) return;
 
-    if (response.statusCode == 200) {
-      final responseBody = await response.stream.bytesToString();
-      final data = jsonDecode(responseBody);
-      final updatedUser = data['user'];
+      if (response.statusCode == 200) {
+        final responseBody = await response.stream.bytesToString();
+        final data = jsonDecode(responseBody);
+        
+        // Add null safety checks
+        if (data is Map<String, dynamic> && 
+            data['user'] is Map<String, dynamic> &&
+            data['user']['selfieUrl'] is String) {
+          final updatedUser = data['user'] as Map<String, dynamic>;
+          final newProfileImage = updatedUser['selfieUrl'] as String;
+          
+          if (mounted) {
+            setState(() {
+              profileImage = newProfileImage;
+            });
 
-      setState(() {
-        profileImage = updatedUser['selfieUrl'];
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile image updated successfully')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update profile image')),
-      );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile image updated successfully')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Invalid response from server')),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update profile image: ${response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating profile image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
@@ -306,7 +375,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
           fit: StackFit.expand,
           children: [
             profileImage.isNotEmpty
-                ? Image.network(profileImage, fit: BoxFit.cover)
+                ? Image.network(
+                    profileImage,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(color: backgroundColor);
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(color: backgroundColor);
+                    },
+                  )
                 : Container(color: backgroundColor),
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -327,7 +406,25 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           profileImage.isNotEmpty
                               ? CircleAvatar(
                                   radius: 36,
-                                  backgroundImage: NetworkImage(profileImage),
+                                  backgroundColor: backgroundColor,
+                                  child: ClipOval(
+                                    child: Image.network(
+                                      profileImage,
+                                      width: 72,
+                                      height: 72,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Text(
+                                          name.isNotEmpty ? name[0].toUpperCase() : '',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 )
                               : CircleAvatar(
                                   radius: 36,
@@ -353,7 +450,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(40),
                                 ),
-                                child: Image.asset('assets/edit.png', width: 16, height: 16),
+                                child: Image.asset(
+                                  'assets/edit.png',
+                                  width: 16,
+                                  height: 16,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.edit, size: 16);
+                                  },
+                                ),
                               ),
                             ),
                           ),
@@ -366,7 +470,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
                           );
                         },
-                        icon: Image.asset('assets/settings.png', width: 24, height: 24),
+                        icon: Image.asset(
+                          'assets/settings.png',
+                          width: 24,
+                          height: 24,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.settings, size: 24, color: Colors.white);
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -385,7 +496,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/univ.png', width: 14),
+                    Image.asset(
+                      'assets/univ.png',
+                      width: 14,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.school, size: 14, color: Color(0xFFE3E3E3));
+                      },
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       university,
@@ -397,7 +514,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Image.asset('assets/loc.png', width: 14),
+                    Image.asset(
+                      'assets/loc.png',
+                      width: 14,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.location_on, size: 14, color: Color(0xFFE3E3E3));
+                      },
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       location,
@@ -443,23 +566,23 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         Expanded(
                           child: Builder(
                             builder: (context) {
-                                                             switch (selectedTabIndex) {
-                                 case 0:
-                                   return ActiveAuctionsTab(
-                                     hideLoadingIndicator: !_allDataReady,
-                                     startLoading: _allDataReady, // Only start loading when parent is ready
-                                   );
-                                 case 1:
-                                   return const AboutTab();
-                                 case 2:
-                                   return const PurchasedTab();
-                                 case 3:
-                                   return const SoldTab();
-                                 case 4:
-                                   return const FavoritesTab(); // Or EmptyState widget
-                                 default:
-                                   return const Center(child: Text("Invalid Tab"));
-                               }
+                              switch (selectedTabIndex) {
+                                case 0:
+                                  return ActiveAuctionsTab(
+                                    hideLoadingIndicator: !_allDataReady,
+                                    startLoading: _allDataReady, // Only start loading when parent is ready
+                                  );
+                                case 1:
+                                  return const AboutTab();
+                                case 2:
+                                  return const PurchasedTab();
+                                case 3:
+                                  return const SoldTab();
+                                case 4:
+                                  return const FavoritesTab(); // Or EmptyState widget
+                                default:
+                                  return const Center(child: Text("Invalid Tab"));
+                              }
                             },
                           ),
                         ),
