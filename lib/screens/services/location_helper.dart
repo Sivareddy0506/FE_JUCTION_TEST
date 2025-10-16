@@ -55,7 +55,7 @@ class LocationCache {
 }
 
 /// Reverse geocode coordinates to location name using Nominatim (OpenStreetMap)
-/// Returns format: "City, State" or "City" or "State" depending on availability
+/// Returns format: "Neighborhood, City" or "City, State" depending on availability
 Future<String> getAddressFromLatLng(double lat, double lng) async {
   // Check cache first
   final cached = LocationCache.get(lat, lng);
@@ -67,7 +67,7 @@ Future<String> getAddressFromLatLng(double lat, double lng) async {
   try {
     final url = Uri.parse(
       'https://nominatim.openstreetmap.org/reverse?'
-      'format=json&lat=$lat&lon=$lng&zoom=10&addressdetails=1'
+      'format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1'
     );
     
     final response = await http.get(
@@ -86,6 +86,7 @@ Future<String> getAddressFromLatLng(double lat, double lng) async {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       
+      // Check if we got valid data
       if (data['error'] != null) {
         debugPrint('Nominatim error: ${data['error']}');
         return 'Location unavailable';
@@ -96,10 +97,15 @@ Future<String> getAddressFromLatLng(double lat, double lng) async {
         return 'Location unavailable';
       }
       
+      // Extract neighborhood/sublocality, city, and state
+      final neighborhood = address['neighbourhood'] ?? 
+                          address['suburb'] ?? 
+                          address['residential'] ??
+                          address['quarter'] ?? '';
+      
       final city = address['city'] ?? 
                    address['town'] ?? 
                    address['village'] ?? 
-                   address['suburb'] ?? 
                    address['municipality'] ?? '';
       
       final state = address['state'] ?? 
@@ -107,14 +113,25 @@ Future<String> getAddressFromLatLng(double lat, double lng) async {
                     address['region'] ?? '';
       
       String result;
-      if (city.isNotEmpty && state.isNotEmpty) {
+      
+      // Priority 1: Neighborhood + City (e.g., "Indira Nagar, Bengaluru")
+      if (neighborhood.isNotEmpty && city.isNotEmpty) {
+        result = '$neighborhood, $city';
+      }
+      // Priority 2: City + State (e.g., "Bengaluru, Karnataka")
+      else if (city.isNotEmpty && state.isNotEmpty) {
         result = '$city, $state';
-      } else if (city.isNotEmpty) {
+      }
+      // Priority 3: Just City
+      else if (city.isNotEmpty) {
         result = city;
-      } else if (state.isNotEmpty) {
+      }
+      // Priority 4: Just State
+      else if (state.isNotEmpty) {
         result = state;
-      } else {
-        // Fallback to country if nothing else available
+      }
+      // Fallback: Country
+      else {
         result = address['country'] ?? 'Location unavailable';
       }
       
