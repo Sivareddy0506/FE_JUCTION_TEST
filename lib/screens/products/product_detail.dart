@@ -4,20 +4,20 @@ import 'package:http/http.dart' as http;
 import 'package:junction/screens/Chat/chat_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
-import '../../widgets/app_button.dart';
 import '../../widgets/products_grid.dart';
 import '../profile/empty_state.dart';
 import '../../services/favorites_service.dart';
 import '../services/chat_service.dart';
 import '../../services/view_tracker.dart';
 import '../services/location_helper.dart';
+import '../../services/profile_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
-  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
+  final VoidCallback? onFavoriteChanged;
 
   const ProductDetailPage({
-    super.key, 
+    super.key,
     required this.product,
     this.onFavoriteChanged,
   });
@@ -32,29 +32,31 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   final ChatService _chatService = ChatService();
   late FavoritesService _favoritesService;
   String? _sellerName;
-  late int _displayViews;
+  int _displayViews = 0;
   bool _registeredView = false;
   String? _cachedLocation;
-  bool _isLoadingLocation = false; 
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
     super.initState();
     _favoritesService = FavoritesService();
     _displayViews = widget.product.views ?? 0;
-    // Increment view count locally once per session
+
     if (!ViewTracker.instance.isViewed(widget.product.id)) {
       _displayViews += 1;
       ViewTracker.instance.markViewed(widget.product.id);
       _registeredView = true;
     }
-    // Defer listener registration to avoid setState during build
+
+    _loadSellerName();
+    _loadProductLocation();
+    _fetchRelatedProducts();
+    _fetchUniqueClicks();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
     });
-    _fetchRelatedProducts();
-    _loadSellerName();
-    _loadProductLocation();
   }
 
   @override
@@ -64,9 +66,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _onFavoritesChanged() {
-    setState(() {
-      // Trigger rebuild when favorites change
-    });
+    setState(() {}); 
   }
 
   Future<void> _loadSellerName() async {
@@ -77,101 +77,71 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _loadProductLocation() async {
-  if ((widget.product.location == null || widget.product.location!.isEmpty) &&
-      widget.product.latitude != null && 
-      widget.product.longitude != null && 
-      _cachedLocation == null &&
-      !_isLoadingLocation) {
-    
-    setState(() {
-      _isLoadingLocation = true;
-    });
+    if ((widget.product.location == null || widget.product.location!.isEmpty) &&
+        widget.product.latitude != null &&
+        widget.product.longitude != null &&
+        _cachedLocation == null &&
+        !_isLoadingLocation) {
+      setState(() => _isLoadingLocation = true);
 
-    try {
-      final location = await getAddressFromLatLng(
-        widget.product.latitude!, 
-        widget.product.longitude!
-      );
-      
-      if (mounted) {
-        setState(() {
-          _cachedLocation = location;
-          _isLoadingLocation = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading location for product ${widget.product.id}: $e');
-      if (mounted) {
-        setState(() {
-          _cachedLocation = 'Location unavailable';
-          _isLoadingLocation = false;
-        });
+      try {
+        final location = await getAddressFromLatLng(
+            widget.product.latitude!, widget.product.longitude!);
+        if (mounted) {
+          setState(() {
+            _cachedLocation = location;
+            _isLoadingLocation = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading location: $e');
+        if (mounted) {
+          setState(() {
+            _cachedLocation = 'Location unavailable';
+            _isLoadingLocation = false;
+          });
+        }
       }
     }
   }
-}
 
   Future<void> _toggleFavorite(String productId) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('authToken');
     if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login to add favorites')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Please login to add favorites')));
       return;
     }
 
     try {
       if (_favoritesService.isFavorited(productId)) {
-        // Remove from favorites using the global service
         final success = await _favoritesService.removeFromFavorites(productId);
-        if (success) {
-          widget.onFavoriteChanged?.call(); // Notify parent of change
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Removed from favorites')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to remove from favorites')),
-          );
-        }
+        if (success) widget.onFavoriteChanged?.call();
       } else {
-        // Add to favorites using the global service
         final success = await _favoritesService.addToFavorites(productId);
-        if (success) {
-          widget.onFavoriteChanged?.call(); // Notify parent of change
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Added to favorites')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to add to favorites')),
-          );
-        }
+        if (success) widget.onFavoriteChanged?.call();
       }
+      setState(() {});
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Network error. Please try again.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Network error. Please try again.')));
     }
   }
 
   Future<void> _fetchRelatedProducts() async {
     setState(() => isLoadingRelated = true);
-
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('authToken');
 
     if (token == null || token.isEmpty) {
-      debugPrint('ProductDetailPage: no auth token found.');
       setState(() => isLoadingRelated = false);
       return;
     }
 
-    final uri = Uri.parse(
-        'https://api.junctionverse.com/product/related/${widget.product.id}');
-
+    final uri =
+        Uri.parse('https://api.junctionverse.com/product/related/${widget.product.id}');
     try {
       final response = await http.get(uri, headers: {
         'Authorization': 'Bearer $token',
@@ -179,85 +149,75 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       });
 
       if (response.statusCode != 200) {
-        debugPrint(
-            'ProductDetailPage: related API Error ${response.statusCode}');
         setState(() => isLoadingRelated = false);
         return;
       }
 
       final dynamic decoded = jsonDecode(response.body);
-
-      final List<dynamic> data = () {
-        if (decoded == null) return <dynamic>[];
-        if (decoded is List) return decoded;
-        if (decoded is Map<String, dynamic>) {
-          if (decoded['products'] is List) return decoded['products'];
-          if (decoded['data'] is List) return decoded['data'];
-          if (decoded['items'] is List) return decoded['items'];
-          final found = decoded.values.firstWhere(
-            (v) => v is List,
-            orElse: () => <dynamic>[],
-          );
-          return found is List ? found : <dynamic>[];
-        }
-        return <dynamic>[];
-      }();
+      final List<dynamic> data = decoded['products'] ?? [];
 
       final List<Product> fetched = data.map<Product>((item) {
-        final Map<String, dynamic> map = Map<String, dynamic>.from(item);
-
+        final map = Map<String, dynamic>.from(item);
         final List<ProductImage> imageList = (map['images'] as List?)
                 ?.map((imgRaw) {
-                  final Map<String, dynamic> img =
-                      Map<String, dynamic>.from(imgRaw);
+                  final img = Map<String, dynamic>.from(imgRaw);
                   return ProductImage(
-                    fileUrl: img['fileUrl']?.toString() ??
-                        'assets/placeholder.png',
-                    fileType: img['fileType']?.toString(),
-                    filename: img['filename']?.toString(),
+                    fileUrl: img['fileUrl'] ?? 'assets/placeholder.png',
+                    fileType: img['fileType'],
+                    filename: img['filename'],
                   );
-                })
-                .toList() ??
+                }).toList() ??
             [];
 
-        final String imageUrl = imageList.isNotEmpty
-            ? imageList.first.fileUrl
-            : (map['imageUrl']?.toString() ??
-                'assets/placeholder.png');
-
-        final Seller? seller = (map['seller'] is Map<String, dynamic>)
+        final Seller? seller = map['seller'] != null
             ? Seller.fromJson(Map<String, dynamic>.from(map['seller']))
             : null;
 
         return Product(
-  id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
-  images: imageList,
-  imageUrl: imageUrl,
-  title: map['title']?.toString() ??
-      map['name']?.toString() ??
-      'No title',
-  price: map['price'] != null ? '₹${map['price']}' : null,
-  description: map['description']?.toString(),
-  location: map['pickupLocation']?.toString() ??
-      map['locationName']?.toString(),
-  seller: seller,
-  isAuction: map['isAuction'] == true, // ✅ required param fix
-  views: int.tryParse((map['views'] ?? map['viewCount'] ?? '0').toString()) ?? 0,
-);
+          id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
+          images: imageList,
+          imageUrl: imageList.isNotEmpty
+              ? imageList.first.fileUrl
+              : (map['imageUrl']?.toString() ?? 'assets/placeholder.png'),
+          title: map['title']?.toString() ?? 'No title',
+          price: map['price'] != null ? '₹${map['price']}' : null,
+          description: map['description']?.toString(),
+          location: map['pickupLocation']?.toString() ??
+              map['locationName']?.toString(),
+          seller: seller,
+          isAuction: map['isAuction'] == true,
+          views: int.tryParse((map['views'] ?? map['viewCount'] ?? '0').toString()) ?? 0,
+        );
       }).toList();
 
-      setState(() {
-        relatedProducts = fetched;
-        isLoadingRelated = false;
-      });
-    } catch (e, st) {
-      debugPrint(
-          'ProductDetailPage: exception while fetching related: $e\n$st');
-      setState(() => isLoadingRelated = false);
+      if (mounted) {
+        setState(() {
+          relatedProducts = fetched;
+          isLoadingRelated = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching related products: $e');
+      if (mounted) setState(() => isLoadingRelated = false);
+    }
+  }
+
+  Future<void> _fetchUniqueClicks() async {
+    try {
+      final clicks = await ProductClickService.getUniqueClicks(widget.product.id);
+      if (mounted) {
+        setState(() {
+          _displayViews = (_registeredView ? _displayViews : clicks);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching unique clicks: $e');
     }
   }
 
   void startChat(BuildContext context) async {
+    if (widget.product.seller?.id == _chatService.currentUserId) return;
+
     try {
       String sellerId = widget.product.seller?.id ?? '';
       String buyerId = _chatService.currentUserId;
@@ -266,12 +226,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       final prefs = await SharedPreferences.getInstance();
       String buyerName = prefs.getString('fullName') ?? 'You';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Opening chat...'), duration: Duration(milliseconds: 800)),
-      );
-
       bool exists = await _chatService.chatExists(chatId);
-      
       if (!exists) {
         await _chatService.createChat(
           productId: productId,
@@ -287,58 +242,36 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => ChatPage(chatId: chatId),
-        ),
+        MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final bool _isSellerViewing = product.seller?.id == _chatService.currentUserId;
 
- @override
-Widget build(BuildContext context) {
-  final product = widget.product;
-  // Hide chat bar if current user is the seller
-  final bool _isSellerViewing = product.seller?.id == _chatService.currentUserId;
-
-  return Scaffold(
-    appBar: AppBar(title: Text(product.title)),
-    body: ListView(
-      padding: EdgeInsets.fromLTRB(16,16,16,MediaQuery.of(context).padding.bottom + 80),
-      children: [
-        // Seller info block (no border, no extra spacing)
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          color: Colors.transparent,
-          child: Row(
+    return Scaffold(
+      appBar: AppBar(title: Text(product.title)),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(
+            16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
+        children: [
+          // Seller info
+          Row(
             children: [
-              Image.asset(
-                'assets/avatarpng.png',
-                width: 12,
-                height: 12,
-                fit: BoxFit.cover,
-              ),
+              Image.asset('assets/avatarpng.png', width: 12, height: 12),
               const SizedBox(width: 8),
-                             Text(
-                 _sellerName ?? 
-                 (product.seller?.fullName?.startsWith('Seller ') == true ? 
-                  'Loading seller...' : 
-                  product.seller?.fullName ?? 'Unknown Seller'),
-                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-               ),
+              Text(_sellerName ?? 'Loading seller...',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               const Spacer(),
               Row(
                 children: [
-                  Image.asset(
-                    'assets/ClockCountdown.png',
-                    width: 14,
-                    height: 14,
-                    color: Colors.grey,
-                  ),
+                  Image.asset('assets/ClockCountdown.png', width: 14, height: 14, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(
                     product.createdAt != null ? _timeAgo(product.createdAt!) : '',
@@ -348,234 +281,94 @@ Widget build(BuildContext context) {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-        // Combined block: Images + badges + category + title/price + views/location
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Product images
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.35, // ~35% of screen height
-                child: PageView(
-                  children: product.images.isNotEmpty
-                      ? product.images
-                          .map((img) => ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  img.fileUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Image.asset(
-                                    'assets/placeholder.png',
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ))
-                          .toList()
-                      : [
-                          ClipRRect(
+          // Product images
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.35,
+            child: PageView(
+              children: product.images.isNotEmpty
+                  ? product.images
+                      .map((img) => ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'assets/placeholder.png',
+                            child: Image.network(
+                              img.fileUrl,
                               fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  Image.asset('assets/placeholder.png', fit: BoxFit.cover),
                             ),
-                          )
-                        ],
-                ),
-              ),
+                          ))
+                      .toList()
+                  : [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset('assets/placeholder.png', fit: BoxFit.cover),
+                      )
+                    ],
+            ),
+          ),
 
-              const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-              // Badges block (condition, usage, age)
-              Wrap(
-                spacing: 12,
-                children: [
-                  if (product.yearOfPurchase != null)
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: const Color(0xFFE3E3E3)),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'Age: > ${DateTime.now().year - product.yearOfPurchase!}Y',
-                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                      ),
-                    ),
-                  if (product.usage != null)
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: const Color(0xFFE3E3E3)),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'Usage: ${product.usage}',
-                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                      ),
-                    ),
-                  if (product.condition != null)
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: const Color(0xFFE3E3E3)),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'Condition: ${product.condition}',
-                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                      ),
-                    ),
-                ],
-              ),
-
-              if (product.category != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                   // color: Colors.white,
-                   // borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    product.category!,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF505050),
-                    ),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 12),
-
-              // Title and Price block
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                 // color: Colors.white,
-                  //borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF262626),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.price ?? '',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF6705),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Views and location block
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Badges (Age, Usage, Condition)
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              // Views row
-              Row(
-                children: [
-                  Image.asset(
-                    'assets/Eye.png',
-                    width: 16,
-                    height: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Viewed by $_displayViews others',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Location row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: _buildLocationText(product),
-                  ),
-                ],
-              ),
+              if (product.yearOfPurchase != null)
+                _buildBadge('Age: > ${DateTime.now().year - product.yearOfPurchase!}Y'),
+              if (product.usage != null) _buildBadge('Usage: ${product.usage}'),
+              if (product.condition != null) _buildBadge('Condition: ${product.condition}'),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
 
-        const SizedBox(height: 16),
+          if (product.category != null)
+            Text(product.category!, style: const TextStyle(fontSize: 10, color: Color(0xFF505050))),
 
-        // Favourite and Share buttons combined in one section with bg color #f9f9f9
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        ),
+          const SizedBox(height: 12),
+
+          // Title & Price
+          Text(product.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(product.price ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF6705))),
+
+          const SizedBox(height: 12),
+
+          // Views & Location
+          Row(
+            children: [
+              Image.asset('assets/Eye.png', width: 16, height: 16),
+              const SizedBox(width: 4),
+              Text('Viewed by $_displayViews others'),
+              const Spacer(),
+              const Icon(Icons.location_on, size: 16, color: Colors.grey),
+              const SizedBox(width: 4),
+              Expanded(child: _buildLocationText(product)),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
 
-        const SizedBox(height: 16),
-
-        // Favourite and Share buttons combined in one section with bg color #f9f9f9
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
+          // Favorite & Share
+          Row(
             children: [
-                             Expanded(
-                 child: OutlinedButton.icon(
-                   onPressed: _favoritesService.isLoading ? null : () => _toggleFavorite(product.id),
-                   icon: _favoritesService.isLoading
-                       ? const SizedBox(
-                           width: 20,
-                           height: 20,
-                           child: CircularProgressIndicator(
-                             strokeWidth: 2,
-                             valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-                           ),
-                         )
-                       : Icon(
-                           _favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
-                           color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : null,
-                         ),
-                   label: _favoritesService.isLoading
-                       ? const Text('Loading...')
-                       : Text(_favoritesService.isFavorited(product.id) ? 'Favourited' : 'Favourite'),
-                 ),
-               ),
-              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _favoritesService.isLoading ? null : () => _toggleFavorite(product.id),
+                  icon: _favoritesService.isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.grey)),
+                        )
+                      : Icon(_favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
+                          color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : null),
+                  label: _favoritesService.isLoading
+                      ? const Text('Loading...')
+                      : Text(_favoritesService.isFavorited(product.id) ? 'Favourited' : 'Favourite'),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
@@ -585,138 +378,104 @@ Widget build(BuildContext context) {
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
 
-        const SizedBox(height: 16),
-
-        // Combined Description and Pickup Location block with bg #f9f9f9
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Description',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                product.description ?? 'No description provided',
-                style: const TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Pickup Location',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              _buildLocationText(product),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Related products and chat button remain unchanged...
-        const SizedBox(height: 16),
-
-        const Text('Related Products',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        if (isLoadingRelated)
-          const Center(child: CircularProgressIndicator())
-        else if (relatedProducts.isEmpty)
-          const EmptyState(text: 'No related products found.')
-        else
-          ProductGridWidget(products: relatedProducts),
-
-      ],
-    ),
-    bottomNavigationBar: _isSellerViewing ? null : SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SizedBox(
-          height: 56,
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => startChat(context),
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('Chat'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              side: const BorderSide(color: Color(0xFFE3E3E3)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Description & Pickup Location
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(8)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                Text(product.description ?? 'No description provided', style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 16),
+                Divider(color: Colors.grey.shade300, thickness: 1),
+                const SizedBox(height: 16),
+                const Text('Pickup Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                _buildLocationText(product),
+              ],
             ),
           ),
-        ),
-      ),
-    ),
-  );
-}
 
-String _timeAgo(DateTime date) {
+          const SizedBox(height: 16),
+
+          // Related Products
+          const Text('Related Products', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          if (isLoadingRelated)
+            const Center(child: CircularProgressIndicator())
+          else if (relatedProducts.isEmpty)
+            const EmptyState(text: 'No related products found.')
+          else
+            ProductGridWidget(products: relatedProducts),
+        ],
+      ),
+      bottomNavigationBar: _isSellerViewing
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SizedBox(
+                  height: 56,
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => startChat(context),
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('Chat'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      side: const BorderSide(color: Color(0xFFE3E3E3)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildBadge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE3E3E3)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+    );
+  }
+
+  Widget _buildLocationText(Product product) {
+    if (product.location != null && product.location!.isNotEmpty) {
+      return Text(product.location!, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
+    }
+    if (_cachedLocation != null && _cachedLocation != 'Location unavailable') {
+      return Text(_cachedLocation!, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
+    }
+    if (_isLoadingLocation) {
+      return const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.grey))),
+          SizedBox(width: 8),
+          Text('Loading location...', style: TextStyle(fontSize: 14, color: Colors.grey)),
+        ],
+      );
+    }
+    return const Text('Location not set', style: TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis);
+  }
+
+  String _timeAgo(DateTime date) {
     final diff = DateTime.now().difference(date);
     if (diff.inDays > 0) return '${diff.inDays} day(s) ago';
     if (diff.inHours > 0) return '${diff.inHours} hour(s) ago';
     if (diff.inMinutes > 0) return '${diff.inMinutes} minute(s) ago';
     return 'Just now';
   }
-
-  Widget _buildLocationText(Product product) {
-  // Priority 1: Use product.location if available
-  if (product.location != null && product.location!.isNotEmpty) {
-    return Text(
-      product.location!,
-      style: const TextStyle(fontSize: 14),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-  
-  // Priority 2: Use cached geocoded location
-  if (_cachedLocation != null && _cachedLocation != 'Location unavailable') {
-    return Text(
-      _cachedLocation!,
-      style: const TextStyle(fontSize: 14),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-  
-  // Priority 3: Show loading indicator
-  if (_isLoadingLocation) {
-    return const Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 14,
-          height: 14,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-          ),
-        ),
-        SizedBox(width: 8),
-        Text(
-          'Loading location...',
-          style: TextStyle(fontSize: 14, color: Colors.grey),
-        ),
-      ],
-    );
-  }
-  
-  // Fallback
-  return const Text(
-    'Location not set',
-    style: TextStyle(fontSize: 14, color: Colors.grey),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-  );
-}
 }

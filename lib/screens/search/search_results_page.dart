@@ -5,6 +5,7 @@ import '../../services/search_service.dart';
 import '../../services/filter_state_service.dart';
 import '../services/api_service.dart';
 import '../products/product_detail.dart';
+import '../../services/profile_service.dart'; 
 
 class SearchResultsPage extends StatefulWidget {
   final String searchQuery;
@@ -27,7 +28,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   bool isLoading = true;
   bool hasError = false;
   String errorMessage = '';
-  Map<String, String> _sellerNames = {}; // Cache for seller names
+  Map<String, String> _sellerNames = {}; // Seller names cache
+  Map<String, int> _uniqueClicks = {};   // Product clicks cache
 
   @override
   void initState() {
@@ -37,7 +39,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
   @override
   void dispose() {
-    // Clear filter state when user exits search results page
     FilterStateService.forceClearFilterState();
     super.dispose();
   }
@@ -50,7 +51,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     });
 
     try {
-      // Always use enhanced search service with location-based filtering
+      // Perform search
       final searchResult = await SearchService.searchProducts(
         query: widget.searchQuery.isNotEmpty ? widget.searchQuery : null,
         listingType: widget.appliedFilters?['listingType'],
@@ -61,16 +62,19 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         maxPrice: widget.appliedFilters?['maxPrice']?.toDouble(),
         sortBy: widget.sortBy ?? 'Distance',
       );
-      
-      // Save search history if query was provided
+
+      // Save search history
       if (widget.searchQuery.isNotEmpty) {
         await ApiService.saveSearchHistory(widget.searchQuery);
       }
-      
+
       setState(() {
         searchResults = searchResult.products;
         isLoading = false;
       });
+
+      // Prefetch product clicks
+      await _fetchAllClicks();
     } catch (e) {
       setState(() {
         hasError = true;
@@ -80,7 +84,17 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
   }
 
-  // Removed external seller fetch; rely on product.seller.fullName
+  Future<void> _fetchAllClicks() async {
+    final Map<String, int> clicksMap = {};
+    await Future.wait(searchResults.map((product) async {
+      final count = await ProductClickService.getUniqueClicks(product.id);
+      clicksMap[product.id] = count;
+    }));
+
+    setState(() {
+      _uniqueClicks = clicksMap;
+    });
+  }
 
   void _handleProductClick(Product product) async {
     await ApiService.trackProductClick(product.id);
@@ -123,9 +137,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             SearchBarWidget(
               initialQuery: widget.searchQuery,
               onSearch: (query) {
-                // Handle new search if needed
                 if (query != widget.searchQuery) {
-                  // Navigate to new search results
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -146,22 +158,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   }
 
   Widget _buildContent() {
-    if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
+    if (isLoading) return const Center(child: CircularProgressIndicator());
 
     if (hasError) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               'Error searching for "${widget.searchQuery}"',
@@ -174,10 +178,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _performSearch,
-              child: const Text('Try Again'),
-            ),
+            ElevatedButton(onPressed: _performSearch, child: const Text('Try Again')),
           ],
         ),
       );
@@ -190,10 +191,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           children: [
             Image.asset('assets/nodata.png', width: 200),
             const SizedBox(height: 16),
-            const Text(
-              'Oops, no listings so far',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
-            ),
+            const Text('Oops, no listings so far', style: TextStyle(color: Colors.grey, fontSize: 14)),
           ],
         ),
       );
@@ -207,11 +205,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             children: [
               Text(
                 '${searchResults.length} result${searchResults.length == 1 ? '' : 's'} found',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -222,14 +216,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             itemCount: searchResults.length,
             itemBuilder: (context, index) {
               final product = searchResults[index];
-
-              final imageUrl = product.images.isNotEmpty
-                  ? product.images[0].fileUrl
-                  : product.imageUrl;
-
-              final ageText = product.yearOfPurchase != null
-                  ? '${DateTime.now().year - product.yearOfPurchase!} Y'
-                  : 'N/A';
+              final imageUrl = product.images.isNotEmpty ? product.images[0].fileUrl : product.imageUrl;
 
               return GestureDetector(
                 onTap: () => _handleProductClick(product),
@@ -240,36 +227,28 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Seller info row
+                      // Seller row
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundImage: const AssetImage('assets/avatarpng.png'),
-                            ),
+                            const CircleAvatar(radius: 6, backgroundImage: AssetImage('assets/avatarpng.png')),
                             const SizedBox(width: 8),
-                                                         Expanded(
-                               child: Builder(
-                                 builder: (context) {
-                                   final sellerId = product.seller?.id;
-                                   final cachedName = _sellerNames[sellerId];
-                                   final originalName = product.seller?.fullName;
-                                   final displayName = cachedName ?? originalName ?? 'Seller Name';
-                                   
-                                   debugPrint('🔍 Displaying seller name for product ${product.id}: cached="$cachedName", original="$originalName", final="$displayName"');
-                                   
-                                   return Text(
-                                     displayName,
-                                     style: const TextStyle(fontWeight: FontWeight.w500),
-                                   );
-                                 },
-                               ),
-                             ),
-                            Text(
-                              _timeAgo(product.createdAt),
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            Expanded(
+                              child: Text(
+                                product.seller?.fullName ?? 'Seller Name',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Image.asset('assets/ClockCountdown.png', width: 14, height: 14, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(product.createdAt != null ? _timeAgo(product.createdAt!) : '',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              ],
                             ),
                           ],
                         ),
@@ -292,60 +271,61 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         ),
                       ),
 
-                      // Chips: Age, Usage, Condition
+                      const SizedBox(height: 12),
+
+                      // Badges block
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Wrap(
-                          spacing: 8,
+                          spacing: 12,
+                          runSpacing: 8,
                           children: [
-                            Chip(label: Text('Age: > $ageText')),
-                            Chip(label: Text('Usage: ${product.usage ?? 'N/A'}')),
-                            Chip(label: Text('Condition: ${product.condition ?? 'N/A'}')),
+                            if (product.yearOfPurchase != null)
+                              _badge('Age: > ${DateTime.now().year - product.yearOfPurchase!}Y'),
+                            if (product.usage != null) _badge('Usage: ${product.usage}'),
+                            if (product.condition != null) _badge('Condition: ${product.condition}'),
                           ],
                         ),
                       ),
 
-                      // Category, Title & price
+                      const SizedBox(height: 16),
+
+                      // Category, title, price
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              product.category ?? '',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
+                            Text(product.category ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             const SizedBox(height: 2),
-                            Text(
-                              product.title,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
+                            Text(product.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
-                            Text(
-                              product.displayPrice,
-                              style: const TextStyle(fontSize: 16, color: Colors.orange, fontWeight: FontWeight.bold),
-                            ),
+                            Text(product.displayPrice,
+                                style: const TextStyle(fontSize: 16, color: Colors.orange, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
 
                       const SizedBox(height: 6),
 
-                                             // Views & location row
-                       Padding(
-                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                         child: Row(
-                           children: [
-                             const Icon(Icons.remove_red_eye, size: 16, color: Colors.grey),
-                             const SizedBox(width: 4),
-                             Text('Viewed by ${product.views ?? 0} others', style: const TextStyle(fontSize: 12)),
-                             const Spacer(),
-                             const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                             const SizedBox(width: 4),
-                             Text(product.location ?? 'Unknown', style: const TextStyle(fontSize: 12)),
-                           ],
-                         ),
-                       ),
+                      // Views & location
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.remove_red_eye, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Viewed by ${_uniqueClicks[product.id] ?? 0} others',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            const Spacer(),
+                            const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(product.location ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -354,6 +334,18 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _badge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE3E3E3)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 12, color: Colors.black87)),
     );
   }
 }

@@ -145,3 +145,67 @@ class ProfileService {
     return await _cacheManager.hasCachedData(CacheConfig.profileKey);
   }
 }
+
+
+class ProductClickService {
+  static final CacheManager _cacheManager = CacheManager();
+  static const String _baseUrl = 'https://api.junctionverse.com';
+
+  /// Fetch unique clicks for a product with caching
+  static Future<int> getUniqueClicks(String productId) async {
+    final cacheKey = 'uniqueClicks_$productId';
+
+    // Check cache first
+    final cachedCount = await _cacheManager.getCachedData<int>(cacheKey);
+    if (cachedCount != null) {
+      debugPrint('ProductClickService: Returning cached clicks for $productId');
+      return cachedCount;
+    }
+
+    // Fetch from API if not cached
+    final count = await _fetchUniqueClicksFromAPI(productId);
+    if (count != null) {
+      await _cacheManager.setCachedData(cacheKey, count, expiry: Duration(hours: 1));
+      debugPrint('ProductClickService: Cached clicks for $productId -> $count');
+      return count;
+    }
+
+    return 0;
+  }
+
+  /// Force refresh clicks for a product
+  static Future<int> refreshUniqueClicks(String productId) async {
+    await _cacheManager.invalidateCache('uniqueClicks_$productId');
+    return await getUniqueClicks(productId);
+  }
+
+  /// Fetch clicks from API
+  static Future<int?> _fetchUniqueClicksFromAPI(String productId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken') ?? '';
+      if (token.isEmpty) return 0;
+
+      final uri = Uri.parse('$_baseUrl/history/unique-clicks');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'productId': productId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['count'] ?? 0;
+      } else {
+        debugPrint('ProductClickService: API error ${response.statusCode}');
+        return 0;
+      }
+    } catch (e) {
+      debugPrint('ProductClickService: Error fetching clicks -> $e');
+      return 0;
+    }
+  }
+}
