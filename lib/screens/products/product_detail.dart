@@ -348,37 +348,80 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ],
           ),
           const SizedBox(height: 16),
-
-          // Favorite & Share
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _favoritesService.isLoading ? null : () => _toggleFavorite(product.id),
-                  icon: _favoritesService.isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.grey)),
-                        )
-                      : Icon(_favoritesService.isFavorited(product.id) ? Icons.favorite : Icons.favorite_border,
-                          color: _favoritesService.isFavorited(product.id) ? Colors.deepOrange : null),
-                  label: _favoritesService.isLoading
-                      ? const Text('Loading...')
-                      : Text(_favoritesService.isFavorited(product.id) ? 'Favourited' : 'Favourite'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.share),
-                  label: const Text('Share'),
-                ),
-              ),
-            ],
+// Favorite & Share
+Container(
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: const Color(0xFFF9F9F9),
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: Row(
+    children: [
+      // Favorite button
+      Expanded(
+        child: TextButton.icon(
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.black87,
+            padding: const EdgeInsets.symmetric(vertical: 12),
           ),
-          const SizedBox(height: 16),
+          onPressed: _favoritesService.isLoading
+              ? null
+              : () => _toggleFavorite(product.id),
+          icon: _favoritesService.isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.grey),
+                  ),
+                )
+              : Icon(
+                  _favoritesService.isFavorited(product.id)
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: _favoritesService.isFavorited(product.id)
+                      ? Colors.deepOrange
+                      : Colors.black54,
+                ),
+          label: _favoritesService.isLoading
+              ? const Text('Loading...')
+              : Text(
+                  _favoritesService.isFavorited(product.id)
+                      ? 'Favourited'
+                      : 'Favourite',
+                ),
+        ),
+      ),
+
+      // Divider
+      Container(
+        height: 40,
+        width: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        color: Colors.grey.shade300,
+      ),
+
+      // Share button
+      Expanded(
+        child: TextButton.icon(
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.black87,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          onPressed: () {},
+          icon: const Icon(Icons.share, color: Colors.black54),
+          label: const Text('Share'),
+        ),
+      ),
+    ],
+  ),
+),
+const SizedBox(height: 16),
+
 
           // Description & Pickup Location
           Container(
