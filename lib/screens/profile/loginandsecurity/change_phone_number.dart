@@ -7,6 +7,7 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/form_text.dart';
 import '../../../widgets/headding_description.dart';
 import './verify_phone_otp.dart';
+import 'package:flutter/services.dart';
 
 class ChangePhoneNumberPage extends StatefulWidget {
   const ChangePhoneNumberPage({super.key});
@@ -19,27 +20,103 @@ class _ChangePhoneNumberPageState extends State<ChangePhoneNumberPage> {
   final TextEditingController _phoneController = TextEditingController();
   bool isValidPhone = false;
   bool isLoading = false;
+  String? errorMessage;
 
-  void _checkPhone(String phone) {
-    final cleaned = phone.replaceAll(RegExp(r'\D'), '');
-    setState(() {
-      isValidPhone = cleaned.length >= 10 && cleaned.length <= 12;
-    });
+  void _validatePhone(String phone) {
+  setState(() {
+    errorMessage = null;
+    
+    if (phone.isEmpty) {
+      isValidPhone = false;
+      return;
+    }
+
+    // First, check for invalid patterns before cleaning
+    // Check for consecutive special characters
+    if (RegExp(r'[,\s]{2,}').hasMatch(phone)) {
+      errorMessage = 'Invalid phone number format';
+      isValidPhone = false;
+      return;
+    }
+
+    // Check for commas (Indian numbers shouldn't have commas)
+    if (phone.contains(',')) {
+      errorMessage = 'Phone number cannot contain commas';
+      isValidPhone = false;
+      return;
+    }
+
+    // Check for invalid characters (allow only digits, +, and spaces)
+    if (!RegExp(r'^[\d\s+]+$').hasMatch(phone)) {
+      errorMessage = 'Phone number can only contain digits';
+      isValidPhone = false;
+      return;
+    }
+
+    final cleaned = _cleanPhoneNumber(phone);
+    
+    if (!_isValidIndianMobile(phone)) {
+      if (cleaned.isEmpty) {
+        errorMessage = 'Please enter a phone number';
+      } else if (cleaned.length < 10) {
+        errorMessage = 'Phone number must be 10 digits';
+      } else if (cleaned.length > 10) {
+        errorMessage = 'Phone number should not exceed 10 digits';
+      } else if (!RegExp(r'^[6-9]').hasMatch(cleaned)) {
+        errorMessage = 'Phone number must start with 6, 7, 8, or 9';
+      } else {
+        errorMessage = 'Please enter a valid Indian mobile number';
+      }
+      isValidPhone = false;
+    } else {
+      isValidPhone = true;
+    }
+  });
+}
+
+bool _isValidIndianMobile(String phone) {
+  final cleaned = phone.replaceAll(RegExp(r'\s+'), '').replaceAll(RegExp(r'[^\d+]'), '');
+  
+  // Check if cleaned is empty after removing invalid chars
+  if (cleaned.isEmpty) return false;
+  
+  final RegExp indianMobilePattern = RegExp(r'^(?:\+91|91)?[6-9]\d{9}$');
+  
+  return indianMobilePattern.hasMatch(cleaned);
+}
+
+String _cleanPhoneNumber(String phone) {
+  String cleaned = phone.replaceAll(RegExp(r'\s+'), '').replaceAll(RegExp(r'[^\d+]'), '');
+  
+  if (cleaned.startsWith('+91')) {
+    cleaned = cleaned.substring(3);
+  } else if (cleaned.startsWith('91') && cleaned.length > 10) {
+    cleaned = cleaned.substring(2);
   }
+  
+  return cleaned;
+}
 
   Future<void> _sendPhoneVerification() async {
-    final phone = _phoneController.text.trim();
-    if (!isValidPhone) return;
+    final phone = _cleanPhoneNumber(_phoneController.text.trim());
+    
+    if (!isValidPhone) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid phone number')),
+      );
+      return;
+    }
 
     setState(() => isLoading = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('authToken'); // fixed from accessToken
+      final token = prefs.getString('authToken');
 
       if (token == null || token.isEmpty) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Access token not found')),
+          const SnackBar(content: Text('Access token not found. Please login again.')),
         );
         setState(() => isLoading = false);
         return;
@@ -55,6 +132,7 @@ class _ChangePhoneNumberPageState extends State<ChangePhoneNumberPage> {
         body: jsonEncode({'phoneNumber': phone}),
       );
 
+      if (!mounted) return;
       setState(() => isLoading = false);
 
       if (response.statusCode == 200) {
@@ -67,15 +145,24 @@ class _ChangePhoneNumberPageState extends State<ChangePhoneNumberPage> {
       } else {
         final res = jsonDecode(response.body);
         final error = res['message'] ?? 'Failed to send OTP';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString()}')),
       );
     }
   }
+
+@override
+void dispose() {
+  _phoneController.dispose();
+  super.dispose();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -105,18 +192,27 @@ class _ChangePhoneNumberPageState extends State<ChangePhoneNumberPage> {
               isMandatory: true,
               keyboardType: TextInputType.phone,
               controller: _phoneController,
-              onChanged: _checkPhone,
+              onChanged: _validatePhone,
             ),
+            if (errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  errorMessage!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             const Spacer(),
             AppButton(
               label: isLoading ? 'Sending...' : 'Send Verification Code',
               bottomSpacing: 30,
-              onPressed: () {
-                if (!isLoading && isValidPhone) {
-                  _sendPhoneVerification();
-                }
-              },
-              backgroundColor: isValidPhone ? const Color(0xFF262626) : const Color(0xFFBDBDBD),
+              onPressed: isValidPhone && !isLoading ? _sendPhoneVerification : null,
+              backgroundColor: isValidPhone && !isLoading
+                  ? const Color(0xFF262626)
+                  : const Color(0xFFBDBDBD),
             ),
           ],
         ),

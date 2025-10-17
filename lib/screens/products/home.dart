@@ -165,10 +165,10 @@ class _HomePageState extends State<HomePage> {
                 child: CategoryGrid(),
               ),
 
-              const SizedBox(height: 8),
+              // const SizedBox(height: 8),
 
-              debugLogWidget('CrewCrashBanner'),
-              const CrewCrashBanner(),
+              // debugLogWidget('CrewCrashBanner'),
+              // const CrewCrashBanner(),
 
               const SizedBox(height: 16),
 

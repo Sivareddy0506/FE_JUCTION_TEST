@@ -5,14 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../screens/products/product_detail.dart';
-import '../screens/services/location_helper.dart';  // Assuming you have a utility for location
+import '../screens/services/location_helper.dart';
 import '../services/favorites_service.dart';
 
-// Inside your ProductGridWidget:
 
 class ProductGridWidget extends StatefulWidget {
   final List<Product> products;
-  final VoidCallback? onFavoriteChanged; // Add callback for favorite changes
+  final VoidCallback? onFavoriteChanged;
 
   const ProductGridWidget({
     super.key, 
@@ -320,6 +319,7 @@ class ProductCard extends StatefulWidget {
 class _ProductCardState extends State<ProductCard> {
   late FavoritesService _favoritesService;
   String? _cachedLocation;
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
@@ -331,24 +331,38 @@ class _ProductCardState extends State<ProductCard> {
 
 
   Future<void> _loadLocation() async {
-    if (widget.product.latitude != null && 
-        widget.product.longitude != null && 
-        _cachedLocation == null) {
-      try {
-        final location = await getAddressFromLatLng(
-          widget.product.latitude!, 
-          widget.product.longitude!
-        );
-        if (mounted) {
-          setState(() {
-            _cachedLocation = location;
-          });
-        }
-      } catch (e) {
-        // Handle error silently
+  if (widget.product.latitude != null && 
+      widget.product.longitude != null && 
+      _cachedLocation == null &&
+      !_isLoadingLocation) {
+    
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      final location = await getAddressFromLatLng(
+        widget.product.latitude!, 
+        widget.product.longitude!
+      );
+      
+      if (mounted) {
+        setState(() {
+          _cachedLocation = location;
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading location for product ${widget.product.id}: $e');
+      if (mounted) {
+        setState(() {
+          _cachedLocation = 'Location unavailable';
+          _isLoadingLocation = false;
+        });
       }
     }
   }
+}
 
   Future<void> _toggleFavorite(String productId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -406,16 +420,6 @@ class _ProductCardState extends State<ProductCard> {
       );
     }
   }
-
-  String _formatDate(DateTime date) {
-    final months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${date.day.toString().padLeft(2, '0')} ${months[date.month]} ${date.year}';
-  }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -507,47 +511,7 @@ class _ProductCardState extends State<ProductCard> {
                         const SizedBox(height: 4),
 
                         // Location
-                        if (widget.product.location != null && widget.product.location!.isNotEmpty) ...[
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
-                              Expanded(
-                                child: Text(
-                                  widget.product.location!,
-                                  style: const TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ] else if (widget.product.latitude != null && widget.product.longitude != null) ...[
-                          _cachedLocation != null
-                              ? Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
-                                    Expanded(
-                                      child: Text(
-                                        _cachedLocation!,
-                                        style: const TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : const Text(
-                                  'Loading location...',
-                                  style: TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
-                                ),
-                        ] else ...[
-                          const Text(
-                            'Location not set',
-                            style: TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
-                          ),
-                        ],
+                        _buildLocationWidget(),
                       ],
                     ),
                   ),
@@ -596,6 +560,70 @@ class _ProductCardState extends State<ProductCard> {
       ),
     );
   }
+
+  Widget _buildLocationWidget() {
+  // Priority 1: Use product.location if available
+  if (widget.product.location != null && widget.product.location!.isNotEmpty) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
+        const SizedBox(width: 2),
+        Expanded(
+          child: Text(
+            widget.product.location!,
+            style: const TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Priority 2: Use lat/lng to fetch location
+  if (widget.product.latitude != null && widget.product.longitude != null) {
+    if (_cachedLocation != null && _cachedLocation != 'Location unavailable') {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Text(
+              _cachedLocation!,
+              style: const TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    } else if (_isLoadingLocation) {
+      return const Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.location_on, size: 14, color: Color(0xFF8A8894)),
+          SizedBox(width: 2),
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8A8894)),
+            ),
+          ),
+        ],
+      );
+    }
+  }
+  
+  // Fallback
+  return const Text(
+    'Location not set',
+    style: TextStyle(fontSize: 7, color: Color(0xFF8A8894)),
+  );
+}
 }
 
 

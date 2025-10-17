@@ -98,12 +98,23 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
       if (response.statusCode == 200 || response.statusCode == 201) {
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Product submitted successfully'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const UserProfilePage()),
               (Route<dynamic> route) => false, // ⬅️ removes all previous routes
         );
-      } else {
+    } else {
         debugPrint('❌ Submission failed: ${response.statusCode}');
         debugPrint(response.body);
       }

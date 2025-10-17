@@ -13,6 +13,7 @@ class AboutTab extends StatefulWidget {
 class _AboutTabState extends State<AboutTab> {
   double avgRating = 0.0;
   List<dynamic> reviews = [];
+  int productsSoldCount = 0; // ✅ new field
   bool isLoading = true;
 
   @override
@@ -30,13 +31,23 @@ class _AboutTabState extends State<AboutTab> {
         setState(() {
           avgRating = 0.0;
           reviews = [];
+          productsSoldCount = 0;
           isLoading = false;
         });
         return;
       }
 
+      final authToken = prefs.getString('authToken');
+
       final url = Uri.parse("https://api.junctionverse.com/ratings/$userId");
-      final response = await http.get(url);
+      // final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -44,12 +55,14 @@ class _AboutTabState extends State<AboutTab> {
         setState(() {
           avgRating = (data["avgRating"] ?? 0).toDouble();
           reviews = data["ratings"] ?? [];
+          productsSoldCount = data["productsSoldCount"] ?? 0; // ✅ fetch count
           isLoading = false;
         });
       } else {
         setState(() {
           avgRating = 0.0;
           reviews = [];
+          productsSoldCount = 0;
           isLoading = false;
         });
       }
@@ -58,6 +71,7 @@ class _AboutTabState extends State<AboutTab> {
       setState(() {
         avgRating = 0.0;
         reviews = [];
+        productsSoldCount = 0;
         isLoading = false;
       });
     }
@@ -89,7 +103,7 @@ class _AboutTabState extends State<AboutTab> {
               children: [
                 const Icon(Icons.shopping_bag, color: Colors.black, size: 30),
                 const SizedBox(height: 5),
-                Text("12", // Replace with API value if available
+                Text(productsSoldCount.toString(), // ✅ dynamic value
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const Text("Items Sold"),
               ],

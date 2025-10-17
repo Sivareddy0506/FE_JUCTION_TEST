@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ProductImage {
   final String fileUrl;
   final String? fileType;
@@ -68,7 +70,6 @@ class Seller {
   });
 
   factory Seller.fromJson(Map<String, dynamic> json) {
-    // API sometimes uses 'fullName' or 'name'
     return Seller(
       id: json['id'] ?? json['_id'] ?? '',
       fullName: json['fullName'] ?? json['name'] ?? '',
@@ -77,19 +78,30 @@ class Seller {
   }
 
   get imageUrl => null;
-  
-  @override
-  String toString() {
-    return 'Seller(id: $id, fullName: $fullName, email: $email)';
+}
+
+// ----------------- New ProductOrder Class -----------------
+class ProductOrder {
+  final String orderId;
+  final String status;
+
+  ProductOrder({required this.orderId, required this.status});
+
+  factory ProductOrder.fromJson(Map<String, dynamic> json) {
+    return ProductOrder(
+      orderId: json['orderId'],
+      status: json['status'],
+    );
   }
 }
 
+// ----------------- Product Class -----------------
 class Product {
   final String id;
-  final List<ProductImage> images;      // now matches API images[]
-  final String imageUrl;               // convenience: first image or placeholder
+  final List<ProductImage> images;
+  final String imageUrl;
   final String title;
-  final String? price;                 // formatted (e.g. '₹4000') or null
+  final String? price;
   final bool isAuction;
   final Auction? auction;
   final DateTime? bidStartDate;
@@ -97,7 +109,7 @@ class Product {
   final double? latitude;
   final double? longitude;
   final String? description;
-  final String? location;              // human readable location/pickup
+  final String? location;
   final Seller? seller;
   final String? category;
   final String? condition;
@@ -107,6 +119,9 @@ class Product {
   final DateTime? createdAt;
   final int? views;
   final String? auctionStatus;
+  final String? orderId; // fallback orderId
+  final ProductOrder? currentOrder; // NEW: current order
+  final String? status;
 
   Product({
     required this.id,
@@ -131,9 +146,11 @@ class Product {
     this.createdAt,
     this.views,
     this.auctionStatus,
+    this.orderId,
+    this.currentOrder,
+     this.status,
   });
 
-  // Helpful formatted price: show fixed price or auction starting price
   String get displayPrice {
     if (price != null && price!.isNotEmpty) return price!;
     if (auction?.startingPrice != null) return '₹${auction!.startingPrice}';
@@ -143,41 +160,9 @@ class Product {
   String? get sellerName => seller?.fullName;
 
   static Seller? _parseSeller(Map<String, dynamic> json) {
-    
-    // Try different possible seller field names and structures
     if (json['seller'] is Map<String, dynamic>) {
       return Seller.fromJson(Map<String, dynamic>.from(json['seller']));
     }
-    
-    // Check if seller is a string (ID) and we have separate name fields
-    if (json['seller'] is String && json['sellerName'] != null) {
-      return Seller(
-        id: json['seller'],
-        fullName: json['sellerName'],
-        email: json['sellerEmail'] ?? '',
-      );
-    }
-    
-    // Check if owner field contains seller info
-    if (json['owner'] is Map<String, dynamic>) {
-      return Seller.fromJson(Map<String, dynamic>.from(json['owner']));
-    }
-    
-    // Check if user field contains seller info
-    if (json['user'] is Map<String, dynamic>) {
-      return Seller.fromJson(Map<String, dynamic>.from(json['user']));
-    }
-    
-    // If seller is just a string (ID), try to create a basic seller
-    if (json['seller'] is String) {
-      return Seller(
-        id: json['seller'],
-        fullName: json['sellerName'] ?? 'Unknown Seller',
-        email: json['sellerEmail'] ?? '',
-      );
-    }
-    
-    // Check if sellerId exists (common case from API)
     if (json['sellerId'] is String) {
       return Seller(
         id: json['sellerId'],
@@ -185,57 +170,61 @@ class Product {
         email: json['sellerEmail'] ?? '',
       );
     }
-    
+    if (json['owner'] is Map<String, dynamic>) {
+      return Seller.fromJson(Map<String, dynamic>.from(json['owner']));
+    }
     return null;
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
-  final imageList = (json['images'] as List?)
-          ?.map((img) => ProductImage.fromJson(Map<String, dynamic>.from(img)))
-          .toList() ??
-      [];
+    final imagesList = (json['images'] as List?)
+            ?.map((img) => ProductImage.fromJson(Map<String, dynamic>.from(img)))
+            .toList() ??
+        [];
 
-  final imageUrl = imageList.isNotEmpty
-      ? imageList[0].fileUrl
-      : (json['imageUrl'] ?? 'assets/placeholder.png');
+    final imageUrl = imagesList.isNotEmpty
+        ? imagesList.first.fileUrl
+        : (json['imageUrl'] ?? 'assets/placeholder.png');
 
-  final auction = json['auction'] != null && json['auction'] is Map<String, dynamic>
-      ? Auction.fromJson(Map<String, dynamic>.from(json['auction']))
-      : null;
+    final auction = json['auction'] != null && json['auction'] is Map<String, dynamic>
+        ? Auction.fromJson(Map<String, dynamic>.from(json['auction']))
+        : null;
 
-  final priceString = json['price'] != null ? '₹${json['price']}' : null;
+    final priceString = json['price'] != null ? '₹${json['price']}' : null;
 
-  return Product(
-    id: json['_id'] ?? json['id'] ?? '',
-    images: imageList, // ✅ Added required argument
-    imageUrl: imageUrl,
-    title: json['title'] ?? json['name'] ?? 'No Title',
-    price: priceString,
-    isAuction: json['isAuction'] ?? false,
-    auction: auction,
-    bidStartDate: json['bidStartDate'] != null
-        ? DateTime.tryParse(json['bidStartDate'])
-        : auction?.auctionStartTime,
-    duration: json['duration'] ?? auction?.duration,
-    latitude: (json['location']?['lat'] ?? json['lat'])?.toDouble(),
-    longitude: (json['location']?['lng'] ?? json['lng'])?.toDouble(),
-    description: json['description'],
-    location: json['pickupLocation'] ??
-        json['locationName'] ??
-        json['location']?['name'],
-    seller: _parseSeller(json),
-    category: json['category'],
-    condition: json['condition'],
-    usage: json['usage'],
-    brand: json['brand'],
-    yearOfPurchase: json['yearOfPurchase'],
-    createdAt: json['createdAt'] != null
-        ? DateTime.tryParse(json['createdAt'])
-        : null,
-    views: int.tryParse(
-            (json['views'] ?? json['viewCount'])?.toString() ?? '0') ??
-        0,
-         auctionStatus: json['auctionStatus'],
-   );
- }
+    return Product(
+      id: json['_id'] ?? json['id'] ?? '',
+      images: imagesList,
+      imageUrl: imageUrl,
+      title: json['title'] ?? json['name'] ?? 'No Title',
+      price: priceString,
+      isAuction: json['isAuction'] ?? false,
+      auction: auction,
+      bidStartDate: json['bidStartDate'] != null
+          ? DateTime.tryParse(json['bidStartDate'])
+          : auction?.auctionStartTime,
+      duration: json['duration'] ?? auction?.duration,
+      latitude: (json['location']?['lat'] ?? json['lat'])?.toDouble(),
+      longitude: (json['location']?['lng'] ?? json['lng'])?.toDouble(),
+      description: json['description'],
+      location: json['pickupLocation'] ??
+          json['locationName'] ??
+          json['location']?['name'],
+      seller: _parseSeller(json),
+      category: json['category'],
+      condition: json['condition'],
+      usage: json['usage'],
+      brand: json['brand'],
+      yearOfPurchase: json['yearOfPurchase'],
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'])
+          : null,
+      views: int.tryParse((json['views'] ?? json['viewCount'])?.toString() ?? '0') ?? 0,
+      auctionStatus: json['auctionStatus'],
+      orderId: json['orderId'] ?? (json['order']?['orderId']),
+      currentOrder: json['currentOrder'] != null
+          ? ProductOrder.fromJson(Map<String, dynamic>.from(json['currentOrder']))
+          : null,
+    );
+  }
 }

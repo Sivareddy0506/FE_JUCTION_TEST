@@ -9,6 +9,7 @@ import 'manual_signup_page.dart';
 import '../login/login_page.dart';
 import 'package:junction/screens/signup/otp_verification_signup_page.dart';
 import '../../widgets/headding_description.dart';
+import 'package:flutter/foundation.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -27,7 +28,8 @@ class _SignupPageState extends State<SignupPage> {
     setState(() {
       isValidEmail = lowerEmail.endsWith('.cc') ||
           lowerEmail.endsWith('.edu') ||
-          lowerEmail.endsWith('@junctionverse.com');
+          lowerEmail.endsWith('@junctionverse.com') ||
+          (lowerEmail.endsWith('@yopmail.com') && kDebugMode);
     });
   }
 
