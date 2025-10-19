@@ -208,4 +208,41 @@ class ProductClickService {
       return 0;
     }
   }
+
+  static Future<Map<String, int>> getUniqueClicksFor(List<String> productIds) async {
+    if (productIds.isEmpty) return {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken') ?? '';
+      
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/history/unique-clicks'),
+        headers: {
+          if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'productId': productIds,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final Map<String, int> results = {};
+        
+        for (final item in data) {
+          results[item['productId']] = item['uniqueClicks'] ?? 0;
+        }
+        
+        return results;
+      } else {
+        debugPrint('ProductClickService: Error ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      debugPrint('ProductClickService: Error -> $e');
+      return {};
+    }
+  }
 }

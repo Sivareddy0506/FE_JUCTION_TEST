@@ -4,6 +4,7 @@ import '../../widgets/search_bar_widget.dart';
 import '../services/api_service.dart';
 import './product_detail.dart';
 import '../services/location_helper.dart';
+import '../../services/profile_service.dart';
 
 class ProductListingPage extends StatefulWidget {
   final String title;
@@ -26,6 +27,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
   // Caches
   Map<String, String> _sellerNames = {};
   Map<String, String> _locationCache = {};
+  Map<String, int> _uniqueClicks = {};
 
   @override
   void initState() {
@@ -46,7 +48,8 @@ class _ProductListingPageState extends State<ProductListingPage> {
   Future<void> fetchSectionProducts() async {
     List<Product> result = [];
 
-    switch (widget.source) {
+    try {
+      switch (widget.source) {
       case 'fresh':
         result = await ApiService.fetchAllProducts();
         break;
@@ -66,6 +69,33 @@ class _ProductListingPageState extends State<ProductListingPage> {
     setState(() {
       products = result;
       isLoading = false;
+    });
+
+    // Prefetch product clicks
+      await _fetchAllClicks();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+        // hasError = true;
+        // errorMessage = e.toString();
+        isLoading = false;
+      });
+      }
+  }
+  }
+
+  Future<void> _fetchAllClicks() async {
+    final Map<String, int> clicksMap = {};
+    final List<String> productIds = products.map((p) => p.id).toList();
+    final results = await ProductClickService.getUniqueClicksFor(productIds);
+    clicksMap.addAll(results);
+    // await Future.wait(searchResults.map((product) async {
+    //   final count = await ProductClickService.getUniqueClicks(product.id);
+    //   clicksMap[product.id] = count;
+    // }));
+
+    setState(() {
+      _uniqueClicks = clicksMap;
     });
   }
 
@@ -280,7 +310,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
                                       size: 16, color: Colors.grey),
                                   const SizedBox(width: 4),
                                   Text(
-                                      'Viewed by ${product.views ?? 0} others',
+                                      'Viewed by ${_uniqueClicks[product.id] ?? 0} others',
                                       style:
                                           const TextStyle(fontSize: 12)),
                                   const Spacer(),

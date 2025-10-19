@@ -76,20 +76,25 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       // Prefetch product clicks
       await _fetchAllClicks();
     } catch (e) {
-      setState(() {
+      if (mounted) {
+        setState(() {
         hasError = true;
         errorMessage = e.toString();
         isLoading = false;
       });
+      }
     }
   }
 
   Future<void> _fetchAllClicks() async {
     final Map<String, int> clicksMap = {};
-    await Future.wait(searchResults.map((product) async {
-      final count = await ProductClickService.getUniqueClicks(product.id);
-      clicksMap[product.id] = count;
-    }));
+    final List<String> productIds = searchResults.map((p) => p.id).toList();
+    final results = await ProductClickService.getUniqueClicksFor(productIds);
+    clicksMap.addAll(results);
+    // await Future.wait(searchResults.map((product) async {
+    //   final count = await ProductClickService.getUniqueClicks(product.id);
+    //   clicksMap[product.id] = count;
+    // }));
 
     setState(() {
       _uniqueClicks = clicksMap;

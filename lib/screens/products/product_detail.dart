@@ -36,6 +36,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool _registeredView = false;
   String? _cachedLocation;
   bool _isLoadingLocation = false;
+  int _viewCount = 0;
 
   @override
   void initState() {
@@ -203,16 +204,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _fetchUniqueClicks() async {
-    try {
-      final clicks = await ProductClickService.getUniqueClicks(widget.product.id);
-      if (mounted) {
-        setState(() {
-          _displayViews = (_registeredView ? _displayViews : clicks);
+    // try {
+    //   final clicks = await ProductClickService.getUniqueClicks(widget.product.id);
+    //   if (mounted) {
+    //     setState(() {
+    //       _displayViews = (_registeredView ? _displayViews : clicks);
+    //     });
+    //   }
+    // } catch (e) {
+    //   debugPrint('Error fetching unique clicks: $e');
+    // }
+    final result = await ProductClickService.getUniqueClicksFor([widget.product.id]);
+    setState(() {
+          _viewCount = result[widget.product.id] ?? 0;
         });
-      }
-    } catch (e) {
-      debugPrint('Error fetching unique clicks: $e');
-    }
   }
 
   void startChat(BuildContext context) async {
@@ -340,7 +345,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             children: [
               Image.asset('assets/Eye.png', width: 16, height: 16),
               const SizedBox(width: 4),
-              Text('Viewed by $_displayViews others'),
+              // Text('Viewed by $_displayViews others'),
+              Text('Viewed by $_viewCount others'),
               const Spacer(),
               const Icon(Icons.location_on, size: 16, color: Colors.grey),
               const SizedBox(width: 4),
