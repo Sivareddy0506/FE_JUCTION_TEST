@@ -288,7 +288,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
               final label = switch (key) {
                 'selfie' => '* Selfie',
                 'collegeId' => '* College ID',
-                'aadhaar' => '* Aadhar Card',
+                'aadhaar' => '* Aadhar or Govt ID',
                 _ => 'Additional Documents',
               };
 
