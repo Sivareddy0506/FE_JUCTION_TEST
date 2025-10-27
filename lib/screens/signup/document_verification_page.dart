@@ -182,7 +182,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                                   setState(() => uploadedFiles[key] = null);
                                   setStateBottom(() {});
                                 },
-                                child: Image.asset('assets/images/X.png'),
+                                child: Image.asset('assets/X.png'),
                               ),
                             ],
                           ),
