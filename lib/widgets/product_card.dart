@@ -18,7 +18,7 @@ class ProductCard extends StatelessWidget {
       case 'Sold':
         return Colors.green;
       case 'Deal Locked':
-        return Colors.orange;
+       return const Color(0xFFFF6705);
       case 'For Sale':
         return Colors.blue;
       default:

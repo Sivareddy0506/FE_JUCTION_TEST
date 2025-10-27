@@ -88,7 +88,7 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
               label: isLoading ? 'Verifying...' : 'Submit for Verification',
               onPressed: isLoading ? null : _submitCode,
               backgroundColor:
-                  isLoading ? const Color(0xFFBDBDBD) : const Color(0xFF262626),
+                  isLoading ? const Color(0xFFA3A3A3) : const Color(0xFF262626),
             ),
             const SizedBox(height: 12),
             Padding(

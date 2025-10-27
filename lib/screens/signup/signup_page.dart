@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
 import 'manual_signup_page.dart';
 import '../login/login_page.dart';
-import 'package:junction/screens/signup/otp_verification_signup_page.dart';
+import 'otp_verification_signup_page.dart';
 import '../../widgets/headding_description.dart';
-import 'package:flutter/foundation.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -99,7 +99,7 @@ class _SignupPageState extends State<SignupPage> {
             const SizedBox(height: 32),
             AppTextField(
               label: 'College Email',
-              placeholder: 'Enter your college email',
+              placeholder: 'Enter College Email ID',
               isMandatory: true,
               keyboardType: TextInputType.emailAddress,
               controller: _emailController,
@@ -137,34 +137,37 @@ class _SignupPageState extends State<SignupPage> {
 
             const Spacer(),
 
-            /// "Already have an account? Log In"
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              alignment: WrapAlignment.center,
-              children: [
-                const Text(
-                  'Already have an account?',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginPage()),
+            /// ✅ Center aligned "Already have an account? Log In"
+            Center(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.center,
+                spacing: 4, // just a space after '?'
+                children: [
+                  const Text(
+                    'Already have an account?',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
                   ),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF212121),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    ),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    child: const Text(
+                      'Log In',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF212121),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
 
             /// Send Verification Button
             AppButton(
@@ -172,7 +175,7 @@ class _SignupPageState extends State<SignupPage> {
               bottomSpacing: 30,
               onPressed: isValidEmail && !isLoading ? _sendVerification : null,
               backgroundColor:
-                  isValidEmail ? const Color(0xFF262626) : const Color(0xFFBDBDBD),
+                  isValidEmail ? const Color(0xFF262626) : const Color(0xFFA3A3A3),
             ),
           ],
         ),

@@ -211,7 +211,7 @@ void dispose() {
               onPressed: isValidPhone && !isLoading ? _sendPhoneVerification : null,
               backgroundColor: isValidPhone && !isLoading
                   ? const Color(0xFF262626)
-                  : const Color(0xFFBDBDBD),
+                  : const Color(0xFFA3A3A3),
             ),
           ],
         ),

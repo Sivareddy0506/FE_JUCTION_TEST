@@ -153,7 +153,7 @@ class _AboutTabState extends State<AboutTab> {
                       "${review["stars"] ?? 0} ★",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.deepOrange,
+                        color: Color(0xFFFF6705)
                       ),
                     ),
                   ],

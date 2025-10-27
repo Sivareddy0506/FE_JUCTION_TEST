@@ -467,7 +467,8 @@ class _ChatPageState extends State<ChatPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: (_isUploading || _isConfirmingDeal) 
                       ? Colors.grey 
-                      : Colors.orange,
+                      : const Color(0xFFFF6705),
+
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
@@ -591,7 +592,8 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                       Text(
                         'Locked Price: ₹${chatData.finalPrice?.toStringAsFixed(0) ?? '0'}',
                         style: const TextStyle(
-                          color: Colors.orange,
+                          color: const Color(0xFFFF6705),
+
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -711,7 +713,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                                       Text('Deal cancelled successfully'),
                                     ],
                                   ),
-                                  backgroundColor: Colors.orange,
+                                 backgroundColor: const Color(0xFFFF6705),
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
@@ -1954,7 +1956,8 @@ Widget _buildProductCard(MessageModel message) {
                   Text(
                     '${productData['price']}',
                     style: const TextStyle(
-                      color: Colors.orange,
+                      color: const Color(0xFFFF6705),
+
                       fontWeight: FontWeight.bold,
                     ),
                   ),

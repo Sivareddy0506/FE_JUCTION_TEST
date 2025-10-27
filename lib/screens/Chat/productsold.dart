@@ -85,7 +85,7 @@ void _navigateToRatingsPage() {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
+                       backgroundColor: const Color(0xFFFF6705),
                       padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

@@ -905,21 +905,44 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        SizedBox(
-                          height: 40,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            itemCount: tabs.length,
-                            itemBuilder: (context, index) {
-                              return _buildTab(
-                                tabs[index],
-                                selectedTabIndex == index,
-                                () => setState(() => selectedTabIndex = index),
-                              );
-                            },
-                          ),
-                        ),
+                        // SizedBox(
+                        //   height: 40,
+                        //   child: ListView.builder(
+                        //     scrollDirection: Axis.horizontal,
+                        //     padding: const EdgeInsets.symmetric(horizontal: 12),
+                        //     itemCount: tabs.length,
+                        //     itemBuilder: (context, index) {
+                        //       return _buildTab(
+                        //         tabs[index],
+                        //         selectedTabIndex == index,
+                        //         () => setState(() => selectedTabIndex = index),
+                        //       );
+                        //     },
+                        //   ),
+                        // ),
+                        ClipRRect(
+  borderRadius: const BorderRadius.only(
+    topLeft: Radius.circular(40),
+    topRight: Radius.circular(40),
+  ),
+  child: Container(
+    color: Colors.white,
+    height: 40,
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      itemCount: tabs.length,
+      itemBuilder: (context, index) {
+        return _buildTab(
+          tabs[index],
+          selectedTabIndex == index,
+          () => setState(() => selectedTabIndex = index),
+        );
+      },
+    ),
+  ),
+),
+
                         Expanded(
                           child: Builder(
                             builder: (context) {

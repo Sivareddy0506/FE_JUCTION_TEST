@@ -114,7 +114,7 @@ class _VerificationRejectedPageState extends State<VerificationRejectedPage> {
             AppButton(
               bottomSpacing: 24,
               label: "Go to Signup",
-              backgroundColor: Colors.orange,
+             backgroundColor: const Color(0xFFFF6705),
               onPressed: () {
                 Navigator.pushReplacement(
                   context,

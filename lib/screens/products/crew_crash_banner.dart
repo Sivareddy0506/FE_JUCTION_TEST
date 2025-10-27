@@ -24,7 +24,7 @@ class CrewCrashBanner extends StatelessWidget {
           ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(backgroundColor: Colors.white),
-            child: const Text('Register', style: TextStyle(color: Colors.deepOrange)),
+            child: const Text('Register', style: TextStyle(color: Color(0xFFFF6705))),
           ),
         ],
       ),

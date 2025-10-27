@@ -247,7 +247,8 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
                   "${imageNames.length}/$maxImages",
                   style: TextStyle(
                     fontSize: 12,
-                    color: _isImageLimitReached ? Colors.orange : Color(0xFF323537),
+                    color: _isImageLimitReached ? const Color(0xFFFF6705) : const Color(0xFF323537),
+
                     fontWeight: FontWeight.w500,
                   ),
                 ),

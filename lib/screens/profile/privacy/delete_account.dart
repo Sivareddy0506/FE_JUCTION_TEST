@@ -88,7 +88,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
             ),
             const SizedBox(height: 12),
             const Text(
-              "Let us know what didn’t work, your feedback helps us improve.",
+              "Do You have any additional feedback for us? (optional)",
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.black,
@@ -114,7 +114,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
             const Spacer(),
             AppButton(
               bottomSpacing: 24,
-              label: isSubmitting ? 'Deleting...' : 'Delete Account',
+              label: isSubmitting ? 'Deleting...' : 'Delete My Account',
               onPressed: isSubmitting ? null : _submitIssue,
               backgroundColor: const Color(0xFF262626),
             ),

@@ -55,7 +55,7 @@ class VerificationSubmittedPage extends StatelessWidget {
             AppButton(
               bottomSpacing: 24,
               label: "Continue",
-              backgroundColor: Colors.orange,
+             backgroundColor: const Color(0xFFFF6705),
               onPressed: () {
                 Navigator.pushReplacement(
                   context,

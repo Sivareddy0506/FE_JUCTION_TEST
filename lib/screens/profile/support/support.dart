@@ -134,7 +134,7 @@ class _SupportPageState extends State<SupportPage> {
       children: [
         const Padding(
           padding: EdgeInsets.only(top: 6, right: 6),
-          child: Icon(Icons.support_agent, size: 18, color: Colors.orange),
+          child: Icon(Icons.support_agent, size: 18, color: const Color(0xFFFF6705)),
         ),
         Expanded(
           child: Column(

@@ -71,7 +71,8 @@ class LogoAndIconsWidget extends StatelessWidget {
                   width: iconContainerSize * 0.2,
                   height: iconContainerSize * 0.2,
                   decoration: const BoxDecoration(
-                    color: Colors.orange,
+                    color: const Color(0xFFFF6705),
+
                     shape: BoxShape.circle,
                   ),
                 ),

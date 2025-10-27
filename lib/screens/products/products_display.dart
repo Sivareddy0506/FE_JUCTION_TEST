@@ -291,7 +291,8 @@ class _ProductListingPageState extends State<ProductListingPage> {
                                     product.displayPrice,
                                     style: const TextStyle(
                                         fontSize: 16,
-                                        color: Colors.orange,
+                                        color: const Color(0xFFFF6705),
+
                                         fontWeight: FontWeight.bold),
                                   ),
                                 ],

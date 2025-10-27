@@ -8,7 +8,7 @@ class MainLandingScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Main Landing'),
-        backgroundColor: Colors.orange,
+       backgroundColor: const Color(0xFFFF6705),
       ),
       body: const Center(
         child: Text(

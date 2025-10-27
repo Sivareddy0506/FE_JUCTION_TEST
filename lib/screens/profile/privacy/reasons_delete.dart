@@ -50,7 +50,7 @@ class ReasonsDeletePage extends StatelessWidget {
             ),
             Align(
               alignment: Alignment.center,
-              child: Image.asset('assets/CaretLeft.png', width: 20, height: 20),
+              child: Image.asset('assets/CaretRight.png', width: 20, height: 20),
             ),
           ],
         ),

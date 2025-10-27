@@ -124,7 +124,7 @@ class _ReferralsPageState extends State<ReferralsPage> {
               final name = referral['fullName'] ?? 'User';
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Colors.orange,
+                 backgroundColor: const Color(0xFFFF6705),
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: const TextStyle(color: Colors.white),
@@ -149,7 +149,7 @@ class _ReferralsPageState extends State<ReferralsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         border: Border.all(color: const Color(0xFF262626)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -162,7 +162,8 @@ class _ReferralsPageState extends State<ReferralsPage> {
             onTap: _copyReferralCode,
             child: const Text(
               "Copy",
-              style: TextStyle(fontSize: 14, color: Colors.orange, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 14, color: const Color(0xFFFF6705),
+ fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -173,7 +174,7 @@ class _ReferralsPageState extends State<ReferralsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: "Referrals"),
+      appBar: const CustomAppBar(title: "Refer a Friend"),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -184,7 +185,7 @@ class _ReferralsPageState extends State<ReferralsPage> {
                   _buildReferralCodeBox(),
                   AppButton(
                     bottomSpacing: 24,
-                    label: "Invite Friend",
+                    label: "Invite Friends Via",
                     backgroundColor: const Color(0xFF262626),
                     onPressed: _shareReferral,
                   ),

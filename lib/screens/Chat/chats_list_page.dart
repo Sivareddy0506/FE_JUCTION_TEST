@@ -123,7 +123,8 @@ if (initials.isEmpty) {
       Colors.red,
       Colors.blue,
       Colors.green,
-      Colors.orange,
+      const Color(0xFFFF6705),
+
     ];
     return colors[name.hashCode % colors.length];
   }

@@ -391,7 +391,7 @@ Container(
                       ? Icons.favorite
                       : Icons.favorite_border,
                   color: _favoritesService.isFavorited(product.id)
-                      ? Colors.deepOrange
+                      ? Color(0xFFFF6705)
                       : Colors.black54,
                 ),
           label: _favoritesService.isLoading
@@ -529,7 +529,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
             //       icon: const Icon(Icons.star_outline),
             //       label: const Text('Rate User'),
             //       style: ElevatedButton.styleFrom(
-            //         backgroundColor: Colors.orange,
+            //        backgroundColor: const Color(0xFFFF6705),
             //         foregroundColor: Colors.white,
             //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             //       ),
@@ -644,7 +644,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                 Navigator.of(context).pop();
                 _rateUser();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6705)),
               child: const Text('Submit Rating', style: TextStyle(color: Colors.white)),
             ),
           ],

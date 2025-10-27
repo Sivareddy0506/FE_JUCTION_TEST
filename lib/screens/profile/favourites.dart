@@ -103,7 +103,7 @@ class _FavoritesTabState extends State<FavoritesTab> {
     }
 
     if (favouriteProducts.isEmpty) {
-      return const EmptyState(text: 'No favorites yet.');
+      return const EmptyState(text: 'No items added to favourites.');
     }
 
     return SingleChildScrollView(

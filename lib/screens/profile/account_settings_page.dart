@@ -57,7 +57,7 @@ class AccountSettingsPage extends StatelessWidget {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
-            Image.asset('assets/CaretLeft.png', width: 20, height: 20),
+            Image.asset('assets/CaretRight.png', width: 20, height: 20),
           ],
         ),
       ),

@@ -43,7 +43,9 @@ class ReportedSuccessPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              "Thanks for letting us know we’ve received your report and will look into it.",
+           
+  "Thanks for letting us know.\nWe’ve received your report and will look into it.",
+
               style: TextStyle(
                 fontSize: 14,
                 height: 1.43, // 20px line height / 14px font size
@@ -55,7 +57,7 @@ class ReportedSuccessPage extends StatelessWidget {
             AppButton(
               bottomSpacing: 24,
               label: "Return to Settings",
-              backgroundColor: Colors.orange,
+             backgroundColor: const Color(0xFFFF6705),
               onPressed: () {
                 Navigator.pushReplacement(
                   context,

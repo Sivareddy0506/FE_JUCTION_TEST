@@ -347,7 +347,8 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
                   child: Text(
                     isResending ? 'Resending...' : 'Resend',
                     style: TextStyle(
-                      color: isResending ? Colors.grey : Colors.orange,
+                      color: isResending ? Colors.grey : const Color(0xFFFF6705),
+
                     ),
                   ),
                 ),
@@ -359,7 +360,7 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               label: isSubmitting ? 'Verifying...' : 'Verify',
               onPressed: (!_isOTPComplete || isSubmitting) ? null : _verifyOTP,
               backgroundColor: (!_isOTPComplete || isSubmitting) 
-                  ? const Color(0xFFBDBDBD) 
+                  ? const Color(0xFFA3A3A3) 
                   : const Color(0xFF262626),
             ),
           ],

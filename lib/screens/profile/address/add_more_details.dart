@@ -60,7 +60,7 @@ class _AddMoreDetailsPageState extends State<AddMoreDetailsPage> {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: AppButton(
           bottomSpacing: 0, // or remove it if handled by Padding
-          label: isLoading ? 'Sending...' : 'Submit',
+          label: isLoading ? 'Saving...' : 'Save',
           backgroundColor: const Color(0xFF262626),
           onPressed: _submit,
         ),

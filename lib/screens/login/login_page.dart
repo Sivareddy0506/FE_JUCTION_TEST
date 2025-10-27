@@ -176,7 +176,7 @@ Padding(
   child: AppButton(
     label: isLoading ? 'Sending...' : 'Send Verification Code',
     onPressed: isValidEmail && !isLoading ? _login : null,
-    backgroundColor: isValidEmail ? const Color(0xFF262626) : const Color(0xFFBDBDBD),
+    backgroundColor: isValidEmail ? const Color(0xFF262626) : const Color(0xFFA3A3A3),
   ),
 ),
 

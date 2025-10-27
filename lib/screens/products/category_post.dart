@@ -75,7 +75,7 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
                 color: Color(0xFF262626),
               ),
             ),
-            Image.asset('assets/CaretLeft.png', width: 20, height: 20),
+            Image.asset('assets/CaretRight.png', width: 20, height: 20),
           ],
         ),
       ),

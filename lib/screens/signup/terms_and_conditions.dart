@@ -73,7 +73,8 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               children: [
                 Checkbox(
                   value: isChecked,
-                  activeColor: Colors.orange,
+                  activeColor: const Color(0xFFFF6705),
+
                   onChanged: (val) {
                     setState(() {
                       isChecked = val ?? false;
@@ -92,7 +93,8 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               bottomSpacing: 30,
               label: 'Done',
               onPressed: isChecked ? _onSubmit : null,
-              backgroundColor: isChecked ? Colors.orange : Colors.grey,
+             backgroundColor: isChecked ? const Color(0xFFFF6705) : Colors.grey,
+
             ),
           ],
         ),

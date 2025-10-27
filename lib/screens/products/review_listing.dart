@@ -101,7 +101,8 @@ class ReviewListingPage extends StatelessWidget {
                 ),
                 Text(
                   price,
-                  style: const TextStyle(fontSize: 16, color: Colors.orange, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 16, color: const Color(0xFFFF6705),
+ fontWeight: FontWeight.bold),
                 ),
               ],
             ),

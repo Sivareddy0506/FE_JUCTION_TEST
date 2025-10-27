@@ -163,10 +163,10 @@ class _VerifyPhoneOTPPageState extends State<VerifyPhoneOTPPage> {
             const Spacer(),
             AppButton(
               bottomSpacing: 24,
-              label: isSubmitting ? 'Verifying...' : 'Verify OTP',
+              label: isSubmitting ? 'Verifying...' : 'Verify',
               onPressed: isSubmitting ? null : _verifyOTP,
               backgroundColor: isSubmitting
-                  ? const Color(0xFFBDBDBD)
+                  ? const Color(0xFFA3A3A3)
                   : const Color(0xFF262626),
             ),
           ],

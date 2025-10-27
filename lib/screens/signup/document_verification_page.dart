@@ -201,7 +201,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                       : null,
                   backgroundColor: uploadedFiles[key] != null
                       ? const Color(0xFF262626)
-                      : const Color(0xFFBDBDBD),
+                      : const Color(0xFFA3A3A3),
                 ),
                 const SizedBox(height: 10),
                 Center(
@@ -307,7 +307,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                       Text(label,
                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                       Image.asset(
-                        isUploaded ? 'assets/tick-green.png' : 'assets/CaretLeft.png',
+                        isUploaded ? 'assets/tick-green.png' : 'assets/CaretRight.png',
                         height: 20,
                       ),
                     ],
@@ -326,7 +326,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                   : null,
               backgroundColor: uploadedFiles.values.where((f) => f != null).length >= 3
                   ? const Color(0xFF262626)
-                  : const Color(0xFFBDBDBD),
+                  : const Color(0xFFA3A3A3),
             ),
           ],
         ),

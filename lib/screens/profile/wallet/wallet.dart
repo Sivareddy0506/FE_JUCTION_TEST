@@ -307,7 +307,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
                 label: 'Add Amount',
                 backgroundColor: isValidAmount 
                     ? const Color(0xFF262626) 
-                    : const Color(0xFFBDBDBD),
+                    : const Color(0xFFA3A3A3),
                 onPressed: isValidAmount
                     ? () {
                         final amount = int.tryParse(_amountController.text);
@@ -321,7 +321,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
               const SizedBox(height: 10),
               AppButton(
                 label: 'Cancel',
-                backgroundColor: const Color(0xFFBDBDBD),
+                backgroundColor: const Color(0xFFA3A3A3),
                 onPressed: () => Navigator.pop(context),
               ),
             ],

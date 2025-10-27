@@ -141,7 +141,7 @@ class _Phase3StatusWidgetState extends State<Phase3StatusWidget> {
     return Column(
       children: [
         _buildStatusRow('Status', isOnline ? 'Online' : 'Offline', isOnline ? Colors.green : Colors.red),
-        _buildStatusRow('Initialized', isInitialized ? 'Yes' : 'No', isInitialized ? Colors.green : Colors.orange),
+        _buildStatusRow('Initialized', isInitialized ? 'Yes' : 'No', isInitialized ? Colors.green :  const Color(0xFFFF6705)),
       ],
     );
   }
@@ -177,7 +177,11 @@ class _Phase3StatusWidgetState extends State<Phase3StatusWidget> {
     return Column(
       children: [
         _buildStatusRow('Status', isOnline ? 'Online' : 'Offline', isOnline ? Colors.green : Colors.red),
-        _buildStatusRow('Pending Actions', '$pendingActions', pendingActions > 0 ? Colors.orange : Colors.green),
+       _buildStatusRow(
+  'Pending Actions',
+  '$pendingActions',
+  pendingActions > 0 ? const Color(0xFFFF6705) : Colors.green,
+),
         _buildStatusRow('Last Sync', lastSync == 'Never' ? 'Never' : _formatTimestamp(lastSync)),
       ],
     );
@@ -253,7 +257,7 @@ class _Phase3StatusWidgetState extends State<Phase3StatusWidget> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _queueTestAction,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                 backgroundColor: const Color(0xFFFF6705),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                 ),

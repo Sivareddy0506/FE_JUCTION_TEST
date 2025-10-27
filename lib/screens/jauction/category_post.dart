@@ -70,7 +70,7 @@ class _CategoryPostPageState extends State<JauctionCategoryPostPage> {
                 color: Color(0xFF262626),
               ),
             ),
-            Image.asset('assets/CaretLeft.png', width: 20, height: 20),
+            Image.asset('assets/CaretRight.png', width: 20, height: 20),
           ],
         ),
       ),

@@ -36,7 +36,7 @@ class LoginPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Image.asset('assets/CaretLeft.png', width: 20, height: 20),
+                      Image.asset('assets/CaretRight.png', width: 20, height: 20),
                     ],
                   ),
                   const SizedBox(height: 8),

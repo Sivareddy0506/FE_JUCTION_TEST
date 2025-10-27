@@ -187,7 +187,8 @@ class _AuctionCardState extends State<AuctionCard> {
                           ? "₹${currentBid.toString()}"
                           : currentBid.toString(),
                       style: const TextStyle(
-                          color: Colors.orange,
+                          color: const Color(0xFFFF6705),
+
                           fontSize: 16,
                           fontWeight: FontWeight.bold),
                     ),

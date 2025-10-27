@@ -48,7 +48,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
         return IconButton(
           icon: Icon(
             Icons.star,
-            color: index < stars ? Colors.deepOrange : Colors.grey.shade400,
+            color: index < stars ? Color(0xFFFF6705) : Colors.grey.shade400,
             size: 32,
           ),
           onPressed: () {
@@ -181,7 +181,7 @@ Future<void> submitRating() async {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange, padding: EdgeInsets.all(16)),
+                       backgroundColor: const Color(0xFFFF6705), padding: EdgeInsets.all(16)),
                   onPressed: isLoading ? null : submitRating,
                   child: isLoading
                       ? CircularProgressIndicator(color: Colors.white)

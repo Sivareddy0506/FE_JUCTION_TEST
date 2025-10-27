@@ -109,18 +109,24 @@ class _ReportPageState extends State<ReportPage> {
             const SizedBox(height: 32),
             const Text('Please describe the issue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            TextField(
-              controller: descriptionController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'Describe here...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
-                ),
-              ),
-              style: const TextStyle(fontSize: 14),
-            ),
+           TextField(
+  controller: descriptionController,
+  maxLines: 5,
+  decoration: InputDecoration(
+    hintText: 'Describe here...',
+    hintStyle: const TextStyle(color: Color(0xFF8A8894), fontSize: 14),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: Color(0xFF262626), width: 1),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: Color(0xFF262626), width: 1),
+    ),
+  ),
+  style: const TextStyle(fontSize: 14, color: Color(0xFF212121)),
+),
+
 
             const SizedBox(height: 32),
             const Text('Upload screenshot', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -132,7 +138,7 @@ class _ReportPageState extends State<ReportPage> {
                 height: 180,
                 decoration: BoxDecoration(
                   border: Border.all(color: const Color(0xFF999999), width: 2, style: BorderStyle.solid),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Center(
                   child: screenshot == null

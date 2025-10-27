@@ -193,7 +193,7 @@ class _OTPVerificationNonEduPageState extends State<OtpVerificationNonEduPage> {
                   onTap: _resendCode,
                   child: const Text(
                     'Resend',
-                    style: TextStyle(color: Colors.orange),
+                    style: TextStyle(color: const Color(0xFFFF6705)),
                   ),
                 ),
               ],
@@ -203,7 +203,7 @@ class _OTPVerificationNonEduPageState extends State<OtpVerificationNonEduPage> {
               bottomSpacing: 24,
               label: isSubmitting ? 'Verifying...' : 'Verify',
               onPressed: isSubmitting ? null : _verifyOTP,
-              backgroundColor: isSubmitting ? const Color(0xFFBDBDBD) : const Color(0xFF262626),
+              backgroundColor: isSubmitting ? const Color(0xFFA3A3A3) : const Color(0xFF262626),
             ),
           ],
         ),

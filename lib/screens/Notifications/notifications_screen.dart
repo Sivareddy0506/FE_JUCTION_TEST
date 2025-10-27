@@ -193,7 +193,8 @@ Widget _buildBody() {
     if (isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          color: Colors.orange,
+          color: const Color(0xFFFF6705),
+
         ),
       );
     }
@@ -221,7 +222,7 @@ Widget _buildBody() {
             ElevatedButton(
               onPressed: _getNotifications,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+               backgroundColor: const Color(0xFFFF6705),
                 foregroundColor: Colors.white,
               ),
               child: const Text('Retry'),
