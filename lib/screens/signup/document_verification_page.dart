@@ -21,6 +21,7 @@ class DocumentVerificationPage extends StatefulWidget {
 class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
   final picker = ImagePicker();
   bool isLoading = false;
+  bool consentGiven = false; // User must accept data-usage acknowledgement
 
   final Map<String, File?> uploadedFiles = {
     'selfie': null,
@@ -181,7 +182,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                                   setState(() => uploadedFiles[key] = null);
                                   setStateBottom(() {});
                                 },
-                                child: Image.asset('assets/X.png'),
+                                child: Image.asset('assets/images/X.png'),
                               ),
                             ],
                           ),
@@ -288,7 +289,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
               final label = switch (key) {
                 'selfie' => '* Selfie',
                 'collegeId' => '* College ID',
-                'aadhaar' => '* Aadhar Card',
+                'aadhaar' => '* Govt Issued ID card (Aadhaar, PAN, DL ...)',
                 _ => 'Additional Documents',
               };
 
@@ -316,15 +317,35 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
               );
             }),
 
+            // Consent acknowledgement checkbox
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: consentGiven,
+                    onChanged: (val) => setState(() => consentGiven = val ?? false),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'You may upload Aadhaar or any other valid ID for verification. This data is used only for identity verification and will be deleted within 48 hours of review.',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF8A8894)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             const Spacer(),
 
             AppButton(
               bottomSpacing: 20,
               label: isLoading ? 'Submitting...' : 'Submit for Verification',
-              onPressed: uploadedFiles.values.where((f) => f != null).length >= 3 && !isLoading
+              onPressed: uploadedFiles.values.where((f) => f != null).length >= 3 && consentGiven && !isLoading
                   ? _submitAll
                   : null,
-              backgroundColor: uploadedFiles.values.where((f) => f != null).length >= 3
+              backgroundColor: uploadedFiles.values.where((f) => f != null).length >= 3 && consentGiven
                   ? const Color(0xFF262626)
                   : const Color(0xFFBDBDBD),
             ),
