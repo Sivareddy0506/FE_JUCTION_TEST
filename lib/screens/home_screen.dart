@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:junction/screens/profile/user_profile.dart';
-import 'package:junction/screens/signup/signup_page.dart';
 import 'package:junction/screens/products/home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_overview.dart';  
@@ -18,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _showMainContent = false;
+  final bool _showMainContent = false;
 
   final PageController _pageController = PageController();
   int _currentSlide = 0;

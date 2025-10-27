@@ -17,7 +17,7 @@ class SelectLocationPage extends StatefulWidget {
   final List<String> imageNames;
 
   const SelectLocationPage({
-    Key? key,
+    super.key,
     required this.selectedCategory,
     required this.title,
     required this.price,
@@ -28,7 +28,7 @@ class SelectLocationPage extends StatefulWidget {
     required this.usage,
     required this.condition,
     required this.imageNames,
-  }) : super(key: key);
+  });
 
   @override
   State<SelectLocationPage> createState() => _SelectLocationPageState();

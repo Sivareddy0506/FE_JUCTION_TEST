@@ -290,32 +290,67 @@ class _FilterModalState extends State<FilterModal> {
   }
 
   Widget _buildFooterButtons() {
-    return Row(
+  return SafeArea( // ✅ prevents buttons from going behind Android system buttons
+    minimum: const EdgeInsets.all(16), // padding for safe distance
+    child: Row(
       children: [
+        // CLEAR ALL button
         Expanded(
           child: OutlinedButton(
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.black, width: 1.5), // ✅ visible border
+              padding: const EdgeInsets.all(13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10), // ✅ rounded corners
+              ),
+              foregroundColor: Colors.black, // ✅ text color
+            ),
             onPressed: _clearAllFilters,
-            child: const Text("Clear All", style: TextStyle(fontSize: 18)),
+            child: const Text(
+              "Clear All",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
+
         const SizedBox(width: 10),
+
+        // APPLY FILTERS button
         Expanded(
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               padding: const EdgeInsets.all(13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10), // ✅ same rounded corners
+              ),
+              foregroundColor: Colors.white, // ✅ white text
+              elevation: 2,
             ),
             onPressed: isLoading ? null : _applyFilters,
-            child: isLoading 
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-              : const Text("Apply Filters", style: TextStyle(fontSize: 18)),
+            child: isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    "Apply Filters",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
+
 
   void _clearAllFilters() {
     setState(() {

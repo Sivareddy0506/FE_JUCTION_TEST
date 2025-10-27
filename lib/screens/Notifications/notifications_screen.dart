@@ -271,7 +271,7 @@ Widget _buildBody() {
               ),
               ...group.notifications.map((notification) {
                 return NotificationTile(notification: notification);
-              }).toList(),
+              }),
             ],
           );
         },

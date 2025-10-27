@@ -7,7 +7,7 @@ class ProductSoldScreen extends StatefulWidget {
   final String ratedById;
   final bool fromProductSold;
 
-  ProductSoldScreen({
+  const ProductSoldScreen({super.key, 
     required this.productName,
     required this.ratedUserId,
     required this.ratedById,
@@ -52,7 +52,7 @@ void _navigateToRatingsPage() {
               children: [
                 // Success Illustration
                 Image.asset(
-                  "images/productsold.png",
+                  "assets/productsold.png",
                   height: 200,
                 ),
                 SizedBox(height: 32),

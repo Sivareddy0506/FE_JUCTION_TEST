@@ -25,8 +25,8 @@ class _ProductListingPageState extends State<ProductListingPage> {
   bool isLoading = true;
 
   // Caches
-  Map<String, String> _sellerNames = {};
-  Map<String, String> _locationCache = {};
+  final Map<String, String> _sellerNames = {};
+  final Map<String, String> _locationCache = {};
   Map<String, int> _uniqueClicks = {};
 
   @override
@@ -236,7 +236,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
                                 width: double.infinity,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => Image.asset(
-                                  'assets/images/placeholder.png',
+                                  'assets/placeholder.png',
                                   height: 200,
                                   width: double.infinity,
                                   fit: BoxFit.cover,

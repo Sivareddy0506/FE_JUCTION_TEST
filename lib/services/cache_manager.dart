@@ -52,8 +52,8 @@ class CacheManager {
     final expiriesData = _prefs!.getString('cache_expiries');
 
     // Safety: skip oversized blob (>5 MB) to avoid OOM
-    const int _maxPersistentBytes = 5 * 1024 * 1024; // 5 MB
-    if (cacheData != null && cacheData.length > _maxPersistentBytes) {
+    const int maxPersistentBytes = 5 * 1024 * 1024; // 5 MB
+    if (cacheData != null && cacheData.length > maxPersistentBytes) {
       debugPrint('CacheManager: persistent cache_data too large (${cacheData.length} bytes). Clearing...');
       // Clear persistent keys directly WITHOUT calling clearAllCaches()
       await _prefs!.remove('cache_data');

@@ -4,7 +4,6 @@ import '../../widgets/search_bar_widget.dart';
 import '../../widgets/category_grid.dart';
 import '../../widgets/bottom_navbar.dart';
 import '../../models/product.dart';
-import './crew_crash_banner.dart';
 import './horizontal_product_list.dart';
 import './ad_banner_widget.dart';
 import '../services/api_service.dart';
@@ -12,7 +11,7 @@ import '../../services/favorites_service.dart';
 //import './products_display.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();

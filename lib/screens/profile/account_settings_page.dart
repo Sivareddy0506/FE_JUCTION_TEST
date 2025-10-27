@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../widgets/custom_appbar.dart';
@@ -11,12 +10,10 @@ import './loginandsecurity/login_security.dart' as security;
 import './address/address.dart';
 import './privacy/privacy.dart';
 import './notification/notification.dart';
-import './wallet/wallet.dart';
+//import './wallet/wallet.dart';
 import './referrals/referrals.dart';
-import './crewclash/crewclash.dart';
 import './faq/faq.dart';
 import './terms/terms.dart';
-import './support/support.dart';
 import './report/report.dart';
 import '../login/login_page.dart' as auth;
 
@@ -165,15 +162,15 @@ class AccountSettingsPage extends StatelessWidget {
                       MaterialPageRoute(builder: (_) => const NotificationPage()),
                     ),
                   ),
-                  _buildSectionTitle("Payments and Transactions"),
-                  _buildSettingItem(
-                    icon: Icons.account_balance_wallet_outlined,
-                    title: "Manage Wallet",
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const WalletPage()),
-                    ),
-                  ),
+                  // _buildSectionTitle("Payments and Transactions"),
+                  // _buildSettingItem(
+                  //   icon: Icons.account_balance_wallet_outlined,
+                  //   title: "Manage Wallet",
+                  //   onTap: () => Navigator.push(
+                  //     context,
+                  //     MaterialPageRoute(builder: (_) => const WalletPage()),
+                  //   ),
+                  // ),
                   _buildSectionTitle("Marketing"),
                   _buildSettingItem(
                     icon: Icons.group_outlined,

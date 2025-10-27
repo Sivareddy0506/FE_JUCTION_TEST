@@ -1,9 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:junction/screens/services/api_service.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'backend_file_upload_service';
@@ -609,6 +606,18 @@ static Future<bool> cancelDeal({
   }
 }
 
+Future<void> cancelDealInChat(String chatId) async {
+  try {
+    await _firestore.collection('chats').doc(chatId).update({
+      'dealStatus': 'cancelled',
+      'lastMessage': 'Deal has been cancelled',
+      'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+    });
+  } catch (e) {
+    throw Exception('Failed to cancel deal in chat: $e');
+  }
+}
+
 
 Future<void> markAsSold({
   required String chatId,
@@ -631,7 +640,7 @@ Future<void> markAsSold({
       'lastMessageTime': Timestamp.fromDate(DateTime.now()),
     });
 
-    String systemMessageId = DateTime.now().millisecondsSinceEpoch.toString() + '_sold';
+    String systemMessageId = '${DateTime.now().millisecondsSinceEpoch}_sold';
     MessageModel systemMessage = MessageModel(
       messageId: systemMessageId,
       senderId: 'system',

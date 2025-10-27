@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import './catergory_item.dart';
 import '../screens/search/search_results_page.dart';
 
 class CategoryGrid extends StatelessWidget {

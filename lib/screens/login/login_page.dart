@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../widgets/custom_app_bar.dart';
@@ -27,55 +28,67 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-  final email = _emailController.text.trim();
-  if (!isValidEmail) return;
+    final email = _emailController.text.trim();
+    if (!isValidEmail) return;
 
-  setState(() => isLoading = true);
+    setState(() => isLoading = true);
 
-  final uri = Uri.parse('https://api.junctionverse.com/user/auth/login');
-  try {
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: '{"email": "$email"}',
-    );
+    final uri = Uri.parse('https://api.junctionverse.com/user/auth/login');
 
-    if (!mounted) return;
-
-    if (response.statusCode == 200) {
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verification code sent!')),
+    try {
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
       );
 
-      // Navigate to OTP Verification page after a slight delay (optional)
-      await Future.delayed(const Duration(milliseconds: 300));
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OTPVerificationLoginPage(email: email),
-        ),
-      );
-    } else {
-      // Show error from response body or fallback message
+      if (!mounted) return;
+
+      bool isSuccess = response.statusCode == 200;
+      String message;
+
+      if (isSuccess) {
+        message = 'Verification code sent!';
+      } else {
+        try {
+          final data = jsonDecode(response.body);
+          message = data['error'] ?? 'Failed to send verification code';
+        } catch (_) {
+          message = 'Failed to send verification code';
+        }
+      }
+
+      // Show SnackBar with proper color
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${response.body.isNotEmpty ? response.body : 'Failed to send verification code'}'),
+          content: Text(message),
+          backgroundColor: isSuccess ? Colors.black : Colors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
-    }
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Network error: $e')),
-    );
-  } finally {
-    if (mounted) {
-      setState(() => isLoading = false);
+
+      if (isSuccess) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OTPVerificationLoginPage(email: email),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Network error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
-}
-
 
   @override
   void dispose() {
@@ -85,6 +98,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = 24.0;
+
     return Scaffold(
       appBar: CustomAppBar(
         showBackButton: true,
@@ -95,61 +110,77 @@ class _LoginPageState extends State<LoginPage> {
           'assets/logo-d.png',
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const HeadingWithDescription(
-              heading: 'Log In',
-              description:
-                  "Enter your registered Email ID.",
+           Expanded(
+  child: SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const HeadingWithDescription(
+          heading: 'Log In',
+          description: "Enter your registered Email ID.",
+        ),
+        const SizedBox(height: 32),
+        AppTextField(
+          label: 'College Email',
+          placeholder: 'Enter your college email',
+          isMandatory: true,
+          keyboardType: TextInputType.emailAddress,
+          controller: _emailController,
+          onChanged: _checkEmail,
+        ),
+        const SizedBox(height: 8),
+        // Inline error message for invalid email
+        if (!isValidEmail && _emailController.text.isNotEmpty)
+          const Text(
+            'Please enter a valid email address.',
+            style: TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        const SizedBox(height: 40),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'New here?',
+              style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
             ),
-            const SizedBox(height: 32),
-            AppTextField(
-              label: 'College Email',
-              placeholder: 'Enter your college email',
-              isMandatory: true,
-              keyboardType: TextInputType.emailAddress,
-              controller: _emailController,
-              onChanged: _checkEmail,
-            ),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'New here?',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SignupPage()),
+                );
+              },
+              child: const Text(
+                'Create an account',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF212121),
                 ),
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SignupPage()),
-                    );
-                  },
-                  child: const Text(
-                    'Create an account',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF212121),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 16),
-            AppButton(
-              bottomSpacing: 30,
-              label: isLoading ? 'Sending...' : 'Send Verification Code',
-              onPressed: isValidEmail && !isLoading ? _login : null,
-              backgroundColor: isValidEmail
-                  ? const Color(0xFF262626)
-                  : const Color(0xFFBDBDBD),
-            ),
+          ],
+        ),
+        const SizedBox(height: 24), // ✅ reduced gap to 24px
+      ],
+    ),
+  ),
+),
+Padding(
+  padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding),
+  child: AppButton(
+    label: isLoading ? 'Sending...' : 'Send Verification Code',
+    onPressed: isValidEmail && !isLoading ? _login : null,
+    backgroundColor: isValidEmail ? const Color(0xFF262626) : const Color(0xFFBDBDBD),
+  ),
+),
+
+          
           ],
         ),
       ),

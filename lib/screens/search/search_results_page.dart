@@ -28,7 +28,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   bool isLoading = true;
   bool hasError = false;
   String errorMessage = '';
-  Map<String, String> _sellerNames = {}; // Seller names cache
+  final Map<String, String> _sellerNames = {}; // Seller names cache
   Map<String, int> _uniqueClicks = {};   // Product clicks cache
 
   @override

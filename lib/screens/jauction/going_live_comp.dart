@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class AuctionCard extends StatefulWidget {
   final Map<String, dynamic> auctionData;
 
-  const AuctionCard({Key? key, required this.auctionData}) : super(key: key);
+  const AuctionCard({super.key, required this.auctionData});
 
   @override
   State<AuctionCard> createState() => _AuctionCardState();
@@ -216,7 +215,7 @@ class _AuctionCardState extends State<AuctionCard> {
 class AuctionCarousel extends StatefulWidget {
   final List<Map<String, dynamic>> auctions;
 
-  const AuctionCarousel({Key? key, required this.auctions}) : super(key: key);
+  const AuctionCarousel({super.key, required this.auctions});
 
   @override
   State<AuctionCarousel> createState() => _AuctionCarouselState();

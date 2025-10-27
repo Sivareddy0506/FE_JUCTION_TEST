@@ -10,8 +10,8 @@ class ProductCard extends StatelessWidget {
   const ProductCard({
     required this.product,
     this.onTap,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   Color _getStatusColor(String status) {
     switch (status) {

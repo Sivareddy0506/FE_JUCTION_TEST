@@ -494,72 +494,110 @@ const SizedBox(height: 16),
       bottomNavigationBar: _buildBottomNavigationBar(isSellerViewing, isProductForSale, isDealLocked),
     );
   }
-Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bool isDealLocked) {
-  return SafeArea(
-    top: false,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          // Mark as Sold button (only for seller, if deal not locked)
-          if (widget.product.seller?.id == _chatService.currentUserId && !isDealLocked)
-            Expanded(
-              child: SizedBox(
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: _showMarkAsSoldDialog,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Mark as Sold'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+  Widget? _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bool isDealLocked) {
+    // Don't show bottom bar for seller viewing their own product
+    if (isSellerViewing) {
+      return null;
+    }
+
+    // If deal is locked, show appropriate buttons
+    if (isDealLocked) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              // Mark as Sold button (for seller)
+              if (widget.product.seller?.id == _chatService.currentUserId)
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showMarkAsSoldDialog(),
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Mark as Sold'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-
-          // Rate User button (only for buyer, if deal not locked)
-          if (widget.product.seller?.id != _chatService.currentUserId && !isDealLocked)
-            // Expanded(
-            //   child: SizedBox(
-            //     height: 56,
-            //     child: ElevatedButton.icon(
-            //       onPressed: _showUserRating,
-            //       icon: const Icon(Icons.star_outline),
-            //       label: const Text('Rate User'),
-            //       style: ElevatedButton.styleFrom(
-            //         backgroundColor: Colors.orange,
-            //         foregroundColor: Colors.white,
-            //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            //       ),
-            //     ),
-            //   ),
-            // ),
-
-          // Always show Chat button
-          Expanded(
-            child: SizedBox(
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () => startChat(context),
-                icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('Chat'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Color(0xFFE3E3E3)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              
+              // User Rating button (for buyer)
+              if (widget.product.seller?.id != _chatService.currentUserId)
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showUserRating(),
+                      icon: const Icon(Icons.star_outline),
+                      label: const Text('Rate User'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
                 ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // If product is not for sale, show disabled chat button
+    if (!isProductForSale) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SizedBox(
+            height: 56,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: null, // Disabled
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Chat'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[300],
+                foregroundColor: Colors.grey[600],
+                side: const BorderSide(color: Color(0xFFE3E3E3)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
-        ],
-      ),
-    ),
-  );
-}
+        ),
+      );
+    }
 
+    // Default chat button for products that are for sale
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SizedBox(
+          height: 56,
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => startChat(context),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Chat'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              side: const BorderSide(color: Color(0xFFE3E3E3)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildBadge(String text) {
     return Container(

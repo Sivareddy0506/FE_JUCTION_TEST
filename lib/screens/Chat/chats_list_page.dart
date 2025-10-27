@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import 'package:junction/screens/Chat/chat_page.dart';
-import 'package:async/async.dart';
 import 'package:junction/screens/services/chat_service.dart';
 
 // import 'firebase_options.dart';
@@ -11,7 +7,7 @@ import 'package:junction/screens/services/chat_service.dart';
 class ChatListPage extends StatelessWidget {
   final ChatService _chatService = ChatService();
 
-  ChatListPage({Key? key}) : super(key: key);
+  ChatListPage({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
-import '../main/main_landing_screen.dart';
+import '../products/home.dart';
 
 class VerificationSubmittedPage extends StatelessWidget {
   const VerificationSubmittedPage({super.key});
@@ -60,7 +60,7 @@ class VerificationSubmittedPage extends StatelessWidget {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const MainLandingScreen(),
+                    builder: (_) => const HomePage(),
                   ),
                 );
               },

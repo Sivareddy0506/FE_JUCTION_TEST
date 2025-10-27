@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:junction/app_state.dart';
-import '../screens/products/home.dart';
-import '../screens/jauction/main.dart';
 import '../screens/products/category_post.dart';
-import '../screens/profile/user_profile.dart';
 import '../services/navigation_manager.dart';
 
 // Wrapper widget that always shows bottom navigation
@@ -13,11 +10,11 @@ class BottomNavWrapper extends StatelessWidget {
   final Function(String) onTap;
 
   const BottomNavWrapper({
-    Key? key,
+    super.key,
     required this.child,
     required this.activeItem,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +37,10 @@ class BottomNavBar extends StatelessWidget {
   final Function(String) onTap;
 
   const BottomNavBar({
-    Key? key,
+    super.key,
     required this.activeItem,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   Widget _buildNavItem(
     BuildContext context,
@@ -51,7 +48,7 @@ class BottomNavBar extends StatelessWidget {
     String iconBaseName,
   ) {
     final isActive = activeItem.toLowerCase() == label.toLowerCase();
-    final assetPath = 'assets/${iconBaseName}${isActive ? "-active" : ""}.png';
+    final assetPath = 'assets/$iconBaseName${isActive ? "-active" : ""}.png';
 
     final screenWidth = MediaQuery.of(context).size.width;
     final iconSize = (screenWidth * 0.06).clamp(22.0, 32.0); // responsive size

@@ -10,7 +10,6 @@ import '../profile/user_profile.dart';
 import '../signup/verification_submitted.dart';
 import '../signup/verification_rejected.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
 
 class OTPVerificationLoginPage extends StatefulWidget {
   final String email;

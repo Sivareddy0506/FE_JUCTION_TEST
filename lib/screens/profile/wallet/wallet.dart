@@ -235,7 +235,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
   return null;
 }
 
-        void _onAmountChanged(String value) {
+        void onAmountChanged(String value) {
           setModalState(() {
             amountError = validateAmount(value);
             isValidAmount = amountError == null && value.isNotEmpty;
@@ -275,7 +275,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
                     isMandatory: true,
                     keyboardType: TextInputType.number,
                     controller: _amountController,
-                    onChanged: _onAmountChanged,
+                    onChanged: onAmountChanged,
                     prefixText: '₹ ',
                   ),
                   if (amountError != null)

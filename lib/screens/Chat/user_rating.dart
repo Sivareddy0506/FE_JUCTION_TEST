@@ -8,7 +8,7 @@ class ReviewScreen extends StatefulWidget {
   final String ratedById;
   final bool fromProductSold; // true => rate buyer, false => rate seller
 
-  ReviewScreen({
+  const ReviewScreen({super.key, 
     required this.ratedUserId,
     required this.ratedById,
     this.fromProductSold = false,
@@ -61,61 +61,60 @@ class _ReviewScreenState extends State<ReviewScreen> {
     );
   }
 
-  Future<void> submitRating() async {
-    if (stars == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please select a star rating")),
-      );
-      return;
-    }
+Future<void> submitRating() async {
+  if (stars == 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Please select a star rating")),
+    );
+    return;
+  }
 
-    setState(() => isLoading = true);
-    try {
+  setState(() => isLoading = true);
+  try {
     final prefs = await SharedPreferences.getInstance();
     final authToken = prefs.getString('authToken');
 
     String comments = vibeController.text;
-    if (comments.isEmpty == true) {
-      comments = "N/A";
-    }
+    if (comments.isEmpty) comments = "N/A";
 
     final response = await http.post(
-        Uri.parse('https://api.junctionverse.com/ratings/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-        body: jsonEncode({
-          "ratedUserId": widget.ratedUserId,
-          "ratedById": widget.ratedById,
-          "communication": q1,
-          "reliability": q2,
-          "tradeAgain": q3,
-          "overallVibe": comments,
-          "comments": comments,
-          "stars": stars,
-        }),
-      );
+      Uri.parse('https://api.junctionverse.com/ratings/'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({
+        "ratedUserId": widget.ratedUserId,
+        "ratedById": widget.ratedById,
+        "communication": q1 ?? "N/A",
+        "reliability": q2 ?? "N/A",
+        "tradeAgain": q3 ?? "N/A",
+        "overallVibe": comments,
+        "comments": comments,
+        "stars": stars,
+      }),
+    );
 
-      if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Rating submitted successfully")),
-        );
-        Navigator.pop(context); // go back after success
-      } else {
-        final err = json.decode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${err["error"] ?? "Failed"}")),
-        );
-      }
-    } catch (e) {
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final msg = json.decode(response.body)["message"] ?? "Rating submitted";
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Something went wrong: $e")),
+        SnackBar(content: Text(msg)),
       );
-    } finally {
-      setState(() => isLoading = false);
+      Navigator.pop(context); // go back after success
+    } else {
+      final err = json.decode(response.body);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: ${err["error"] ?? "Failed"}")),
+      );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Something went wrong: $e")),
+    );
+  } finally {
+    setState(() => isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {

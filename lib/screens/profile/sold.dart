@@ -143,9 +143,9 @@ class _SoldTabState extends State<SoldTab> {
                // Product image
                ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: product.imageUrl!.isNotEmpty
+          child: product.imageUrl.isNotEmpty
               ? Image.network(
-                  product.imageUrl!,
+                  product.imageUrl,
                   width: 70,
                   height: 70,
                   fit: BoxFit.cover,

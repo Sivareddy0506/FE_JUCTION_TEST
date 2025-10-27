@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/app_cache_service.dart';
-import '../services/cache_manager.dart';
 
 /// Debug widget for monitoring and managing cache
 class CacheDebugWidget extends StatefulWidget {

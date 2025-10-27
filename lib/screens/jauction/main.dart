@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../widgets/logo_icons_widget.dart';
-import '../../widgets/search_bar_widget.dart';
 import '../../widgets/bottom_navbar.dart';
 import '../../widgets/jauction_coming_soon_widget.dart';
 // TODO: Uncomment when restoring auction functionality
@@ -15,10 +14,10 @@ class JauctionHomePage extends StatefulWidget {
   final String adUrl2;
 
   const JauctionHomePage({
-    Key? key,
+    super.key,
     this.adUrl1 = '',
     this.adUrl2 = '',
-  }) : super(key: key);
+  });
 
   @override
   State<JauctionHomePage> createState() => _JauctionHomePageState();

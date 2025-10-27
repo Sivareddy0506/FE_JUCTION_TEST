@@ -79,7 +79,7 @@ class _FaqPageState extends State<FaqPage> {
               ),
             ),
             const SizedBox(height: 24),
-            ..._items.map((item) => _FaqTile(item: item)).toList(),
+            ..._items.map((item) => _FaqTile(item: item)),
           ],
         ),
       ),
@@ -102,7 +102,7 @@ class _FaqItem {
 class _FaqTile extends StatefulWidget {
   final _FaqItem item;
 
-  const _FaqTile({required this.item, super.key});
+  const _FaqTile({required this.item});
 
   @override
   State<_FaqTile> createState() => _FaqTileState();

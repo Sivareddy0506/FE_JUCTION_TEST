@@ -30,7 +30,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
   };
 
   Future<File?> compressImage(File file) async {
-    final dir = await Directory.systemTemp;
+    final dir = Directory.systemTemp;
     final targetPath = '${dir.path}/${p.basename(file.path)}_compressed.jpg';
 
     final XFile? result = await FlutterImageCompress.compressAndGetFile(

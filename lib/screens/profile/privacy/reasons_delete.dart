@@ -86,7 +86,7 @@ class ReasonsDeletePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 36),
-            ...reasons.map((reason) => _buildReasonItem(context, reason)).toList(),
+            ...reasons.map((reason) => _buildReasonItem(context, reason)),
           ],
         ),
       ),

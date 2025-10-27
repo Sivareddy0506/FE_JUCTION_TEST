@@ -13,7 +13,7 @@ class AboutTab extends StatefulWidget {
 class _AboutTabState extends State<AboutTab> {
   double avgRating = 0.0;
   List<dynamic> reviews = [];
-  int productsSoldCount = 0; // ✅ new field
+  int productsSoldCount = 0;
   bool isLoading = true;
 
   @override
@@ -25,8 +25,7 @@ class _AboutTabState extends State<AboutTab> {
   Future<void> fetchRatings() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? userId = prefs.getString("userId"); // logged-in user id
-
+      String? userId = prefs.getString("userId");
       if (userId == null) {
         setState(() {
           avgRating = 0.0;
@@ -38,24 +37,18 @@ class _AboutTabState extends State<AboutTab> {
       }
 
       final authToken = prefs.getString('authToken');
-
       final url = Uri.parse("https://api.junctionverse.com/ratings/$userId");
-      // final response = await http.get(url);
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-      );
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      });
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
         setState(() {
           avgRating = (data["avgRating"] ?? 0).toDouble();
           reviews = data["ratings"] ?? [];
-          productsSoldCount = data["productsSoldCount"] ?? 0; // ✅ fetch count
+          productsSoldCount = data["productsSoldCount"] ?? 0;
           isLoading = false;
         });
       } else {
@@ -67,7 +60,6 @@ class _AboutTabState extends State<AboutTab> {
         });
       }
     } catch (e) {
-      print("Error fetching ratings: $e");
       setState(() {
         avgRating = 0.0;
         reviews = [];
@@ -83,69 +75,132 @@ class _AboutTabState extends State<AboutTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Ratings Summary
+        // Badges Row
+        // Row(
+        //   children: [
+        //     _buildBadgeIcon('1', 'Hustler', Colors.purple.shade400),
+        //     const SizedBox(width: 12),
+        //     _buildBadgeIcon('2', 'Bid Boss', Colors.green.shade400),
+        //   ],
+        // ),
+        const SizedBox(height: 20),
+
+        // Ratings & Items Sold
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Column(
-              children: [
-                const Icon(Icons.star, color: Colors.black, size: 30),
-                const SizedBox(height: 5),
-                Text(avgRating.toStringAsFixed(1),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const Text("Ratings"),
-              ],
+            _buildSummaryCard(
+              icon: Icons.star,
+              title: avgRating.toStringAsFixed(1),
+              subtitle: 'Ratings',
             ),
-            Column(
-              children: [
-                const Icon(Icons.shopping_bag, color: Colors.black, size: 30),
-                const SizedBox(height: 5),
-                Text(productsSoldCount.toString(), // ✅ dynamic value
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const Text("Items Sold"),
-              ],
+            const SizedBox(width: 12),
+            _buildSummaryCard(
+              icon: Icons.shopping_bag,
+              title: productsSoldCount.toString(),
+              subtitle: 'Items Sold',
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
 
+        // Reviews header
         const Text("Reviews", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        Expanded(
-          child: reviews.isEmpty
-              ? const Center(
-                  child: Text(
-                    "No ratings found",
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: reviews.length,
-                  itemBuilder: (context, index) {
-                    final review = reviews[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      child: ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: Text(review["ratedBy"]["fullName"] ?? "Anonymous"),
-                        subtitle: Text(review["comments"] ?? "No comments"),
-                        trailing: Text(
-                          "${review["stars"]} ★",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepOrange,
+        // Reviews list
+        ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: reviews.length,
+          itemBuilder: (context, index) {
+            final review = reviews[index];
+            final reviewer = review["ratedBy"] ?? {};
+            final avatarUrl = reviewer["avatarUrl"];
+            return Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundImage: avatarUrl != null
+                          ? NetworkImage(avatarUrl)
+                          : null,
+                      child: avatarUrl == null ? const Icon(Icons.person) : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reviewer["fullName"] ?? "Anonymous",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(review["comments"] ?? "No comments"),
+                        ],
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "${review["stars"] ?? 0} ★",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+            );
+          },
         ),
       ]),
+    );
+  }
+
+  Widget _buildBadgeIcon(String number, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(number, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard({required IconData icon, required String title, required String subtitle}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 28, color: Colors.black87),
+            const SizedBox(height: 6),
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 class ProductImage {
   final String fileUrl;

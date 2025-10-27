@@ -279,28 +279,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
-  String getReadableLocation(String fullAddress) {
-  if (fullAddress.isEmpty) return '';
-
-  // Split by commas and trim spaces
-  final parts = fullAddress.split(',').map((p) => p.trim()).toList();
-
-  // Remove any part that starts with a number (likely a street number)
-  final filteredParts = parts.where((p) => !RegExp(r'^\d').hasMatch(p)).toList();
-
-  if (filteredParts.isEmpty) return fullAddress; // fallback
-
-  // Take last 2-3 parts for area, city/state
-  if (filteredParts.length >= 3) {
-    return '${filteredParts[filteredParts.length - 3]}, ${filteredParts[filteredParts.length - 2]}, ${filteredParts[filteredParts.length - 1]}';
-  } else if (filteredParts.length >= 2) {
-    return '${filteredParts[filteredParts.length - 2]}, ${filteredParts[filteredParts.length - 1]}';
-  } else {
-    return filteredParts.join(', ');
-  }
-}
-
-
   Future<void> _updateProfileImage() async {
     // Add haptic feedback for better user experience
     await HapticFeedback.lightImpact();
@@ -879,15 +857,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-  getReadableLocation(location),
-  style: const TextStyle(
-    color: Color(0xFFE3E3E3),
-    fontWeight: FontWeight.w500,
-    fontSize: 12,
-    height: 16 / 12,
-  ),
-)
-
+                      location,
+                      style: const TextStyle(
+                        color: Color(0xFFE3E3E3),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        height: 16 / 12,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
