@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/app_button.dart';
 import './signup/signup_page.dart';
+import '../app.dart'; // For SlidePageRoute
 
 class AppOverviewScreen extends StatelessWidget {
   const AppOverviewScreen({super.key});
@@ -121,7 +122,7 @@ class AppOverviewScreen extends StatelessWidget {
                 await prefs.setBool('isFirstTime', false);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SignupPage()),
+                  SlidePageRoute(page: const SignupPage()),
                 );
               },
             ),

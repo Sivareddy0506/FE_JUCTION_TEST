@@ -3,7 +3,8 @@ import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/headding_description.dart';
-import 'document_verification_page.dart'; 
+import 'document_verification_page.dart';
+import '../../app.dart'; // For SlidePageRoute 
 
 class ReferralCodePage extends StatefulWidget {
   final String email;
@@ -31,8 +32,8 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => DocumentVerificationPage(email: widget.email),
+        SlidePageRoute(
+          page: DocumentVerificationPage(email: widget.email),
         ),
       );
     } catch (_) {
@@ -49,8 +50,8 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
   void _skip() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => DocumentVerificationPage(email: widget.email),
+      SlidePageRoute(
+        page: DocumentVerificationPage(email: widget.email),
       ),
     );
   }
@@ -88,7 +89,7 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
               label: isLoading ? 'Verifying...' : 'Submit for Verification',
               onPressed: isLoading ? null : _submitCode,
               backgroundColor:
-                  isLoading ? const Color(0xFFA3A3A3) : const Color(0xFF262626),
+                  isLoading ? const Color(0xFF8C8C8C) : const Color(0xFF262626),
             ),
             const SizedBox(height: 12),
             Padding(

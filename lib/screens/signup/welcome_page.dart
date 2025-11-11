@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../login/login_page.dart'; // Replace with your actual LoginPage path
+import '../login/login_page.dart';
+import '../../app.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -13,14 +14,12 @@ class _WelcomePageState extends State<WelcomePage> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 4), () {
+    Future.delayed(const Duration(milliseconds: 1500), () {
       if (!mounted) return; // ✅ Guard against context use after disposal
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => const LoginPage(),
-        ),
+        SlidePageRoute(page: const LoginPage()),
       );
     });
   }

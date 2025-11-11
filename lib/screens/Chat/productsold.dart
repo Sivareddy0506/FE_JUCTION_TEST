@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:junction/screens/Chat/user_rating.dart';
+import '../../app.dart'; // For SlidePageRoute
+import '../../widgets/app_button.dart';
 
 class ProductSoldScreen extends StatefulWidget {
   final String productName;
@@ -29,8 +31,8 @@ void _navigateToRatingsPage() {
   Future.delayed(const Duration(seconds: 3), () {
     Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => ReviewScreen(
+          SlidePageRoute(
+            page: ReviewScreen(
               ratedUserId: widget.ratedUserId,
               ratedById: widget.ratedById,
               fromProductSold: widget.fromProductSold,
@@ -81,24 +83,13 @@ void _navigateToRatingsPage() {
                 SizedBox(height: 40),
 
                 // Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                       backgroundColor: const Color(0xFFFF6705),
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context); // Go back or redirect
-                    },
-                    child: Text(
-                      "Continue",
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
-                  ),
+                AppButton(
+                  label: "Continue",
+                  onPressed: () {
+                    Navigator.pop(context); // Go back or redirect
+                  },
+                  backgroundColor: const Color(0xFFFF6705),
+                  textColor: Colors.white,
                 ),
               ],
             ),

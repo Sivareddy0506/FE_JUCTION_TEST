@@ -6,6 +6,7 @@ import 'empty_state.dart';
 import '../../../models/product.dart';
 import 'package:intl/intl.dart';
 import '/screens/products/product_detail.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class PurchasedTab extends StatefulWidget {
   const PurchasedTab({super.key});
@@ -28,23 +29,19 @@ class _PurchasedTabState extends State<PurchasedTab> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
-
+      final currentUserId = prefs.getString('userId');
       if (token == null || token.isEmpty) {
         setState(() => isLoading = false);
         return;
       }
-
       final uri = Uri.parse('https://api.junctionverse.com/product/purchased');
       final response = await http.get(uri, headers: {
         'Authorization': 'Bearer $token',
       });
-
       debugPrint("Purchased API Response: ${response.body}");
-
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         final List<dynamic> items = decoded is List ? decoded : [];
-
         final fetchedProducts = items.map<Product>((item) {
           final imagesList = (item['images'] as List?)
                   ?.map((img) =>
@@ -88,12 +85,27 @@ class _PurchasedTabState extends State<PurchasedTab> {
             usage: item['usage'] ?? '',
             brand: item['brand'] ?? '',
             yearOfPurchase: item['yearOfPurchase'] ?? 0,
+            // Custom extension: try extracting buyerId if present
+            // buyerId: item['buyerId'] ?? '', // Skipped unless Product has this field
           );
         }).toList();
-
+        // Filter by buyerId only if at least one item has a non-null buyerId; otherwise trust API and show all
+        List<Product> filteredProducts = fetchedProducts;
+        final bool hasBuyerIdKey = items.isNotEmpty && items.first is Map && (items.first as Map).containsKey('buyerId');
+        final bool anyNonNullBuyer = hasBuyerIdKey && items.any((item) => (item as Map)['buyerId'] != null);
+        if (anyNonNullBuyer) {
+          filteredProducts = fetchedProducts.where((p) {
+            final matched = items.firstWhere(
+              (item) => (item['id'] ?? item['_id'] ?? '') == p.id,
+              orElse: () => null,
+            );
+            if (matched == null) return false;
+            return matched['buyerId'] == currentUserId;
+          }).toList();
+        }
         if (!mounted) return;
         setState(() {
-          products = fetchedProducts;
+          products = filteredProducts;
           isLoading = false;
         });
       } else {
@@ -127,8 +139,8 @@ class _PurchasedTabState extends State<PurchasedTab> {
             // TODO: navigate to product details page
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetailPage(product: product),
+              SlidePageRoute(
+                page: ProductDetailPage(product: product),
               ),
             );
           },

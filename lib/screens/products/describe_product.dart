@@ -6,6 +6,7 @@ import '../../../widgets/form_text.dart';
 import '../../../widgets/app_dropdown.dart';
 import '../../widgets/tune_auction.dart';
 import './add_product_images.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class DescribeProductPage extends StatefulWidget {
   final String selectedCategory;
@@ -201,25 +202,12 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        side: const BorderSide(color: Color(0xFF262626)),
-                      ),
-                    ),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Color(0xFF262626),
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
+                AppButton(
+                  label: 'Cancel',
+                  onPressed: () => Navigator.of(context).pop(),
+                  backgroundColor: Colors.white,
+                  borderColor: const Color(0xFF262626),
+                  textColor: const Color(0xFF262626),
                 ),
               ],
             ),
@@ -299,8 +287,8 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
     if (AppState.instance.isJuction == true) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => TuneAuctionWidget(
+        SlidePageRoute(
+          page: TuneAuctionWidget(
             selectedCategory: productDetails.category,
             title: productDetails.title,
             price: productDetails.price,
@@ -316,8 +304,8 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => AddProductImagesPage(
+        SlidePageRoute(
+          page: AddProductImagesPage(
             selectedCategory: productDetails.category,
             title: productDetails.title,
             price: productDetails.price,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../widgets/app_button.dart';
 
 class ListingGuidelinesPage extends StatefulWidget {
   final Map<String, dynamic> listingData;
@@ -104,20 +105,21 @@ class _ListingGuidelinesPageState extends State<ListingGuidelinesPage> {
               ],
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: agreed && !isSubmitting ? _submitListing : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: agreed ? Colors.black : Colors.grey,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: isSubmitting
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Done", style: TextStyle(color: Colors.white)),
-                ),
-              ),
+            AppButton(
+              label: isSubmitting ? 'Submitting...' : 'Done',
+              onPressed: agreed && !isSubmitting ? _submitListing : null,
+              backgroundColor: agreed ? Colors.black : Colors.grey,
+              textColor: Colors.white,
+              customChild: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : null,
             )
           ],
         ),

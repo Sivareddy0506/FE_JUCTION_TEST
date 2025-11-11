@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../address/address.dart';
 
@@ -28,42 +29,60 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
     super.initState();
     _loadUserProfile();
   }
+Future<void> _loadUserProfile() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
 
-  Future<void> _loadUserProfile() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('authToken');
+    if (token == null) return;
 
-      if (token == null) return;
+    final uri = Uri.parse('https://api.junctionverse.com/user/profile');
+    final response = await http.get(uri, headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    });
 
-      final uri = Uri.parse('https://api.junctionverse.com/user/profile');
-      final response = await http.get(uri, headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final user = data['user'];
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final user = data['user'];
+      // ✅ Fetch the homeAddress from addressJson by matching the homeAddress ID
+      String addressText = '';
+      final homeAddressId = user['homeAddress'];
+      final addressJson = user['addressJson'];
 
-        setState(() {
-          name = user['fullName'] ?? '';
-          email = user['email'] ?? '';
-          mobile = user['phoneNumber'] ?? '';
-          currentAddress = user['homeAddress'] ?? '';
-          college = user['university'] ?? '';
-          enrollmentYear = "${user['enrollmentMonth'] ?? 'June'} ${user['enrollmentYear'] ?? '2023'}";
-          graduationYear = "${user['graduationMonth'] ?? 'May'} ${user['graduationYear'] ?? '2027'}";
-          isLoading = false;
-        });
-      } else {
-        setState(() => isLoading = false);
+      if (homeAddressId != null && addressJson is List) {
+        final defaultAddress = addressJson.firstWhere(
+          (addr) => addr['id'] == homeAddressId,
+          orElse: () => null,
+        );
+        
+        if (defaultAddress != null) {
+          addressText = "${defaultAddress['label'] ?? ''} — ${defaultAddress['address'] ?? ''}";
+        }
       }
-    } catch (e) {
-      print("Error: $e");
+
+      setState(() {
+        name = user['fullName'] ?? '';
+        email = user['email'] ?? '';
+        mobile = user['phoneNumber'] ?? '';
+        currentAddress = addressText;
+        college = user['university'] ?? '';
+        enrollmentYear =
+            "${user['enrollmentMonth'] ?? 'June'} ${user['enrollmentYear'] ?? '2023'}";
+        graduationYear =
+            "${user['graduationMonth'] ?? 'May'} ${user['graduationYear'] ?? '2027'}";
+        isLoading = false;
+      });
+    } else {
       setState(() => isLoading = false);
     }
+  } catch (e) {
+    print("Error: $e");
+    setState(() => isLoading = false);
   }
+}
+
 
   Widget _buildSectionTitle(String title) {
     return Padding(
@@ -113,7 +132,7 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const AddressPage()),
+                  SlidePageRoute(page: const AddressPage()),
                 );
               },
             ),

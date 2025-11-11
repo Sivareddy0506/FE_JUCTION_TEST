@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:junction/app_state.dart';
 import '../../../widgets/custom_appbar.dart';
 import './describe_product.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class CategoryPostPage extends StatefulWidget {
   const CategoryPostPage({super.key});
@@ -26,8 +27,8 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
  void _onCategorySelected(String category) {
   Navigator.push(
     context,
-    MaterialPageRoute(
-      builder: (_) => DescribeProductPage(selectedCategory: category),
+    SlidePageRoute(
+      page: DescribeProductPage(selectedCategory: category),
     ),
   );
 }

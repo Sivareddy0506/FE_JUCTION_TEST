@@ -8,6 +8,7 @@ import '../services/app_cache_service.dart';
 import '../services/memory_monitor_service.dart';
 import 'services/api_service.dart';
 import 'login/login_page.dart';
+import '../app.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -71,14 +72,12 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      await Future.delayed(const Duration(seconds: 3));
+      await Future.delayed(const Duration(milliseconds: 1200));
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => shouldGoToHome ? HomePage() : LoginPage(),
-          ),
+          SlidePageRoute(page: shouldGoToHome ? HomePage() : LoginPage()),
         );
       }
     } catch (e) {
@@ -87,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => LoginPage()),
+          SlidePageRoute(page: LoginPage()),
         );
       }
     }
@@ -273,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_currentSlide == _slides.length - 1) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const AppOverviewScreen()),
+              FadePageRoute(page: const AppOverviewScreen()),
             );
           } else {
             _pageController.nextPage(
@@ -291,19 +290,23 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: _showMainContent
-            ? Column(
-                children: [
-                  const SizedBox(height: 24),
-                  _buildHeader(),
-                  const SizedBox(height: 12),
-                  _buildSliderContent(),
-                  const SizedBox(height: 24),
-                  _buildBottomButton(),
-                  const SizedBox(height: 24),
-                ],
-              )
-            : _buildMatrixLogo(),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: _showMainContent
+              ? Column(
+                  key: const ValueKey('main-content'),
+                  children: [
+                    const SizedBox(height: 24),
+                    _buildHeader(),
+                    const SizedBox(height: 12),
+                    _buildSliderContent(),
+                    const SizedBox(height: 24),
+                    _buildBottomButton(),
+                    const SizedBox(height: 24),
+                  ],
+                )
+              : _buildMatrixLogo(),
+        ),
       ),
     );
   }

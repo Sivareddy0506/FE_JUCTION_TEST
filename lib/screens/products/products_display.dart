@@ -5,6 +5,12 @@ import '../services/api_service.dart';
 import './product_detail.dart';
 import '../services/location_helper.dart';
 import '../../services/profile_service.dart';
+import '../../../widgets/custom_appbar.dart';
+import '../../widgets/bottom_navbar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../profile/user_profile.dart';
+import '../profile/others_profile.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class ProductListingPage extends StatefulWidget {
   final String title;
@@ -89,10 +95,6 @@ class _ProductListingPageState extends State<ProductListingPage> {
     final List<String> productIds = products.map((p) => p.id).toList();
     final results = await ProductClickService.getUniqueClicksFor(productIds);
     clicksMap.addAll(results);
-    // await Future.wait(searchResults.map((product) async {
-    //   final count = await ProductClickService.getUniqueClicks(product.id);
-    //   clicksMap[product.id] = count;
-    // }));
 
     setState(() {
       _uniqueClicks = clicksMap;
@@ -119,29 +121,45 @@ class _ProductListingPageState extends State<ProductListingPage> {
     }
   }
 
-  Future<void> _handleProductClick(Product product) async {
+  Future<void> _handleProductClick(Product product, int index) async {
     await ApiService.trackProductClick(product.id); // track click
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailPage(product: product),
+      SlidePageRoute(
+        page: ProductDetailPage(
+          product: product,
+          products: products, // Pass in product list
+          initialIndex: index, // Pass in list index
+        ),
       ),
     );
   }
 
+  Future<void> _openSellerProfile(String sellerId) async {
+    if (sellerId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final currentUserId = prefs.getString('userId');
+    if (!mounted) return;
+    if (sellerId == currentUserId) {
+      Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
+    } else {
+      Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: sellerId)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-      ),
+    return Scaffold
+    (
+      appBar: CustomAppBar(title: widget.title),
       body: SafeArea(
         child: Column(
           children: [
-            const SearchBarWidget(),
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SearchBarWidget(),
+            ),
             const SizedBox(height: 8),
             if (isLoading)
               const Expanded(
@@ -171,7 +189,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
                         : product.imageUrl;
 
                     return GestureDetector(
-                      onTap: () => _handleProductClick(product),
+                      onTap: () => _handleProductClick(product, index),
                       child: Card(
                         margin: const EdgeInsets.only(bottom: 16),
                         shape: RoundedRectangleBorder(
@@ -184,46 +202,59 @@ class _ProductListingPageState extends State<ProductListingPage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
-                              child: Row(
-                                children: [
-                                  const CircleAvatar(
-                                    radius: 6,
-                                    backgroundImage:
-                                        AssetImage('assets/avatarpng.png'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      displayName,
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Image.asset(
-                                        'assets/ClockCountdown.png',
-                                        width: 14,
-                                        height: 14,
-                                        color: Colors.grey,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        product.createdAt != null
-                                            ? _timeAgo(product.createdAt!)
-                                            : '',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                             child: Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  crossAxisAlignment: CrossAxisAlignment.center,
+  children: [
+    // 👤 Seller section (left-aligned)
+    GestureDetector(
+      onTap: () => _openSellerProfile(sellerId),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircleAvatar(
+            radius: 6,
+            backgroundImage: AssetImage('assets/avatarpng.png'),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 140,
+            child: Text(
+              displayName,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    // ⏰ Time section (right-aligned)
+    Row(
+      children: [
+        Image.asset(
+          'assets/ClockCountdown.png',
+          width: 14,
+          height: 14,
+          color: Colors.grey,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          product.createdAt != null ? _timeAgo(product.createdAt!) : '',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
+    ),
+  ],
+),
+
                             ),
 
                             // Product image
@@ -307,16 +338,14 @@ class _ProductListingPageState extends State<ProductListingPage> {
                                   horizontal: 12, vertical: 8),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.remove_red_eye,
-                                      size: 16, color: Colors.grey),
+                                  Image.asset('assets/Eye.png', width: 16, height: 16),
                                   const SizedBox(width: 4),
                                   Text(
                                       'Viewed by ${_uniqueClicks[product.id] ?? 0} others',
                                       style:
                                           const TextStyle(fontSize: 12)),
                                   const Spacer(),
-                                  const Icon(Icons.location_on,
-                                      size: 16, color: Colors.grey),
+                                  Image.asset('assets/MapPin.png', width: 16, height: 16),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(locationString,
@@ -337,6 +366,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
           ],
         ),
       ),
+      bottomNavigationBar: BottomNavBar(activeItem: 'home', onTap: (_) {}),
     );
   }
 

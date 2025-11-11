@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
 import 'reasons_delete.dart';
@@ -9,7 +10,7 @@ class ThinkingDeletePage extends StatelessWidget {
   void _proceed(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ReasonsDeletePage()),
+      SlidePageRoute(page: const ReasonsDeletePage()),
     );
   }
 

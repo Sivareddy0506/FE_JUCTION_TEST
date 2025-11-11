@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/search/search_results_page.dart';
+import '../app.dart'; // For SlidePageRoute
 
 class CategoryGrid extends StatelessWidget {
   const CategoryGrid({super.key});
@@ -40,8 +41,8 @@ class CategoryGrid extends StatelessWidget {
 
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => SearchResultsPage(searchQuery: query),
+                SlidePageRoute(
+                  page: SearchResultsPage(searchQuery: query),
                 ),
               );
             },

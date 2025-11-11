@@ -4,40 +4,40 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
     id "com.google.gms.google-services"
 }
-  def keystoreProperties = new Properties()
+def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
 android {
-    namespace "com.example.junction"
-    compileSdk 36
+    namespace "com.junction"
+    compileSdk 35
 
     defaultConfig {
-        applicationId "com.example.junction"
-        minSdkVersion flutter.minSdkVersion
-        minSdkVersion flutter.minSdkVersion
+        applicationId "com.junction"
         minSdkVersion 23
-        targetSdk 36
-        versionCode 1
-        versionName "1.0"
+        targetSdk 35
+        versionCode 4
+        versionName "1.0.1"
         multiDexEnabled true
     }
     signingConfigs {
-    release {
-        keyAlias keystoreProperties['keyAlias']
-        keyPassword keystoreProperties['keyPassword']
-        storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-        storePassword keystoreProperties['storePassword']
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                storePassword keystoreProperties['storePassword']
+            }
+        }
     }
-}
 
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             minifyEnabled false
@@ -48,6 +48,7 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -61,4 +62,18 @@ flutter {
 
 dependencies {
     implementation 'com.android.support:multidex:1.0.3'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+    
+    // Import the Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:34.4.0')
+    
+    // TODO: Add the dependencies for Firebase products you want to use
+    // When using the BoM, don't specify versions in Firebase dependencies
+    // https://firebase.google.com/docs/android/setup#available-libraries
+    
+    // Firebase dependencies (add as needed)
+    // implementation 'com.google.firebase:firebase-analytics'
+    // implementation 'com.google.firebase:firebase-messaging'
+    // implementation 'com.google.firebase:firebase-auth'
+    // implementation 'com.google.firebase:firebase-firestore'
 }

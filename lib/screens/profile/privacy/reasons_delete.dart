@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'delete_account.dart';
 
@@ -17,8 +18,8 @@ class ReasonsDeletePage extends StatelessWidget {
   void _navigateToDeleteAccount(BuildContext context, String reason) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => DeleteAccountPage(selectedReason: reason),
+      SlidePageRoute(
+        page: DeleteAccountPage(selectedReason: reason),
       ),
     );
   }

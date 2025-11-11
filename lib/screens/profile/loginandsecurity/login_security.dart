@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import './change_phone_number.dart'; // Import the new page
 
@@ -73,7 +74,7 @@ class LoginPage extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ChangePhoneNumberPage()),
+                  SlidePageRoute(page: const ChangePhoneNumberPage()),
                 );
               },
             ),

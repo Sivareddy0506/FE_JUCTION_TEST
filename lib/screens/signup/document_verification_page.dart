@@ -1,14 +1,18 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as p;
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
+import '../../utils/image_compression.dart';
 import './verification_submitted.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class DocumentVerificationPage extends StatefulWidget {
   final String email;
@@ -21,6 +25,10 @@ class DocumentVerificationPage extends StatefulWidget {
 class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
   final picker = ImagePicker();
   bool isLoading = false;
+  String? fileSizeError; // Error message for file size
+  
+  // File size limits
+  static const int maxTotalSize = 20 * 1024 * 1024; // 20MB total in bytes
 
   final Map<String, File?> uploadedFiles = {
     'selfie': null,
@@ -28,19 +36,28 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
     'aadhaar': null,
     'otherDocs': null,
   };
+  final Map<String, bool> _consentGiven = {};
 
-  Future<File?> compressImage(File file) async {
-    final dir = Directory.systemTemp;
-    final targetPath = '${dir.path}/${p.basename(file.path)}_compressed.jpg';
-
-    final XFile? result = await FlutterImageCompress.compressAndGetFile(
-      file.absolute.path,
-      targetPath,
-      quality: 75,
-    );
-
-    return result != null ? File(result.path) : null;
+  // Calculate total size of all uploaded files
+  Future<int> _getTotalSize() async {
+    int total = 0;
+    for (var file in uploadedFiles.values) {
+      if (file != null && await file.exists()) {
+        total += await file.length();
+      }
+    }
+    return total;
   }
+
+  // Format file size helper
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+
+  bool _requiresConsent(String key) => key == 'aadhaar';
 
   Future<void> _handlePickedFile(
     XFile? picked,
@@ -50,22 +67,45 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
     Function setStateBottom,
   ) async {
     if (picked != null) {
-      File file = File(picked.path);
-      file = (await compressImage(file)) ?? file;
-
-      final fileSizeInBytes = await file.length();
-      final fileSizeInMB = fileSizeInBytes / (1024 * 1024);
-
-      if (fileSizeInMB > 3) {
+      // Compress image to ensure it's under 5MB
+      final compressedFile = await ImageCompression.compressImageToFit(picked.path);
+      if (compressedFile == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File size must not exceed 3MB')),
-          );
+          setState(() {
+            fileSizeError = 'Failed to process image. Please try again.';
+          });
+          setStateBottom(() {});
         }
-      } else {
-        setState(() => uploadedFiles[key] = file);
-        setStateBottom(() {});
+        return;
       }
+
+      final fileSize = await compressedFile.length();
+
+      // Check total size (20MB total limit)
+      final currentTotal = await _getTotalSize();
+      // Get the previous file size if replacing
+      final previousFile = uploadedFiles[key];
+      int previousSize = 0;
+      if (previousFile != null && await previousFile.exists()) {
+        previousSize = await previousFile.length();
+      }
+      final newTotal = currentTotal - previousSize + fileSize;
+
+      if (newTotal > maxTotalSize) {
+        if (context.mounted) {
+          setState(() {
+            fileSizeError = 'Total upload size (${ImageCompression.formatFileSize(newTotal)}) exceeds 20MB limit. Please remove some files or select smaller files.';
+          });
+          setStateBottom(() {});
+        }
+        return;
+      }
+
+      setState(() {
+        uploadedFiles[key] = compressedFile;
+        fileSizeError = null; // Clear error on success
+      });
+      setStateBottom(() {});
     }
   }
 
@@ -92,32 +132,101 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                 ),
                 const SizedBox(height: 24),
 
+                if (_requiresConsent(key))
+                  CheckboxListTile(
+                    value: _consentGiven[key] ?? false,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'I agree to share these documents with JunctionVerse for verification purposes.',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _consentGiven[key] = value ?? false;
+                      });
+                      setStateBottom(() {});
+                    },
+                  ),
+
                 GestureDetector(
                   onTap: () async {
+                    if (_requiresConsent(key) && !(_consentGiven[key] ?? false)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please provide consent before uploading this document.'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
                     showModalBottomSheet(
                       context: context,
-                      builder: (context) => SafeArea(
-                        child: Wrap(
-                          children: [
-                            ListTile(
-                              leading: const Icon(Icons.camera_alt),
-                              title: const Text('Take a Photo'),
-                              onTap: () async {
-                                Navigator.pop(context);
-                                final picked = await picker.pickImage(source: ImageSource.camera);
-                                await _handlePickedFile(picked, key, context, setState, setStateBottom);
-                              },
-                            ),
-                            ListTile(
-                              leading: const Icon(Icons.photo_library),
-                              title: const Text('Choose from Gallery'),
-                              onTap: () async {
-                                Navigator.pop(context);
-                                final picked = await picker.pickImage(source: ImageSource.gallery);
-                                await _handlePickedFile(picked, key, context, setState, setStateBottom);
-                              },
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => Container(
+                        margin: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
                           ],
+                        ),
+                        child: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(bottom: 20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const Text(
+                                  'Add Photo',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                AppButton(
+                                  label: 'Take a Photo',
+                                  backgroundColor: Colors.white,
+                                  textColor: const Color(0xFF262626),
+                                  borderColor: const Color(0xFF262626),
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    final picked = await picker.pickImage(source: ImageSource.camera);
+                                    await _handlePickedFile(picked, key, context, setState, setStateBottom);
+                                  },
+                                  bottomSpacing: 16,
+                                ),
+                                AppButton(
+                                  label: 'Upload from device',
+                                  backgroundColor: Colors.white,
+                                  textColor: const Color(0xFF262626),
+                                  borderColor: const Color(0xFF262626),
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    final picked = await picker.pickImage(source: ImageSource.gallery);
+                                    await _handlePickedFile(picked, key, context, setState, setStateBottom);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -178,7 +287,10 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                               ),
                               GestureDetector(
                                 onTap: () {
-                                  setState(() => uploadedFiles[key] = null);
+                                  setState(() {
+                                    uploadedFiles[key] = null;
+                                    fileSizeError = null; // Clear error when removing file
+                                  });
                                   setStateBottom(() {});
                                 },
                                 child: Image.asset('assets/X.png'),
@@ -189,19 +301,74 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                 ),
 
                 const SizedBox(height: 8),
-                const Text('JPG, PNG, PDF files up to 3MB', style: TextStyle(fontSize: 14)),
+                const Text('JPG, PNG, PDF files up to 5MB each', style: TextStyle(fontSize: 14)),
+                
+                // Show total size info
+                FutureBuilder<int>(
+                  future: _getTotalSize(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      final totalSize = snapshot.data!;
+                      final uploadedCount = uploadedFiles.values.where((f) => f != null).length;
+                      if (uploadedCount > 0) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Total size: ${_formatFileSize(totalSize)} / ${_formatFileSize(maxTotalSize)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: totalSize > maxTotalSize ? Colors.red : const Color(0xFF8A8894),
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                
+                // File size error message
+                if (fileSizeError != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            fileSizeError!,
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
                 const SizedBox(height: 20),
 
                 AppButton(
                   label: isLoading ? 'Uploading...' : 'Upload',
-                  onPressed: uploadedFiles[key] != null
+                  onPressed: uploadedFiles[key] != null && (! _requiresConsent(key) || (_consentGiven[key] ?? false))
                       ? () {
                           Navigator.pop(context);
                         }
                       : null,
                   backgroundColor: uploadedFiles[key] != null
-                      ? const Color(0xFF262626)
-                      : const Color(0xFFA3A3A3),
+                      ? ((!_requiresConsent(key) || (_consentGiven[key] ?? false))
+                          ? const Color(0xFF262626)
+                          : const Color(0xFF8C8C8C))
+                      : const Color(0xFF8C8C8C),
                 ),
                 const SizedBox(height: 10),
                 Center(
@@ -218,46 +385,212 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
     );
   }
 
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
  Future<void> _submitAll() async {
-  setState(() => isLoading = true);
+   // Check total size before submitting
+   final totalSize = await _getTotalSize();
+   if (totalSize > maxTotalSize) {
+     setState(() {
+       fileSizeError = 'Total upload size (${_formatFileSize(totalSize)}) exceeds 20MB limit. Please remove some files or select smaller files.';
+     });
+     ScaffoldMessenger.of(context).showSnackBar(
+       SnackBar(
+         content: Text('Total upload size exceeds 20MB limit. Please reduce file sizes.'),
+         backgroundColor: Colors.red,
+       ),
+     );
+     return;
+   }
 
-  final uri = Uri.parse("https://api.junctionverse.com/user/upload-verification-docs");
-  final request = http.MultipartRequest('POST', uri);
-  request.fields['email'] = widget.email;
-
-  for (var entry in uploadedFiles.entries) {
-    if (entry.value != null) {
-      request.files.add(http.MultipartFile.fromBytes(
-        entry.key,
-        entry.value!.readAsBytesSync(),
-        filename: p.basename(entry.value!.path),
-      ));
-    }
-  }
-
-  final streamedResponse = await request.send();
-  final response = await http.Response.fromStream(streamedResponse);
-
-  setState(() => isLoading = false);
-
-  if (response.statusCode == 200) {
+  if (_requiresConsent('aadhaar') && uploadedFiles['aadhaar'] != null && !(_consentGiven['aadhaar'] ?? false)) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Verification submitted.')),
+      const SnackBar(
+        content: Text('Please provide consent before submitting your ID document.'),
+        backgroundColor: Colors.red,
+      ),
     );
-
-    // Navigate to verification_submitted.dart
-    if (context.mounted) {
-      Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(builder: (context) => const VerificationSubmittedPage()),
-);
-
-    }
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed: ${response.body}')),
-    );
+    return;
   }
+ 
+   setState(() => isLoading = true);
+   String? errorMessage;
+
+   try {
+     final uri = Uri.parse("https://api.junctionverse.com/user/upload-verification-docs");
+     final request = http.MultipartRequest('POST', uri);
+     request.fields['email'] = widget.email;
+
+     // Read files asynchronously and add to request
+     int totalRequestSize = request.fields['email']!.length; // Start with email field size
+     debugPrint('DocumentVerification: Starting file upload. Email field size: ${totalRequestSize} bytes');
+     
+     for (var entry in uploadedFiles.entries) {
+       if (entry.value != null) {
+         final fileBytes = await entry.value!.readAsBytes();
+         final fileName = p.basename(entry.value!.path);
+         
+         // Estimate multipart overhead (~150-200 bytes per file for headers + boundaries)
+         final estimatedOverhead = 200;
+         final estimatedMultipartSize = fileBytes.length + estimatedOverhead;
+         totalRequestSize += estimatedMultipartSize;
+         
+         debugPrint('DocumentVerification: Adding file ${entry.key} - ${(fileBytes.length / 1024 / 1024).toStringAsFixed(2)}MB, estimated multipart size: ${(estimatedMultipartSize / 1024 / 1024).toStringAsFixed(2)}MB');
+         
+         // Determine content type based on file extension
+         String? contentType;
+         final extension = p.extension(fileName).toLowerCase();
+         if (extension == '.jpg' || extension == '.jpeg') {
+           contentType = 'image/jpeg';
+         } else if (extension == '.png') {
+           contentType = 'image/png';
+         } else if (extension == '.pdf') {
+           contentType = 'application/pdf';
+         }
+         
+        request.files.add(http.MultipartFile.fromBytes(
+          entry.key,
+          fileBytes,
+          filename: fileName,
+          contentType: contentType != null ? MediaType.parse(contentType) : null,
+        ));
+       }
+     }
+     
+     debugPrint('DocumentVerification: Total estimated request size: ${(totalRequestSize / 1024 / 1024).toStringAsFixed(2)}MB');
+     debugPrint('DocumentVerification: Sending request to ${request.url}');
+     debugPrint('DocumentVerification: Number of files: ${request.files.length}');
+     debugPrint('DocumentVerification: Request headers: ${request.headers}');
+
+     debugPrint('DocumentVerification: Calling request.send()...');
+     final streamedResponse = await request.send().timeout(
+       const Duration(minutes: 5),
+       onTimeout: () {
+         debugPrint('DocumentVerification: Request timeout after 5 minutes');
+         throw TimeoutException('Upload request timed out after 5 minutes');
+       },
+     );
+     debugPrint('DocumentVerification: Request sent successfully. Status code: ${streamedResponse.statusCode}');
+     debugPrint('DocumentVerification: Response headers: ${streamedResponse.headers}');
+     
+     final response = await http.Response.fromStream(streamedResponse);
+     debugPrint('DocumentVerification: Response body length: ${response.body.length} bytes');
+     debugPrint('DocumentVerification: Response status: ${response.statusCode}');
+     debugPrint('DocumentVerification: Response body (first 200 chars): ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+
+     setState(() => isLoading = false);
+
+     if (response.statusCode == 200) {
+       if (context.mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Verification submitted.')),
+         );
+         // Navigate to verification_submitted.dart
+         Navigator.pushReplacement(
+           context,
+           SlidePageRoute(page: const VerificationSubmittedPage()),
+         );
+       }
+     } else {
+       errorMessage = 'Upload failed';
+       String responseBody = response.body;
+       
+       // Parse error message
+       if (response.statusCode == 413) {
+         errorMessage = 'File size too large. Please ensure each file is under 5MB and total size is reasonable.';
+       } else if (responseBody.isNotEmpty) {
+         try {
+           final errorJson = jsonDecode(responseBody);
+           errorMessage = errorJson['error'] ?? errorJson['message'] ?? responseBody;
+         } catch (e) {
+           errorMessage = responseBody.length > 100 ? '${responseBody.substring(0, 100)}...' : responseBody;
+         }
+       }
+       
+       if (context.mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(
+             content: Text('Failed: $errorMessage (Status: ${response.statusCode})'),
+             backgroundColor: Colors.red,
+             duration: const Duration(seconds: 5),
+           ),
+         );
+       }
+     }
+   } catch (e, stackTrace) {
+     setState(() => isLoading = false);
+     
+     debugPrint('DocumentVerification: Exception caught during upload');
+     debugPrint('DocumentVerification: Exception type: ${e.runtimeType}');
+     debugPrint('DocumentVerification: Exception message: ${e.toString()}');
+     debugPrint('DocumentVerification: Stack trace: $stackTrace');
+     
+     // Check if it's a timeout or connection error
+     if (e is TimeoutException) {
+       errorMessage = 'Upload request timed out. Please check your internet connection and try again.';
+     } else if (e is SocketException) {
+       errorMessage = 'Network error: Unable to connect to server. Please check your internet connection.';
+     } else if (e is HttpException) {
+       errorMessage = 'HTTP error: ${e.message}';
+     } else {
+       errorMessage = 'Upload failed: ${e.toString()}';
+     }
+     
+     if (context.mounted) {
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+           content: Text(errorMessage),
+           backgroundColor: Colors.red,
+           duration: const Duration(seconds: 5),
+         ),
+       );
+     }
+   }
 }
 
 
@@ -326,7 +659,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                   : null,
               backgroundColor: uploadedFiles.values.where((f) => f != null).length >= 3
                   ? const Color(0xFF262626)
-                  : const Color(0xFFA3A3A3),
+                  : const Color(0xFF8C8C8C),
             ),
           ],
         ),

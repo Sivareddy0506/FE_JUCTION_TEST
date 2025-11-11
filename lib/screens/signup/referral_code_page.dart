@@ -4,6 +4,7 @@ import '../../widgets/custom_app_bar.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/headding_description.dart';
 import 'edu_details_page.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class ReferralCodePage extends StatefulWidget {
   final String email;
@@ -31,8 +32,8 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => EduDetailsPage(
+        SlidePageRoute(
+          page: EduDetailsPage(
             email: widget.email,
             otp: widget.otp,
             referralCode: code,
@@ -53,8 +54,8 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
   void _skip() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => EduDetailsPage(
+      SlidePageRoute(
+        page: EduDetailsPage(
           email: widget.email,
           otp: widget.otp,
           referralCode: '',
@@ -96,7 +97,7 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
               label: isLoading ? 'Verifying...' : 'Verify',
               onPressed: isLoading ? null : _submitCode,
               backgroundColor:
-                  isLoading ? const Color(0xFFA3A3A3) : const Color(0xFF262626),
+                  isLoading ? const Color(0xFF8C8C8C) : const Color(0xFF262626),
             ),
             const SizedBox(height: 12),
             Padding(

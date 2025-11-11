@@ -16,6 +16,8 @@ import './faq/faq.dart';
 import './terms/terms.dart';
 import './report/report.dart';
 import '../login/login_page.dart' as auth;
+import '../../services/profile_service.dart'; // for cache clearing
+import '../../app.dart'; // For SlidePageRoute
 
 class AccountSettingsPage extends StatelessWidget {
   const AccountSettingsPage({super.key});
@@ -80,11 +82,13 @@ class AccountSettingsPage extends StatelessWidget {
       if (response.statusCode == 200) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
+        await ProfileService.clearProfileCache(); // <-- fix: clear cached profile on logout
+        // Also clear other relevant single-user caches if any
 
         if (context.mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const auth.LoginPage()),
+            SlidePageRoute(page: const auth.LoginPage()),
             (route) => false,
           );
         }
@@ -127,7 +131,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Personal Information",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PersonalInfoPage()),
+                      SlidePageRoute(page: const PersonalInfoPage()),
                     ),
                   ),
                   _buildSettingItem(
@@ -135,7 +139,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Login & Security",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const security.LoginPage()),
+                      SlidePageRoute(page: const security.LoginPage()),
                     ),
                   ),
                   _buildSettingItem(
@@ -143,7 +147,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Manage Address",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const AddressPage()),
+                      SlidePageRoute(page: const AddressPage()),
                     ),
                   ),
                   _buildSettingItem(
@@ -151,7 +155,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Privacy Settings",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PrivacyPage()),
+                      SlidePageRoute(page: const PrivacyPage()),
                     ),
                   ),
                   _buildSettingItem(
@@ -159,7 +163,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Notification Preferences",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const NotificationPage()),
+                      SlidePageRoute(page: const NotificationPage()),
                     ),
                   ),
                   // _buildSectionTitle("Payments and Transactions"),
@@ -168,7 +172,7 @@ class AccountSettingsPage extends StatelessWidget {
                   //   title: "Manage Wallet",
                   //   onTap: () => Navigator.push(
                   //     context,
-                  //     MaterialPageRoute(builder: (_) => const WalletPage()),
+                  //     SlidePageRoute(page: const WalletPage()),
                   //   ),
                   // ),
                   _buildSectionTitle("Marketing"),
@@ -177,7 +181,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Referrals",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ReferralsPage()),
+                      SlidePageRoute(page: const ReferralsPage()),
                     ),
                   ),
                   // _buildSettingItem(
@@ -185,7 +189,7 @@ class AccountSettingsPage extends StatelessWidget {
                   //   title: "Crew Clash",
                   //   onTap: () => Navigator.push(
                   //     context,
-                  //     MaterialPageRoute(builder: (_) => const CrewClashPage()),
+                  //     SlidePageRoute(page: const CrewClashPage()),
                   //   ),
                   // ),
                   _buildSectionTitle("Help and Support"),
@@ -194,7 +198,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "FAQ",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const FaqPage()),
+                      SlidePageRoute(page: const FaqPage()),
                     ),
                   ),
                   _buildSettingItem(
@@ -202,7 +206,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Terms & Conditions",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const TermsPage()),
+                      SlidePageRoute(page: const TermsPage()),
                     ),
                   ),
                   // _buildSettingItem(
@@ -210,7 +214,7 @@ class AccountSettingsPage extends StatelessWidget {
                   //   title: "Contact Support",
                   //   onTap: () => Navigator.push(
                   //     context,
-                  //     MaterialPageRoute(builder: (_) => const SupportPage()),
+                  //     SlidePageRoute(page: const SupportPage()),
                   //   ),
                   // ),
                   _buildSettingItem(
@@ -218,7 +222,7 @@ class AccountSettingsPage extends StatelessWidget {
                     title: "Report Issue",
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ReportPage()),
+                      SlidePageRoute(page: const ReportPage()),
                     ),
                   ),
                   const SizedBox(height: 24),

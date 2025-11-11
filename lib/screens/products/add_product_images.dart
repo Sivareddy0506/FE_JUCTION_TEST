@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
+import '../../../utils/image_compression.dart';
 import './select_location.dart';
+import '../../../app.dart'; 
 
 class AddProductImagesPage extends StatefulWidget {
   final String selectedCategory;
@@ -36,11 +38,25 @@ class AddProductImagesPage extends StatefulWidget {
 class _AddProductImagesPageState extends State<AddProductImagesPage> {
   final List<String> imageNames = [];
   bool isSubmitting = false;
+  String? fileSizeError; // Error message for file size
   
   // Image upload limits
   static const int maxImages = 6;
+  static const int maxTotalSize = 20 * 1024 * 1024; // 20MB total in bytes
 
   final ImagePicker _picker = ImagePicker();
+
+  // Calculate total size of all uploaded images
+  Future<int> _getTotalSize() async {
+    int total = 0;
+    for (String path in imageNames) {
+      final file = File(path);
+      if (await file.exists()) {
+        total += await file.length();
+      }
+    }
+    return total;
+  }
 
   // Helper method to get user-friendly image name
   String _getImageDisplayName(int index) {
@@ -60,8 +76,8 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
   void _goToSelectLocationPage() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => SelectLocationPage(
+      SlidePageRoute(
+        page: SelectLocationPage(
           selectedCategory: widget.selectedCategory,
           title: widget.title,
           price: widget.price,
@@ -79,42 +95,52 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final pickedFile = await _picker.pickImage(source: source, imageQuality: 80);
+      setState(() => fileSizeError = null); // Clear previous error
+      
+      final pickedFile = await _picker.pickImage(source: source, imageQuality: 100); // Pick at full quality first
       if (pickedFile != null) {
-        // Check file size (5MB limit)
-        final file = File(pickedFile.path);
-        final fileSize = await file.length();
-        final maxSize = 5 * 1024 * 1024; // 5MB in bytes
-        
-        if (fileSize > maxSize) {
-          _showErrorDialog(
-            'File Too Large',
-            'The selected image (${_formatFileSize(fileSize)}) is too large. Please select an image smaller than 5MB.',
-          );
-          return;
-        }
-        
-        // Check file format
+        // Check file format first
         final extension = pickedFile.path.split('.').last.toLowerCase();
         final allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         
         if (!allowedFormats.contains(extension)) {
-          _showErrorDialog(
-            'Unsupported Format',
-            'The file format ".$extension" is not supported. Please select an image in JPG, PNG, GIF, or WebP format.',
-          );
+          setState(() {
+            fileSizeError = 'The file format ".$extension" is not supported. Please select an image in JPG, PNG, GIF, or WebP format.';
+          });
+          return;
+        }
+        
+        // Compress image to ensure it's under 5MB
+        final compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
+        if (compressedFile == null) {
+          setState(() {
+            fileSizeError = 'Failed to process image. Please try again.';
+          });
+          return;
+        }
+        
+        final fileSize = await compressedFile.length();
+        
+        // Check total size (20MB total limit)
+        final currentTotal = await _getTotalSize();
+        if (currentTotal + fileSize > maxTotalSize) {
+          // Clean up compressed file
+          await compressedFile.delete();
+          setState(() {
+            fileSizeError = 'Total upload size (${ImageCompression.formatFileSize(currentTotal + fileSize)}) exceeds 20MB limit. Please remove some images or select smaller files.';
+          });
           return;
         }
         
         setState(() {
-          imageNames.add(pickedFile.path);
+          imageNames.add(compressedFile.path);
+          fileSizeError = null; // Clear error on success
         });
       }
     } catch (e) {
-      _showErrorDialog(
-        'Upload Error',
-        'Failed to upload image. Please try again.',
-      );
+      setState(() {
+        fileSizeError = 'Failed to upload image. Please try again.';
+      });
     }
   }
 
@@ -139,33 +165,120 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _pickImage(ImageSource.gallery);
-                },
+        return Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const Text(
+                    'Add Photo',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  AppButton(
+                    label: 'Take a Photo',
+                    backgroundColor: Colors.white,
+                    textColor: const Color(0xFF262626),
+                    borderColor: const Color(0xFF262626),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _pickImage(ImageSource.camera);
+                    },
+                    bottomSpacing: 16,
+                  ),
+                  AppButton(
+                    label: 'Upload from device',
+                    backgroundColor: Colors.white,
+                    textColor: const Color(0xFF262626),
+                    borderColor: const Color(0xFF262626),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _pickImage(ImageSource.gallery);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -248,11 +361,32 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
                   style: TextStyle(
                     fontSize: 12,
                     color: _isImageLimitReached ? const Color(0xFFFF6705) : const Color(0xFF323537),
-
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
+            ),
+            // Show total size info
+            FutureBuilder<int>(
+              future: _getTotalSize(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && imageNames.isNotEmpty) {
+                  final totalSize = snapshot.data!;
+                  final totalSizeMB = totalSize / (1024 * 1024);
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Total size: ${_formatFileSize(totalSize)} / ${_formatFileSize(maxTotalSize)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: totalSize > maxTotalSize ? Colors.red : const Color(0xFF323537),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
             ),
             const SizedBox(height: 32),
 
@@ -263,12 +397,48 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
             // "Take a Photo" Option should always be visible
             _buildImageItem("Take a Photo", isAddNew: true),
 
+            // File size error message
+            if (fileSizeError != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        fileSizeError!,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const Spacer(),
 
-            AppButton(
-              bottomSpacing: 24,
-              label: isSubmitting ? 'Submitting...' : 'Next',
-              onPressed: (isSubmitting || imageNames.isEmpty) ? null : _goToSelectLocationPage,
+            // Check total size before allowing navigation
+            FutureBuilder<int>(
+              future: _getTotalSize(),
+              builder: (context, snapshot) {
+                final totalSize = snapshot.data ?? 0;
+                final exceedsLimit = totalSize > maxTotalSize;
+                return AppButton(
+                  bottomSpacing: 24,
+                  label: isSubmitting ? 'Submitting...' : 'Next',
+                  onPressed: (isSubmitting || imageNames.isEmpty || exceedsLimit) ? null : _goToSelectLocationPage,
+                );
+              },
             ),
           ],
         ),

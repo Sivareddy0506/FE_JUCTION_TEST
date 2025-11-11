@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../screens/search/search_results_page.dart';
 import '../services/filter_state_service.dart';
+import '../app.dart'; // For SlidePageRoute
+import 'app_button.dart';
 
 class FilterModal extends StatefulWidget {
   final String? searchQuery;
@@ -296,23 +298,12 @@ class _FilterModalState extends State<FilterModal> {
       children: [
         // CLEAR ALL button
         Expanded(
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 1.5), // ✅ visible border
-              padding: const EdgeInsets.all(13),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10), // ✅ rounded corners
-              ),
-              foregroundColor: Colors.black, // ✅ text color
-            ),
+          child: AppButton(
+            label: "Clear All",
             onPressed: _clearAllFilters,
-            child: const Text(
-              "Clear All",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            backgroundColor: Colors.white,
+            borderColor: Colors.black,
+            textColor: Colors.black,
           ),
         ),
 
@@ -320,30 +311,18 @@ class _FilterModalState extends State<FilterModal> {
 
         // APPLY FILTERS button
         Expanded(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              padding: const EdgeInsets.all(13),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10), // ✅ same rounded corners
-              ),
-              foregroundColor: Colors.white, // ✅ white text
-              elevation: 2,
-            ),
+          child: AppButton(
+            label: isLoading ? 'Applying...' : "Apply Filters",
             onPressed: isLoading ? null : _applyFilters,
-            child: isLoading
+            backgroundColor: Colors.black,
+            textColor: Colors.white,
+            customChild: isLoading
                 ? const SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
-                : const Text(
-                    "Apply Filters",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                : null,
           ),
         ),
       ],
@@ -387,8 +366,8 @@ class _FilterModalState extends State<FilterModal> {
       // Navigate to search results with filters
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => SearchResultsPage(
+        SlidePageRoute(
+          page: SearchResultsPage(
             searchQuery: widget.searchQuery ?? '',
             appliedFilters: filters,
             sortBy: selectedSortBy,
@@ -400,12 +379,12 @@ class _FilterModalState extends State<FilterModal> {
       if (mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Filter Error'),
             content: Text('Failed to apply filters: ${e.toString()}'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(dialogContext),
                 child: const Text('OK'),
               ),
             ],

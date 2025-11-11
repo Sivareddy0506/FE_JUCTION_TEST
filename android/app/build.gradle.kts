@@ -6,15 +6,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.junction"
+    namespace = "com.junction"
     compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.example.junction"
+    applicationId = "com.junction"
     minSdk = 23        // ✅ Kotlin DSL syntax
     targetSdk = 34     // ✅ Kotlin DSL syntax
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "1.0.1"
     multiDexEnabled = true
 }
 configurations.all {

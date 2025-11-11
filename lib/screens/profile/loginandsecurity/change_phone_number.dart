@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/form_text.dart';
@@ -137,8 +138,8 @@ String _cleanPhoneNumber(String phone) {
       if (response.statusCode == 200) {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => VerifyPhoneOTPPage(phoneNumber: phone),
+          SlidePageRoute(
+            page: VerifyPhoneOTPPage(phoneNumber: phone),
           ),
         );
       } else {
@@ -211,7 +212,7 @@ void dispose() {
               onPressed: isValidPhone && !isLoading ? _sendPhoneVerification : null,
               backgroundColor: isValidPhone && !isLoading
                   ? const Color(0xFF262626)
-                  : const Color(0xFFA3A3A3),
+                  : const Color(0xFF8C8C8C),
             ),
           ],
         ),

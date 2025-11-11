@@ -7,6 +7,7 @@ import 'backend_file_upload_service';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../utils/image_compression.dart';
 
 class ChatModel {
   final String chatId;
@@ -335,17 +336,20 @@ Stream<ChatModel?> getChatStream(String chatId) {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
+        imageQuality: 100, // Pick at full quality, we'll compress later
       );
       
       if (pickedFile != null) {
-        File imageFile = File(pickedFile.path);
+        // Compress image to ensure it's under 5MB
+        File? compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
+        
+        if (compressedFile == null) {
+          throw Exception('Failed to process image. Please try again.');
+        }
         
         // Upload image to backend
         final Map<String, dynamic> attachmentData = await _uploadImageToBackend(
-          imageFile: imageFile,
+          imageFile: compressedFile,
           onProgress: (progress) {
             print('Upload progress: ${(progress * 100).toStringAsFixed(1)}%');
           },
@@ -378,19 +382,25 @@ Stream<ChatModel?> getChatStream(String chatId) {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
+        imageQuality: 100, // Pick at full quality, we'll compress later
       );
       
       if (pickedFile != null) {
-        File imageFile = File(pickedFile.path);
+        onUploadStart('Compressing image...');
+        
+        // Compress image to ensure it's under 5MB
+        File? compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
+        
+        if (compressedFile == null) {
+          onError('Failed to process image. Please try again.');
+          return;
+        }
         
         onUploadStart('Uploading image...');
         
         // Upload image with progress tracking
         final Map<String, dynamic> attachmentData = await _uploadImageToBackend(
-          imageFile: imageFile,
+          imageFile: compressedFile,
           onProgress: onUploadProgress,
         );
         
@@ -417,11 +427,27 @@ Stream<ChatModel?> getChatStream(String chatId) {
     Function(double)? onProgress,
   }) async {
     try {
-      final String fileName = path.basename(file.path);
-      final int fileSize = await file.length();
+      File? fileToUpload = file;
+      
+      // Only compress images, not documents or videos
+      if (fileType == 'image') {
+        fileToUpload = await ImageCompression.compressImageToFit(file.path);
+        if (fileToUpload == null) {
+          throw Exception('Failed to compress image. Please try again.');
+        }
+      } else {
+        // For non-image files, check size
+        final fileSize = await file.length();
+        if (fileSize > ImageCompression.maxFileSize) {
+          throw Exception('File size (${ImageCompression.formatFileSize(fileSize)}) exceeds 5MB limit. Please select a smaller file.');
+        }
+      }
+      
+      final String fileName = path.basename(fileToUpload.path);
+      final int fileSize = await fileToUpload.length();
       
       final String s3Url = await BackendFileUploadService.uploadFile(
-        file: file,
+        file: fileToUpload,
         onProgress: onProgress,
       );
       
@@ -635,7 +661,7 @@ Future<void> markAsSold({
     );
 
     await _firestore.collection('chats').doc(chatId).update({
-      'dealStatus': 'locked', // ★ FINAL STATUS: product sold
+      'dealStatus': 'sold', // ★ FINAL STATUS: product sold
       'lastMessage': 'Product marked as sold',
       'lastMessageTime': Timestamp.fromDate(DateTime.now()),
     });
@@ -671,6 +697,9 @@ static Future<bool> markProductAsSold({
     final prefs = await SharedPreferences.getInstance();
     final authToken = prefs.getString('authToken');
 
+    // Determine if sold inside Junction (has orderId) or outside
+    final bool soldInJunction = orderId != null && orderId.isNotEmpty;
+    
     final response = await http.post(
       Uri.parse('https://api.junctionverse.com/product/mark-sold'),
       headers: {
@@ -678,9 +707,9 @@ static Future<bool> markProductAsSold({
         'Authorization': 'Bearer $authToken',
       },
       body: jsonEncode({
-        'productId': productId,
-        'buyerId': buyerId,
-        'orderId': orderId, // ✅ Send orderId
+        if (soldInJunction) 'orderId': orderId,
+        if (!soldInJunction) 'productId': productId,
+        'soldInJunction': soldInJunction,
       }),
     );
 
@@ -688,7 +717,7 @@ static Future<bool> markProductAsSold({
       return true;
     } else {
       final errorData = jsonDecode(response.body);
-      throw Exception('Failed to mark product as sold: ${response.statusCode} - ${errorData['message'] ?? 'Unknown error'}');
+      throw Exception('Failed to mark product as sold: ${response.statusCode} - ${errorData['error'] ?? errorData['message'] ?? 'Unknown error'}');
     }
   } catch (e) {
     throw Exception('API call failed: $e');
@@ -779,6 +808,31 @@ static Future<String> lockDeal({
     
     return messages.docs.length + 1;
   }
+
+  // Mark all unread messages as read when chat is opened
+  Future<void> markMessagesAsRead(String chatId) async {
+    try {
+      // Get all unread messages where current user is the receiver
+      final unreadMessages = await _firestore
+          .collection('messages')
+          .doc(chatId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      if (unreadMessages.docs.isEmpty) return;
+
+      // Batch update all unread messages
+      final batch = _firestore.batch();
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      print('Error marking messages as read: $e');
+    }
+  }
 }
 
 // 6. Example usage in your app
@@ -786,8 +840,8 @@ static Future<String> lockDeal({
 // Navigate to product details
 Navigator.push(
   context,
-  MaterialPageRoute(
-    builder: (context) => ProductDetailsPage(
+  SlidePageRoute(
+    page: ProductDetailsPage(
       productId: 'product_123',
       product: {
         'title': 'Samsung a14 for urgent sale',
@@ -804,14 +858,14 @@ Navigator.push(
 // Navigate to chat list
 Navigator.push(
   context,
-  MaterialPageRoute(builder: (context) => ChatListPage()),
+  SlidePageRoute(page: ChatListPage()),
 );
 
 // Navigate directly to a chat
 Navigator.push(
   context,
-  MaterialPageRoute(
-    builder: (context) => ChatPage(chatId: 'product123_seller123_buyer123'),
+  SlidePageRoute(
+    page: ChatPage(chatId: 'product123_seller123_buyer123'),
   ),
 );
 */

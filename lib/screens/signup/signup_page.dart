@@ -10,6 +10,7 @@ import 'manual_signup_page.dart';
 import '../login/login_page.dart';
 import 'otp_verification_signup_page.dart';
 import '../../widgets/headding_description.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -53,29 +54,28 @@ class _SignupPageState extends State<SignupPage> {
       if (response.statusCode == 200) {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => OTPVerificationSignupPage(email: email),
+          SlidePageRoute(
+            page: OTPVerificationSignupPage(email: email),
           ),
         );
       } else {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         final errorMessage = responseData['message'] ?? 'Failed to send code';
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorMessage)));
       }
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Network error: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Network error: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset:
+          true, // Ensures the button stays visible when keyboard opens
       appBar: CustomAppBar(
         showBackButton: true,
         logoAssets: [
@@ -85,99 +85,124 @@ class _SignupPageState extends State<SignupPage> {
           'assets/logo-d.png',
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            const HeadingWithDescription(
-              heading: 'Create Account',
-              description:
-                  "Enter your college email. We will send you a confirmation code there.",
-            ),
-            const SizedBox(height: 32),
-            AppTextField(
-              label: 'College Email',
-              placeholder: 'Enter College Email ID',
-              isMandatory: true,
-              keyboardType: TextInputType.emailAddress,
-              controller: _emailController,
-              onChanged: _checkEmail,
-            ),
-            const SizedBox(height: 12),
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final viewInsets = MediaQuery.of(context).viewInsets.bottom;
 
-            /// "No College Email? Verify Manually"
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text(
-                  'No College Email? ',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ManualSignupPage(),
-                    ),
-                  ),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                  child: const Text(
-                    'Verify Manually',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFFF6705),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const Spacer(),
-
-            /// ✅ Center aligned "Already have an account? Log In"
-            Center(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.center,
-                spacing: 4, // just a space after '?'
+              return Column(
                 children: [
-                  const Text(
-                    'Already have an account?',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginPage()),
-                    ),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                    child: const Text(
-                      'Log In',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF212121),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.fromLTRB(
+                        24,
+                        24,
+                        24,
+                        viewInsets > 0 ? 24 : 40,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const HeadingWithDescription(
+                            heading: 'Create Account',
+                            description:
+                                "Enter your college email. We will send you a confirmation code there.",
+                          ),
+                          const SizedBox(height: 32),
+                          AppTextField(
+                            label: 'Email ID',
+                            placeholder: 'Enter College Email ID',
+                            isMandatory: true,
+                            keyboardType: TextInputType.emailAddress,
+                            controller: _emailController,
+                            onChanged: _checkEmail,
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              const Text(
+                                'No College Email? ',
+                                style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  SlidePageRoute(
+                                    page: const ManualSignupPage(),
+                                  ),
+                                ),
+                                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                                child: const Text(
+                                  'Verify Manually',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFFF6705),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 16,
+                      bottom: viewInsets > 0 ? viewInsets + 16 : 32,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Already have an account?',
+                              style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                SlidePageRoute(page: const LoginPage()),
+                              ),
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                              child: const Text(
+                                'Log In',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF212121),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        AppButton(
+                          label: isLoading ? 'Sending...' : 'Send Verification Code',
+                          onPressed: isValidEmail && !isLoading ? _sendVerification : null,
+                          backgroundColor:
+                              isValidEmail ? const Color(0xFF262626) : const Color(0xFF8C8C8C),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            /// Send Verification Button
-            AppButton(
-              label: isLoading ? 'Sending...' : 'Send Verification Code',
-              bottomSpacing: 30,
-              onPressed: isValidEmail && !isLoading ? _sendVerification : null,
-              backgroundColor:
-                  isValidEmail ? const Color(0xFF262626) : const Color(0xFFA3A3A3),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );

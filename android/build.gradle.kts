@@ -9,7 +9,7 @@ buildscript {
         // Required for Kotlin Gradle Plugin (if using Kotlin)
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0") // Use your current Kotlin version
         // ⭐ REQUIRED FOR GOOGLE SERVICES (FIREBASE) ⭐
-        classpath("com.google.gms:google-services:4.4.2") // ⭐ USE THE LATEST VERSION ⭐
+        classpath("com.google.gms:google-services:4.4.4") // ⭐ USE THE LATEST VERSION ⭐
     }
 }
 
