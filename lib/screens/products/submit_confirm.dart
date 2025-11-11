@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:junction/app_state.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
 import '../profile/user_profile.dart';
@@ -110,7 +111,7 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
 
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const UserProfilePage()),
+          SlidePageRoute(page: const UserProfilePage()),
               (Route<dynamic> route) => false, // ⬅️ removes all previous routes
         );
     } else {

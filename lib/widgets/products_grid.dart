@@ -7,6 +7,8 @@ import '../../models/product.dart';
 import '../screens/products/product_detail.dart';
 import '../screens/services/location_helper.dart';
 import '../services/favorites_service.dart';
+import '../../app.dart'; // For SlidePageRoute
+import '../services/cache_manager.dart';
 
 class ProductGridWidget extends StatefulWidget {
   final List<Product> products;
@@ -51,7 +53,7 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
       if (token == null || token.isEmpty) return;
 
       final uri = Uri.parse('https://api.junctionverse.com/api/history/track-click');
-      await http.post(
+      final response = await http.post(
         uri,
         headers: {
           'Authorization': 'Bearer $token',
@@ -59,6 +61,10 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
         },
         body: jsonEncode({'productId': productId}),
       );
+
+      if (response.statusCode == 200) {
+        await CacheManager().invalidateCache(CacheConfig.lastViewedKey);
+      }
     } catch (e) {
       debugPrint('Error tracking product click: $e');
     }
@@ -68,21 +74,27 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final tileWidth = 170.0;
-        int crossAxisCount = (constraints.maxWidth / tileWidth).floor();
+        final screenWidth = MediaQuery.of(context).size.width;
+        final idealWidth = screenWidth > 800 ? 210.0 : 170.0;
+        int crossAxisCount = (constraints.maxWidth / idealWidth).clamp(2, 4).toInt();
         if (crossAxisCount < 2) crossAxisCount = 2;
-
+        final itemCount = widget.products.length;
+        final remainder = itemCount % crossAxisCount;
+        final totalCount = remainder == 0 ? itemCount : itemCount + (crossAxisCount - remainder);
         return GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
-          itemCount: widget.products.length,
+          itemCount: totalCount,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.70,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            childAspectRatio: 0.65,
+            crossAxisSpacing: screenWidth < 600 ? 8 : 12,
+            mainAxisSpacing: screenWidth < 600 ? 8 : 12,
           ),
           itemBuilder: (context, index) {
+            if (index >= itemCount) {
+              return const SizedBox.shrink();
+            }
             final product = widget.products[index];
             return ProductCard(
               product: product,
@@ -91,8 +103,8 @@ class _ProductGridWidgetState extends State<ProductGridWidget> {
                 _sendTrackRequest(product.id);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => ProductDetailPage(
+                  SlidePageRoute(
+                    page: ProductDetailPage(
                       product: product,
                       onFavoriteChanged: widget.onFavoriteChanged,
                     ),
@@ -215,6 +227,7 @@ Widget build(BuildContext context) {
   return InkWell(
     onTap: widget.onTap,
     child: Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.grey.shade300, width: 1),
@@ -228,122 +241,126 @@ Widget build(BuildContext context) {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ---------------- IMAGE SECTION ----------------
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: AspectRatio(
-                  aspectRatio: 1.05,
-                  child: Image.network(
-                    widget.product.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Image.asset('assets/placeholder.png'),
-                  ),
-                ),
-              ),
-
-              // ❤️ Favourite Icon — now bottom-right
-              Positioned(
-                bottom: 10,
-                right: 10,
-                child: GestureDetector(
-                  onTap: () => _toggleFavorite(widget.product.id),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0x33000000), // 0.2 opacity black
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        isFav ? Icons.favorite : Icons.favorite_border,
-                        color: isFav ? const Color(0xFFFF6705) : Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // ---------------- DETAILS SECTION ----------------
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF9F9F9),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-            ),
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ---------------- IMAGE SECTION ----------------
+            Stack(
               children: [
-                // Product title
-                Text(
-                  widget.product.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF262626),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    height: 1.3, // ~16px line height
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Price text
-                Text(
-                  widget.product.price ?? '',
-                  style: const TextStyle(
-                    color: Color(0xFFFF6705),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Location Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/MapPin.png',
-                      width: 10,
-                      height: 10,
-                      color: const Color(0xFF8A8894),
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  child: AspectRatio(
+                    aspectRatio: 1.05,
+                    child: Image.network(
+                      widget.product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Image.asset('assets/placeholder.png'),
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        _cachedLocation ??
-                            widget.product.location ??
-                            'Location not set',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 8,
-                          color: Color(0xFF8A8894),
-                          fontWeight: FontWeight.normal,
-                          height: 1.2,
+                  ),
+                ),
+
+                // ❤️ Favourite Icon — now bottom-right
+                Positioned(
+                  bottom: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: () => _toggleFavorite(widget.product.id),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0x33000000), // 0.2 opacity black
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          isFav ? Icons.favorite : Icons.favorite_border,
+                          color: isFav ? const Color(0xFFFF6705) : Colors.white,
+                          size: 16,
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+
+            // ---------------- DETAILS SECTION ----------------
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF9F9F9),
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+                ),
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product title
+                    Text(
+                      widget.product.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF262626),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        height: 1.3, // ~16px line height
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Price text
+                    Text(
+                      widget.product.price ?? '',
+                      style: const TextStyle(
+                        color: Color(0xFFFF6705),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Location Row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/MapPin.png',
+                          width: 10,
+                          height: 10,
+                          color: const Color(0xFF8A8894),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _cachedLocation ??
+                                widget.product.location ??
+                                'Location not set',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 8,
+                              color: Color(0xFF8A8894),
+                              fontWeight: FontWeight.normal,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

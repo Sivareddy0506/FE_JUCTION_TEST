@@ -18,6 +18,7 @@ import '../../widgets/bottom_navbar.dart';
 import '../../services/favorites_service.dart';
 import '../../services/profile_service.dart';
 import 'account_settings_page.dart';
+import '../../app.dart'; // For SlidePageRoute, FadePageRoute
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -279,6 +280,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  String getReadableLocation(String fullAddress) {
+  if (fullAddress.isEmpty) return '';
+
+  // Split by commas and trim spaces
+  final parts = fullAddress.split(',').map((p) => p.trim()).toList();
+
+  // Remove any part that starts with a number (likely a street number)
+  final filteredParts = parts.where((p) => !RegExp(r'^\d').hasMatch(p)).toList();
+
+  if (filteredParts.isEmpty) return fullAddress; // fallback
+
+  // Take last 2-3 parts for area, city/state
+  if (filteredParts.length >= 3) {
+    return '${filteredParts[filteredParts.length - 3]}, ${filteredParts[filteredParts.length - 2]}, ${filteredParts[filteredParts.length - 1]}';
+  } else if (filteredParts.length >= 2) {
+    return '${filteredParts[filteredParts.length - 2]}, ${filteredParts[filteredParts.length - 1]}';
+  } else {
+    return filteredParts.join(', ');
+  }
+}
+
+
   Future<void> _updateProfileImage() async {
     // Add haptic feedback for better user experience
     await HapticFeedback.lightImpact();
@@ -287,7 +310,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   final source = await showModalBottomSheet<ImageSource>(
   context: context,
   isScrollControlled: true, // 👈 allows full height if needed
-  backgroundColor: Colors.transparent,
+  backgroundColor: Colors.black.withOpacity(0.92),
   builder: (context) {
     return Padding(
       padding: EdgeInsets.only(
@@ -398,6 +421,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
       final pickedFile = await picker.pickImage(source: source);
       if (!mounted) return;
       if (pickedFile == null) return;
+
+      // Check file size before uploading (limit: 5MB = 5 * 1024 * 1024 bytes)
+      final file = File(pickedFile.path);
+      final bytes = await file.length();
+      final maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      
+      if (bytes > maxSize) {
+        if (mounted) {
+          setState(() {
+            _isUploadingImage = false;
+            _uploadProgress = 0.0;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Image size (${(bytes / (1024 * 1024)).toStringAsFixed(2)}MB) exceeds 5MB limit. Please choose a smaller image.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
 
       // Show immediate local preview
       if (mounted) {
@@ -573,11 +618,26 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return Color.fromRGBO(r, g, b, 1);
   }
 
+  Color _darkenColor(Color color, [double amount = .1]) {
+    final hsl = HSLColor.fromColor(color);
+    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
+    return hslDark.toColor();
+  }
+
+  Color _lightenColor(Color color, [double amount = .1]) {
+    final hsl = HSLColor.fromColor(color);
+    final hslLight = hsl.withLightness((hsl.lightness + amount).clamp(0.0, 1.0));
+    return hslLight.toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('UserProfilePage: build called. _allDataReady=$_allDataReady, _favoritesReady=$_favoritesReady, _profileReady=$_profileReady, _activeListingsReady=$_activeListingsReady, _isFirstLoad=$_isFirstLoad');
     
     final backgroundColor = _generateColorFromName(name);
+    final gradientStart = _darkenColor(backgroundColor, 0.25);
+    final gradientEnd = _lightenColor(backgroundColor, 0.05);
+    final avatarBackground = _darkenColor(backgroundColor, 0.35).withOpacity(0.95);
     
     Widget content;
     
@@ -591,45 +651,37 @@ class _UserProfilePageState extends State<UserProfilePage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            (_localImagePath != null && _isUploadingImage)
-                ? Image.file(
-                    File(_localImagePath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(color: Colors.transparent);
-                    },
-                  )
-                : profileImage.isNotEmpty
-                    ? Image.network(
-                        profileImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(color: Colors.transparent);
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.transparent,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                                strokeWidth: 2,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                    : Container(color: Colors.transparent),
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                color: Colors.black.withOpacity(0.5),
-              ),
-            ),
+           if (_localImagePath != null && _isUploadingImage) ...[
+  Image.file(
+    File(_localImagePath!),
+    fit: BoxFit.cover,
+    errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[100]),
+  ),
+  BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+    child: Container(color: Colors.white.withOpacity(0.4)),
+  ),
+] else if (profileImage.isNotEmpty) ...[
+  Image.network(
+    profileImage,
+    fit: BoxFit.cover,
+    errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[100]),
+  ),
+  BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+    child: Container(color: Colors.white.withOpacity(0.4)),
+  ),
+] else ...[
+  Container(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [gradientStart, gradientEnd],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+  ),
+],
             Column(
               children: [
                 Padding(
@@ -639,14 +691,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     children: [
                       const SizedBox(width: 48),
                       Stack(
+                        clipBehavior: Clip.none,
                         children: [
-                          // Show local image if uploading, otherwise show network image
-                          (_localImagePath != null && _isUploadingImage)
-                              ? CircleAvatar(
-                                  radius: 36,
-                                  backgroundColor: Colors.transparent,
-                                  child: ClipOval(
-                                    child: Image.file(
+                          CircleAvatar(
+                            radius: 36,
+                            backgroundColor: avatarBackground,
+                            child: ClipOval(
+                              child: (_localImagePath != null && _isUploadingImage)
+                                  ? Image.file(
                                       File(_localImagePath!),
                                       width: 72,
                                       height: 72,
@@ -661,15 +713,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                           ),
                                         );
                                       },
-                                    ),
-                                  ),
-                                )
-                              : profileImage.isNotEmpty
-                                  ? CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.transparent,
-                                      child: ClipOval(
-                                        child: Image.network(
+                                    )
+                                  : profileImage.isNotEmpty
+                                      ? Image.network(
                                           profileImage,
                                           width: 72,
                                           height: 72,
@@ -705,70 +751,31 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                               ),
                                             );
                                           },
+                                        )
+                                      : Text(
+                                          name.isNotEmpty ? name[0].toUpperCase() : '',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
-                                      ),
-                                    )
-                                  : CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.transparent,
-                                      child: Text(
-                                        name.isNotEmpty ? name[0].toUpperCase() : '',
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                          // Upload progress indicator - removed for seamless transition
-                          // if (_isUploadingImage)
-                          //   Positioned.fill(
-                          //     child: Container(
-                          //       decoration: BoxDecoration(
-                          //         shape: BoxShape.circle,
-                          //         color: Colors.black.withOpacity(0.3),
-                          //       ),
-                          //       child: Center(
-                          //         child: Stack(
-                          //           alignment: Alignment.center,
-                          //           children: [
-                          //             SizedBox(
-                          //               width: 40,
-                          //               height: 40,
-                          //               child: CircularProgressIndicator(
-                          //                 value: _uploadProgress,
-                          //                 strokeWidth: 3,
-                          //                 backgroundColor: Colors.white.withOpacity(0.3),
-                          //                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                          //               ),
-                          //             ),
-                          //             Text(
-                          //               '${(_uploadProgress * 100).toInt()}%',
-                          //               style: const TextStyle(
-                          //                 color: Colors.white,
-                          //                 fontSize: 10,
-                          //                 fontWeight: FontWeight.bold,
-                          //               ),
-                          //             ),
-                          //           ],
-                          //         ),
-                          //       ),
-                          //     ),
-                          //   ),
+                            ),
+                          ),
                           Positioned(
-                            bottom: 0,
-                            right: 0,
+                            bottom: -4,
+                            right: -4,
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: _isUploadingImage ? null : _updateProfileImage,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(18),
                                 child: Container(
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
                                     color: _isUploadingImage ? Colors.grey[300] : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(18),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withOpacity(0.2),
@@ -780,13 +787,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   child: Center(
                                     child: Image.asset(
                                       'assets/edit.png',
-                                      width: 18,
-                                      height: 18,
+                                      width: 24,
+                                      height: 24,
                                       errorBuilder: (context, error, stackTrace) {
                                         return Icon(
-                                          Icons.edit, 
-                                          size: 18, 
-                                          color: _isUploadingImage ? Colors.grey : Colors.black
+                                          Icons.edit,
+                                          size: 24,
+                                          color: _isUploadingImage ? Colors.grey : Colors.black,
                                         );
                                       },
                                     ),
@@ -801,13 +808,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
+                            SlidePageRoute(page: const AccountSettingsPage()),
                           );
                         },
                         icon: Image.asset(
                           'assets/settings.png',
-                          width: 24,
-                          height: 24,
+                          width: 40,
+                          height: 40,
                           errorBuilder: (context, error, stackTrace) {
                             return const Icon(Icons.settings, size: 24, color: Colors.white);
                           },
@@ -857,14 +864,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      location,
-                      style: const TextStyle(
-                        color: Color(0xFFE3E3E3),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                        height: 16 / 12,
-                      ),
-                    ),
+  getReadableLocation(location),
+  style: const TextStyle(
+    color: Color(0xFFE3E3E3),
+    fontWeight: FontWeight.w500,
+    fontSize: 12,
+    height: 16 / 12,
+  ),
+)
+
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -882,21 +890,30 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        SizedBox(
-                          height: 40,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            itemCount: tabs.length,
-                            itemBuilder: (context, index) {
-                              return _buildTab(
-                                tabs[index],
-                                selectedTabIndex == index,
-                                () => setState(() => selectedTabIndex = index),
-                              );
-                            },
-                          ),
-                        ),
+                       
+                        ClipRRect(
+  borderRadius: const BorderRadius.only(
+    topLeft: Radius.circular(40),
+    topRight: Radius.circular(40),
+  ),
+  child: Container(
+    color: Colors.white,
+    height: 40,
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      itemCount: tabs.length,
+      itemBuilder: (context, index) {
+        return _buildTab(
+          tabs[index],
+          selectedTabIndex == index,
+          () => setState(() => selectedTabIndex = index),
+        );
+      },
+    ),
+  ),
+),
+
                         Expanded(
                           child: Builder(
                             builder: (context) {

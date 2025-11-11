@@ -7,6 +7,12 @@ import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
 import 'terms_and_conditions.dart';
 import '../../widgets/headding_description.dart';
+import '../../app.dart';
+
+final int currentYear = DateTime.now().year;
+final List<String> months = List.generate(12, (index) => DateFormat('MMMM').format(DateTime(0, index + 1)));
+final List<String> enrollmentYears = List.generate(4, (index) => (currentYear - index).toString());
+final List<String> graduationYears = List.generate(6, (index) => (currentYear + index).toString());
 
 class EduDetailsPage extends StatefulWidget {
   final String email;
@@ -46,9 +52,6 @@ class _EduDetailsPageState extends State<EduDetailsPage> {
   String? enrollmentYear;
   String? graduationMonth;
   String? graduationYear;
-
-  final List<String> months = List.generate(12, (index) => DateFormat('MMMM').format(DateTime(0, index + 1)));
-  final List<String> years = List.generate(21, (index) => (DateTime.now().year - index).toString());
 
   bool loading = false;
 
@@ -293,7 +296,7 @@ void _onHomeAddressChanged(String value) {
       "referralCode": widget.referralCode,
     };
 
-    final uri = Uri.http('34.237.61.93:3000', '/user/complete-edu-onboarding');
+    final uri = Uri.parse('https://api.junctionverse.com/user/complete-edu-onboarding');
 
     try {
       final response = await http.post(
@@ -307,7 +310,7 @@ void _onHomeAddressChanged(String value) {
       if (response.statusCode == 200) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const TermsAndConditionsPage()),
+          FadePageRoute(page: const TermsAndConditionsPage()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +427,7 @@ Widget build(BuildContext context) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       AppTextField(
-                        label: 'Home Address *',
+                        label: 'Address *',
                         placeholder: 'Eg: 123 Main Street, City Name',
                         controller: homeAddressController,
                         onChanged: _onHomeAddressChanged,
@@ -458,12 +461,16 @@ Widget build(BuildContext context) {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 16),
+                 const SizedBox(height: 16),
+                      
+Container(
+  height: 1,
+  color: Color(0xFFE0E0E0), // light gray border line
+),
+const SizedBox(height: 16),
+                  // University Details label
                   const Text('University Details', style: TextStyle(fontSize: 14, color: Color(0xFF212121))),
                   const SizedBox(height: 16),
-                  
                   // University Name field with validation
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,58 +510,50 @@ Widget build(BuildContext context) {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Enrollment date
-                  _buildDualDropdown(
-                    label: 'Enrollment',
-                    monthValue: enrollmentMonth,
-                    yearValue: enrollmentYear,
-                    onMonthChanged: (val) {
-                      setState(() {
-                        enrollmentMonth = val;
-                        _onDateChanged();
-                      });
-                    },
-                    onYearChanged: (val) {
-                      setState(() {
-                        enrollmentYear = val;
-                        _onDateChanged();
-                      });
-                    },
-                  ),
+                  // Divider before enrollment/graduation
+                  const Divider(),
                   const SizedBox(height: 16),
-                  
-                  // Graduation date with validation
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildDualDropdown(
-                        label: 'Graduation',
-                        monthValue: graduationMonth,
-                        yearValue: graduationYear,
-                        onMonthChanged: (val) {
-                          setState(() {
-                            graduationMonth = val;
-                            _onDateChanged();
-                          });
-                        },
-                        onYearChanged: (val) {
-                          setState(() {
-                            graduationYear = val;
-                            _onDateChanged();
-                          });
-                        },
+                  // Enrollment and Graduation fields with clearly styled label
+                   _buildDualDropdown(
+  label: 'Enrollment',
+  monthValue: enrollmentMonth,
+  yearValue: enrollmentYear,
+  onMonthChanged: (val) => setState(() {
+    enrollmentMonth = val;
+    _onDateChanged();
+  }),
+  onYearChanged: (val) => setState(() {
+    enrollmentYear = val;
+    _onDateChanged();
+  }),
+  isEnrollment: true,
+),
+
+const SizedBox(height: 16),
+
+_buildDualDropdown(
+  label: 'Graduation',
+  monthValue: graduationMonth,
+  yearValue: graduationYear,
+  onMonthChanged: (val) => setState(() {
+    graduationMonth = val;
+    _onDateChanged();
+  }),
+  onYearChanged: (val) => setState(() {
+    graduationYear = val;
+    _onDateChanged();
+  }),
+  isEnrollment: false,
+),
+
+                  if (dateError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 12),
+                      child: Text(
+                        dateError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
                       ),
-                      if (dateError != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8, left: 12),
-                          child: Text(
-                            dateError!,
-                            style: const TextStyle(color: Colors.red, fontSize: 12),
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -574,72 +573,80 @@ Widget build(BuildContext context) {
   );
 }
 
-  Widget _buildDualDropdown({
-    required String label,
-    required String? monthValue,
-    required String? yearValue,
-    required ValueChanged<String?> onMonthChanged,
-    required ValueChanged<String?> onYearChanged,
-  }) {
-    const borderColor = Color(0xFF212121);
+Widget _buildDualDropdown({
+  required String label,
+  required String? monthValue,
+  required String? yearValue,
+  required ValueChanged<String?> onMonthChanged,
+  required ValueChanged<String?> onYearChanged,
+  required bool isEnrollment,
+}) {
+  const borderColor = Color(0xFF212121);
+  final yearsList = isEnrollment ? enrollmentYears : graduationYears;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF212121))),
-        const SizedBox(height: 8),
-        Row(
+  return Row(
+    children: [
+      // Left dropdown (Month) with inline label
+      Expanded(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: monthValue,
-                decoration: InputDecoration(
-                  hintText: 'Month',
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                ),
-                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: onMonthChanged,
-              ),
+            DropdownButtonFormField<String>(
+              value: monthValue,
+              decoration: _dropdownDecoration('', borderColor),
+              items: months
+                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                  .toList(),
+              onChanged: onMonthChanged,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: yearValue,
-                decoration: InputDecoration(
-                  hintText: 'Year',
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                    borderRadius: BorderRadius.circular(6),
+            Positioned(
+              left: 12,
+              top: -8,
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  '* $label',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF212121),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
-                items: years.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
-                onChanged: onYearChanged,
               ),
             ),
           ],
-        )
-      ],
-    );
-  }
+        ),
+      ),
+
+      const SizedBox(width: 16),
+
+      // Right dropdown (Year)
+      Expanded(
+        child: DropdownButtonFormField<String>(
+          value: yearValue,
+          decoration: _dropdownDecoration('', borderColor),
+          items: yearsList
+              .map((y) => DropdownMenuItem(value: y, child: Text(y)))
+              .toList(),
+          onChanged: onYearChanged,
+        ),
+      ),
+    ],
+  );
+}
+
+InputDecoration _dropdownDecoration(String hint, Color borderColor) {
+  return InputDecoration(
+    hintText: hint.isNotEmpty ? hint : null,
+    enabledBorder: OutlineInputBorder(
+      borderSide: BorderSide(color: borderColor, width: 1),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderSide: BorderSide(color: borderColor, width: 1),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+  );
+}
 }

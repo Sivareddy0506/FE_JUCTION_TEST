@@ -15,9 +15,12 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../widgets/bottom_navbar.dart';
+import '../../widgets/app_button.dart';
 import '../../services/favorites_service.dart';
 import '../../services/profile_service.dart';
+import '../../utils/image_compression.dart';
 import 'account_settings_page.dart';
+import '../../app.dart'; // For SlidePageRoute, FadePageRoute
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -280,25 +283,33 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   String getReadableLocation(String fullAddress) {
-  if (fullAddress.isEmpty) return '';
+    if (fullAddress.isEmpty) return '';
 
-  // Split by commas and trim spaces
-  final parts = fullAddress.split(',').map((p) => p.trim()).toList();
+    // Split by commas and trim spaces
+    final parts = fullAddress.split(',').map((p) => p.trim()).toList();
 
-  // Remove any part that starts with a number (likely a street number)
-  final filteredParts = parts.where((p) => !RegExp(r'^\d').hasMatch(p)).toList();
+    // Remove any part that starts with a number (likely a street number)
+    final filteredParts = parts.where((p) => !RegExp(r'^\d').hasMatch(p)).toList();
 
-  if (filteredParts.isEmpty) return fullAddress; // fallback
+    if (filteredParts.isEmpty) return fullAddress; // fallback
 
-  // Take last 2-3 parts for area, city/state
-  if (filteredParts.length >= 3) {
-    return '${filteredParts[filteredParts.length - 3]}, ${filteredParts[filteredParts.length - 2]}, ${filteredParts[filteredParts.length - 1]}';
-  } else if (filteredParts.length >= 2) {
-    return '${filteredParts[filteredParts.length - 2]}, ${filteredParts[filteredParts.length - 1]}';
-  } else {
-    return filteredParts.join(', ');
+    // Format as "area, city or state"
+    if (filteredParts.length >= 3) {
+      // Last 3 parts: area, city, state -> "area, city or state"
+      final area = filteredParts[filteredParts.length - 3];
+      final city = filteredParts[filteredParts.length - 2];
+      final state = filteredParts[filteredParts.length - 1];
+      return '$area, $city , $state';
+    } else if (filteredParts.length >= 2) {
+      // Last 2 parts: city, state -> "city or state"
+      final city = filteredParts[filteredParts.length - 2];
+      final state = filteredParts[filteredParts.length - 1];
+      return '$city, $state';
+    } else {
+      // Single part: just return it
+      return filteredParts.first;
+    }
   }
-}
 
 
   Future<void> _updateProfileImage() async {
@@ -308,103 +319,62 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final picker = ImagePicker();
   final source = await showModalBottomSheet<ImageSource>(
   context: context,
-  isScrollControlled: true, // 👈 allows full height if needed
+  isScrollControlled: true,
   backgroundColor: Colors.transparent,
   builder: (context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom, // 👈 avoids overflow
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: SingleChildScrollView(
-        child: Container(
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Change Profile Picture',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 32),
+              AppButton(
+                label: 'Take a Photo',
+                backgroundColor: Colors.white,
+                textColor: const Color(0xFF262626),
+                borderColor: const Color(0xFF262626),
+                onPressed: () => Navigator.pop(context, ImageSource.camera),
+                bottomSpacing: 16,
+              ),
+              AppButton(
+                label: 'Upload from device',
+                backgroundColor: Colors.white,
+                textColor: const Color(0xFF262626),
+                borderColor: const Color(0xFF262626),
+                onPressed: () => Navigator.pop(context, ImageSource.gallery),
               ),
             ],
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const Text(
-                    'Update Profile Picture',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Choose how you want to update your profile picture',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildImageSourceOption(
-                          icon: Icons.camera_alt_rounded,
-                          label: 'Camera',
-                          onTap: () => Navigator.pop(context, ImageSource.camera),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildImageSourceOption(
-                          icon: Icons.photo_library_rounded,
-                          label: 'Gallery',
-                          onTap: () => Navigator.pop(context, ImageSource.gallery),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
       ),
@@ -430,6 +400,44 @@ class _UserProfilePageState extends State<UserProfilePage> {
         });
       }
 
+      // Compress image to ensure it's under 5MB
+      final compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
+      if (compressedFile == null) {
+        if (mounted) {
+          setState(() {
+            _isUploadingImage = false;
+            _uploadProgress = 0.0;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to process image. Please try again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Double-check the compressed file size
+      final compressedSize = await compressedFile.length();
+      if (compressedSize > ImageCompression.maxFileSize) {
+        if (mounted) {
+          setState(() {
+            _isUploadingImage = false;
+            _uploadProgress = 0.0;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Image is too large (${ImageCompression.formatFileSize(compressedSize)}). Please choose a smaller image.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
       if (!mounted) return;
@@ -438,7 +446,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       final uri = Uri.parse('https://api.junctionverse.com/user/update-profile-image');
       final request = http.MultipartRequest('PUT', uri);
       request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(await http.MultipartFile.fromPath('profileImage', pickedFile.path));
+      request.files.add(await http.MultipartFile.fromPath('profileImage', compressedFile.path));
 
       // Simulate upload progress
       final streamedResponse = await request.send();
@@ -512,7 +520,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ),
     );
   }
-}
+ }
  else {
         if (mounted) {
           setState(() {
@@ -520,8 +528,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
             _isUploadingImage = false;
             _uploadProgress = 0.0;
           });
+          
+          String errorMessage;
+          if (streamedResponse.statusCode == 413) {
+            errorMessage = 'Image is too large. Please choose a smaller image (under 5MB).';
+          } else {
+            errorMessage = 'Failed to update profile image (${streamedResponse.statusCode}). Please try again.';
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update profile image: ${streamedResponse.statusCode}')),
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
           );
         }
       }
@@ -595,11 +615,26 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return Color.fromRGBO(r, g, b, 1);
   }
 
+  Color _darkenColor(Color color, [double amount = .1]) {
+    final hsl = HSLColor.fromColor(color);
+    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
+    return hslDark.toColor();
+  }
+
+  Color _lightenColor(Color color, [double amount = .1]) {
+    final hsl = HSLColor.fromColor(color);
+    final hslLight = hsl.withLightness((hsl.lightness + amount).clamp(0.0, 1.0));
+    return hslLight.toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('UserProfilePage: build called. _allDataReady=$_allDataReady, _favoritesReady=$_favoritesReady, _profileReady=$_profileReady, _activeListingsReady=$_activeListingsReady, _isFirstLoad=$_isFirstLoad');
     
     final backgroundColor = _generateColorFromName(name);
+    final gradientStart = _darkenColor(backgroundColor, 0.25);
+    final gradientEnd = _lightenColor(backgroundColor, 0.05);
+    final avatarBackground = _darkenColor(backgroundColor, 0.35).withOpacity(0.95);
     
     Widget content;
     
@@ -613,45 +648,41 @@ class _UserProfilePageState extends State<UserProfilePage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            (_localImagePath != null && _isUploadingImage)
-                ? Image.file(
-                    File(_localImagePath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(color: Colors.transparent);
-                    },
-                  )
-                : profileImage.isNotEmpty
-                    ? Image.network(
-                        profileImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(color: Colors.transparent);
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.transparent,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                                strokeWidth: 2,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                    : Container(color: Colors.transparent),
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                color: Colors.black.withOpacity(0.5),
-              ),
-            ),
+           if (_localImagePath != null && _isUploadingImage) ...[
+  Image.file(
+    File(_localImagePath!),
+    fit: BoxFit.cover,
+    errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[100]),
+  ),
+  BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+    child: Container(color: Colors.black.withOpacity(0.5)),
+  ),
+] else if (profileImage.isNotEmpty) ...[
+  Image.network(
+    profileImage,
+    fit: BoxFit.cover,
+    errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[100]),
+  ),
+  BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+    child: Container(color: Colors.black.withOpacity(0.5)),
+  ),
+] else ...[
+  Container(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [gradientStart, gradientEnd],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+  ),
+  BackdropFilter(
+    filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+    child: Container(color: Colors.black.withOpacity(0.4)),
+  ),
+],
             Column(
               children: [
                 Padding(
@@ -661,14 +692,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     children: [
                       const SizedBox(width: 48),
                       Stack(
+                        clipBehavior: Clip.none,
                         children: [
-                          // Show local image if uploading, otherwise show network image
-                          (_localImagePath != null && _isUploadingImage)
-                              ? CircleAvatar(
-                                  radius: 36,
-                                  backgroundColor: Colors.transparent,
-                                  child: ClipOval(
-                                    child: Image.file(
+                          CircleAvatar(
+                            radius: 36,
+                            backgroundColor: avatarBackground,
+                            child: ClipOval(
+                              child: (_localImagePath != null && _isUploadingImage)
+                                  ? Image.file(
                                       File(_localImagePath!),
                                       width: 72,
                                       height: 72,
@@ -683,15 +714,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                           ),
                                         );
                                       },
-                                    ),
-                                  ),
-                                )
-                              : profileImage.isNotEmpty
-                                  ? CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.transparent,
-                                      child: ClipOval(
-                                        child: Image.network(
+                                    )
+                                  : profileImage.isNotEmpty
+                                      ? Image.network(
                                           profileImage,
                                           width: 72,
                                           height: 72,
@@ -727,73 +752,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                               ),
                                             );
                                           },
+                                        )
+                                      : Text(
+                                          name.isNotEmpty ? name[0].toUpperCase() : '',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
-                                      ),
-                                    )
-                                  : CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.transparent,
-                                      child: Text(
-                                        name.isNotEmpty ? name[0].toUpperCase() : '',
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                          // Upload progress indicator - removed for seamless transition
-                          // if (_isUploadingImage)
-                          //   Positioned.fill(
-                          //     child: Container(
-                          //       decoration: BoxDecoration(
-                          //         shape: BoxShape.circle,
-                          //         color: Colors.black.withOpacity(0.3),
-                          //       ),
-                          //       child: Center(
-                          //         child: Stack(
-                          //           alignment: Alignment.center,
-                          //           children: [
-                          //             SizedBox(
-                          //               width: 40,
-                          //               height: 40,
-                          //               child: CircularProgressIndicator(
-                          //                 value: _uploadProgress,
-                          //                 strokeWidth: 3,
-                          //                 backgroundColor: Colors.white.withOpacity(0.3),
-                          //                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                          //               ),
-                          //             ),
-                          //             Text(
-                          //               '${(_uploadProgress * 100).toInt()}%',
-                          //               style: const TextStyle(
-                          //                 color: Colors.white,
-                          //                 fontSize: 10,
-                          //                 fontWeight: FontWeight.bold,
-                          //               ),
-                          //             ),
-                          //           ],
-                          //         ),
-                          //       ),
-                          //     ),
-                          //   ),
+                            ),
+                          ),
                           Positioned(
-                            bottom: 0,
-                            right: 0,
+                            bottom: -4,
+                            right: -4,
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: _isUploadingImage ? null : _updateProfileImage,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(18),
                                 child: Container(
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
                                     color: _isUploadingImage ? Colors.grey[300] : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(18),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
+                                        color: Colors.black.withOpacity(0.6),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -802,13 +788,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   child: Center(
                                     child: Image.asset(
                                       'assets/edit.png',
-                                      width: 18,
-                                      height: 18,
+                                      width: 24,
+                                      height: 24,
                                       errorBuilder: (context, error, stackTrace) {
                                         return Icon(
-                                          Icons.edit, 
-                                          size: 18, 
-                                          color: _isUploadingImage ? Colors.grey : Colors.black
+                                          Icons.edit,
+                                          size: 24,
+                                          color: _isUploadingImage ? Colors.grey : Colors.black,
                                         );
                                       },
                                     ),
@@ -823,13 +809,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
+                            SlidePageRoute(page: const AccountSettingsPage()),
                           );
                         },
                         icon: Image.asset(
                           'assets/settings.png',
-                          width: 24,
-                          height: 24,
+                          width: 40,
+                          height: 40,
                           errorBuilder: (context, error, stackTrace) {
                             return const Icon(Icons.settings, size: 24, color: Colors.white);
                           },
@@ -905,29 +891,24 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        // SizedBox(
-                        //   height: 40,
-                        //   child: ListView.builder(
-                        //     scrollDirection: Axis.horizontal,
-                        //     padding: const EdgeInsets.symmetric(horizontal: 12),
-                        //     itemCount: tabs.length,
-                        //     itemBuilder: (context, index) {
-                        //       return _buildTab(
-                        //         tabs[index],
-                        //         selectedTabIndex == index,
-                        //         () => setState(() => selectedTabIndex = index),
-                        //       );
-                        //     },
-                        //   ),
-                        // ),
+                       
                         ClipRRect(
   borderRadius: const BorderRadius.only(
     topLeft: Radius.circular(40),
     topRight: Radius.circular(40),
   ),
   child: Container(
-    color: Colors.white,
-    height: 40,
+    height: 50,
+    padding: const EdgeInsets.only(bottom: 10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border(
+        bottom: BorderSide(
+          color: Colors.grey.shade300,
+          width: 1,
+        ),
+      ),
+    ),
     child: ListView.builder(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -942,7 +923,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     ),
   ),
 ),
-
+                        const SizedBox(height: 16),
                         Expanded(
                           child: Builder(
                             builder: (context) {

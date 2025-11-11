@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:junction/app_state.dart';
+import '../app.dart';
 import '../../../widgets/custom_appbar.dart';
 
 import '../screens/products/add_product_images.dart';
@@ -81,8 +82,8 @@ class _TuneAuctionWidgetState extends State<TuneAuctionWidget> {
   void gotoNextPage(){
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddProductImagesPage(
+      SlidePageRoute(
+        page: AddProductImagesPage(
           selectedCategory: widget.selectedCategory,
           title: widget.title,
           price: widget.price,

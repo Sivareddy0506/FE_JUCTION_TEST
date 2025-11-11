@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../widgets/app_button.dart';
 
 class AuctionCard extends StatefulWidget {
   final Map<String, dynamic> auctionData;
@@ -195,14 +196,13 @@ class _AuctionCardState extends State<AuctionCard> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Add your bidding logic here
-                    },
-                    child: const Text("Bid Now"),
-                  ),
+                AppButton(
+                  label: "Bid Now",
+                  onPressed: () {
+                    // TODO: Add your bidding logic here
+                  },
+                  backgroundColor: const Color(0xFF262626),
+                  textColor: Colors.white,
                 ),
               ],
             ),

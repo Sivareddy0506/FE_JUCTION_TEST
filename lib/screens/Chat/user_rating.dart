@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/error_handler.dart';
+import '../../widgets/app_button.dart';
 
 class ReviewScreen extends StatefulWidget {
   final String ratedUserId;
@@ -97,20 +99,13 @@ Future<void> submitRating() async {
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       final msg = json.decode(response.body)["message"] ?? "Rating submitted";
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ErrorHandler.showSuccessSnackBar(context, msg);
       Navigator.pop(context); // go back after success
     } else {
-      final err = json.decode(response.body);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: ${err["error"] ?? "Failed"}")),
-      );
+      ErrorHandler.showErrorSnackBar(context, null, response: response);
     }
   } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Something went wrong: $e")),
-    );
+    ErrorHandler.showErrorSnackBar(context, e);
   } finally {
     setState(() => isLoading = false);
   }
@@ -153,7 +148,7 @@ Future<void> submitRating() async {
 
               buildRadioQuestion(
                 "2. Did they show up / complete the deal reliably?",
-                ["Yes", "No", "Almost"],
+                ["Yes", "No"],
                 q2,
                 (val) => setState(() => q2 = val),
               ),
@@ -177,16 +172,21 @@ Future<void> submitRating() async {
               ),
               SizedBox(height: 20),
 
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                       backgroundColor: const Color(0xFFFF6705), padding: EdgeInsets.all(16)),
-                  onPressed: isLoading ? null : submitRating,
-                  child: isLoading
-                      ? CircularProgressIndicator(color: Colors.white)
-                      : Text("Submit"),
-                ),
+              AppButton(
+                label: isLoading ? 'Submitting...' : 'Submit',
+                onPressed: isLoading ? null : submitRating,
+                backgroundColor: const Color(0xFFFF6705),
+                textColor: Colors.white,
+                customChild: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : null,
               )
             ],
           ),

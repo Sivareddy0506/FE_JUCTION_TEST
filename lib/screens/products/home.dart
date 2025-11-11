@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/logo_icons_widget.dart';
 import '../../widgets/search_bar_widget.dart';
 import '../../widgets/category_grid.dart';
@@ -8,7 +9,8 @@ import './horizontal_product_list.dart';
 import './ad_banner_widget.dart';
 import '../services/api_service.dart';
 import '../../services/favorites_service.dart';
-//import './products_display.dart';
+import './products_display.dart';
+import '../../app.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   List<Product> trendingProducts = [];
   String adUrl1 = '';
   String adUrl2 = '';
+  bool _isLoggedIn = false;
   
   // Separate flags for different data sources
   bool _favoritesReady = false;
@@ -92,6 +95,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> fetchHomeData() async {
     debugPrint('HomePage: fetchHomeData started');
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      final bool loggedIn = token != null && token.isNotEmpty;
+
       final lastViewed = await ApiService.fetchLastOpenedWithCache();
       final latest = await ApiService.fetchAllProductsWithCache();
       final trending = await ApiService.fetchMostClickedWithCache();
@@ -106,6 +113,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint("📸 Ad URLs: $ads");
 
       setState(() {
+        _isLoggedIn = loggedIn;
         lastViewedProducts = lastViewed;
         allProducts = latest;
         trendingProducts = trending;
@@ -113,12 +121,14 @@ class _HomePageState extends State<HomePage> {
         if (ads.isNotEmpty) {
           adUrl1 = ads[0];
           adUrl2 = ads.length > 1 ? ads[1] : ads[0];
+        } else {
+          adUrl1 = '';
+          adUrl2 = '';
         }
       });
     } catch (e, stacktrace) {
       debugPrint('HomePage: Exception in fetchHomeData - $e');
       debugPrint(stacktrace.toString());
-      // Don't set isLoading to false here, let _initializeProducts handle it
       rethrow; // Re-throw to be caught by _initializeProducts
     }
   }
@@ -154,45 +164,37 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               debugLogWidget('SearchBarWidget'),
               const SearchBarWidget(),
-
-              const SizedBox(height: 16),
-              const SizedBox(height: 16),
-
-              // Category grid (fixed height)
+              const SizedBox(height: 20),
+              debugLogWidget('CategoryGrid'),
               const SizedBox(
                 height: 130,
                 child: CategoryGrid(),
               ),
-
-              // const SizedBox(height: 8),
-
-              // debugLogWidget('CrewCrashBanner'),
-              // const CrewCrashBanner(),
-
-              const SizedBox(height: 16),
-
-              if (lastViewedProducts.isNotEmpty) ...[
-                debugLogWidget('HorizontalProductList: Pick up where you left off'),
-                HorizontalProductList(
-                  title: 'Pick up where you left off',
-                  products: lastViewedProducts,
-                  source: 'lastViewed',
-                  onFavoriteChanged: _refreshFavorites,
-                ),
-                const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              ..._buildProductSection(
+                title: 'Last Viewed',
+                products: lastViewedProducts,
+                source: 'lastViewed',
+                requireLogin: true,
+                emptyMessage: 'You haven\'t viewed any products yet. Start exploring to see them here.',
+              ),
+              ..._buildProductSection(
+                title: 'Fresh Listings',
+                products: allProducts,
+                source: 'fresh',
+                emptyMessage: 'No fresh listings available right now. Check back soon!',
+              ),
+              if (adUrl1.isNotEmpty) ...[
+                debugLogWidget('AdBannerWidget: adUrl1'),
+                AdBannerWidget(mediaUrl: adUrl1),
+                const SizedBox(height: 24),
               ],
-
-              if (allProducts.isNotEmpty) ...[
-                debugLogWidget('HorizontalProductList: Fresh Listings'),
-                HorizontalProductList(
-                  title: 'Fresh Listings',
-                  products: allProducts,
-                  source: 'fresh',
-                  onFavoriteChanged: _refreshFavorites,
-                ),
-                const SizedBox(height: 16),
-              ],
-
+              ..._buildProductSection(
+                title: 'Trending in your location',
+                products: trendingProducts,
+                source: 'trending',
+                emptyMessage: 'No trending items nearby yet. Be the first to list!',
+              ),
               if (previousSearchProducts.isNotEmpty) ...[
                 debugLogWidget('HorizontalProductList: Based on your Previous Search'),
                 HorizontalProductList(
@@ -201,27 +203,7 @@ class _HomePageState extends State<HomePage> {
                   source: 'searched',
                   onFavoriteChanged: _refreshFavorites,
                 ),
-                const SizedBox(height: 16),
               ],
-
-              if (adUrl1.isNotEmpty) ...[
-                debugLogWidget('AdBannerWidget: adUrl1'),
-                AdBannerWidget(mediaUrl: adUrl1),
-                const SizedBox(height: 16),
-              ],
-
-              if (trendingProducts.isNotEmpty) ...[
-                debugLogWidget('HorizontalProductList: Trending in your Locality'),
-                HorizontalProductList(
-                  title: 'Trending in your Locality',
-                  products: trendingProducts,
-                  source: 'trending',
-                  onFavoriteChanged: _refreshFavorites,
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              const SizedBox(height: 30),
             ],
           ),
         ),
@@ -239,5 +221,94 @@ class _HomePageState extends State<HomePage> {
   Widget debugLogWidget(String widgetName) {
     debugPrint('Rendering widget: $widgetName');
     return const SizedBox.shrink();
+  }
+
+  List<Widget> _buildProductSection({
+    required String title,
+    required List<Product> products,
+    required String source,
+    String? emptyMessage,
+    bool requireLogin = false,
+  }) {
+    final bool shouldShow = !requireLogin || _isLoggedIn;
+    if (!shouldShow) return [];
+
+    final widgets = <Widget>[];
+
+    if (products.isEmpty) {
+      if (emptyMessage == null) return [];
+      widgets
+        ..add(debugLogWidget('Placeholder: $title'))
+        ..add(_buildEmptySection(
+          title: title,
+          message: emptyMessage,
+          source: source,
+        ));
+    } else {
+      widgets
+        ..add(debugLogWidget('HorizontalProductList: $title'))
+        ..add(HorizontalProductList(
+          title: title,
+          products: products,
+          source: source,
+          onFavoriteChanged: _refreshFavorites,
+        ));
+    }
+
+    if (widgets.isNotEmpty) {
+      widgets.add(const SizedBox(height: 16));
+    }
+
+    return widgets;
+  }
+
+  Widget _buildEmptySection({
+    required String title,
+    required String message,
+    required String source,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  SlidePageRoute(
+                    page: ProductListingPage(
+                      title: title,
+                      source: source,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE6E6E6)),
+          ),
+          child: Text(
+            message,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF4F4F4F)),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:junction/screens/Chat/chat_page.dart';
 import 'package:junction/screens/services/chat_service.dart';
-
-// import 'firebase_options.dart';
+import '../../../widgets/custom_appbar.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class ChatListPage extends StatelessWidget {
   final ChatService _chatService = ChatService();
@@ -13,18 +13,7 @@ class ChatListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'Chats',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: const CustomAppBar(title: "Chats"),
       body: StreamBuilder<List<ChatModel>>(
         stream: _chatService.getUserChats(),
         builder: (context, snapshot) {
@@ -54,61 +43,99 @@ class ChatListPage extends StatelessWidget {
             );
           }
 
-          return ListView.builder(
+          return ListView.separated(
             itemCount: chats.length,
+            separatorBuilder: (context, index) => const Divider(
+              height: 1,
+              thickness: 0.5,
+              color: Color(0xFFEAEAEA),
+            ),
             itemBuilder: (context, index) {
               ChatModel chat = chats[index];
-              String otherUserName = chat.sellerId == _chatService.currentUserId 
-                  ? chat.buyerName 
+              String otherUserName = chat.sellerId == _chatService.currentUserId
+                  ? chat.buyerName
                   : chat.sellerName;
 
-              // Generate avatar based on name
-              String initials = otherUserName.trim().split(' ')
-                       .where((name) => name.isNotEmpty)
-                        .take(2)
-                        .map((name) => name[0])
-                        .join()
-                        .toUpperCase();
+              // Split into first and last name initials
+              final nameParts = otherUserName.trim().split(' ');
+              String initials = '';
+              if (nameParts.isNotEmpty) {
+                initials += nameParts.first[0];
+                if (nameParts.length > 1) initials += nameParts.last[0];
+              }
+              initials = initials.toUpperCase();
 
-// Fallback for empty names or edge cases
-if (initials.isEmpty) {
-  initials = otherUserName.isNotEmpty ? otherUserName[0].toUpperCase() : 'U';
-}
-              Color avatarColor = _getAvatarColor(otherUserName);
+              // Fallback if initials are empty
+              if (initials.isEmpty) {
+                initials = otherUserName.isNotEmpty
+                    ? otherUserName[0].toUpperCase()
+                    : 'U';
+              }
 
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: avatarColor,
-                  child: Text(
-                    initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  otherUserName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  chat.lastMessage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.grey),
-                ),
-                trailing: Text(
-                  _formatTime(chat.lastMessageTime),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
+              Color avatarColor = _getAvatarColorLight(otherUserName);
+
+              return InkWell(
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => ChatPage(chatId: chat.chatId),
+                    SlidePageRoute(
+                      page: ChatPage(chatId: chat.chatId),
                     ),
                   );
                 },
+                child: Container(
+                  color: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: avatarColor,
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              otherUserName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              chat.lastMessage,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatTime(chat.lastMessageTime),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
           );
@@ -117,14 +144,16 @@ if (initials.isEmpty) {
     );
   }
 
-  Color _getAvatarColor(String name) {
+  /// Soft pastel avatar colors for better readability
+  Color _getAvatarColorLight(String name) {
     final colors = [
-      Colors.purple,
-      Colors.red,
-      Colors.blue,
-      Colors.green,
-      const Color(0xFFFF6705),
-
+      const Color(0xFFE0BBE4),
+      const Color(0xFFB5EAD7),
+      const Color(0xFFFFDAC1),
+      const Color(0xFFC7CEEA),
+      const Color(0xFFFFF3B0),
+      const Color(0xFFFFD6A5),
+      const Color(0xFFA0E7E5),
     ];
     return colors[name.hashCode % colors.length];
   }

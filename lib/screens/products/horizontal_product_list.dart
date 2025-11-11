@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app.dart';
 import '../../models/product.dart';
 import '../../widgets/products_grid.dart';
 import './products_display.dart';
@@ -45,8 +46,8 @@ class HorizontalProductList extends StatelessWidget {
                 debugPrint('HorizontalProductList: "View All" pressed for "$title"');
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => ProductListingPage(
+                  SlidePageRoute(
+                    page: ProductListingPage(
                       title: title,
                       source: source,
                     ),

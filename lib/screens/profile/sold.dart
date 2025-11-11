@@ -6,6 +6,7 @@ import 'empty_state.dart';
 import '../../../models/product.dart';
 import 'package:intl/intl.dart';
 import '/screens/products/product_detail.dart';
+import '../../app.dart'; // For SlidePageRoute
 
 class SoldTab extends StatefulWidget {
   const SoldTab({super.key});
@@ -28,23 +29,19 @@ class _SoldTabState extends State<SoldTab> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
-
+      final currentUserId = prefs.getString('userId'); // <-- get it here
       if (token == null || token.isEmpty) {
         setState(() => isLoading = false);
         return;
       }
-
       final uri = Uri.parse('https://api.junctionverse.com/product/sold');
       final response = await http.get(uri, headers: {
         'Authorization': 'Bearer $token',
       });
-
-      debugPrint("Sold API Response: ${response.body}");
-
+      debugPrint("Sold API Response:  ${response.body}");
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         final List<dynamic> items = decoded is List ? decoded : [];
-
         final fetchedProducts = items.map<Product>((item) {
           final imagesList = (item['images'] as List?)
                   ?.map((img) => ProductImage.fromJson(Map<String, dynamic>.from(img)))
@@ -82,10 +79,10 @@ class _SoldTabState extends State<SoldTab> {
             yearOfPurchase: item['yearOfPurchase'] ?? 0,
           );
         }).toList();
-
+        final filteredProducts = fetchedProducts.where((p) => p.seller != null && p.seller!.id == currentUserId).toList();
         if (!mounted) return;
         setState(() {
-          products = fetchedProducts;
+          products = filteredProducts;
           isLoading = false;
         });
       } else {
@@ -118,8 +115,8 @@ class _SoldTabState extends State<SoldTab> {
           // TODO: navigate to product details page
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => ProductDetailPage(product: product),
+            SlidePageRoute(
+              page: ProductDetailPage(product: product),
             ),
           );
         },

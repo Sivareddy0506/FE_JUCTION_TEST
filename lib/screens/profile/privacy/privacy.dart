@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'privacy_settings.dart';
 import 'thinking_delete.dart';
@@ -70,7 +71,7 @@ class PrivacyPage extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const PrivacySettingsPage()),
+                  SlidePageRoute(page: const PrivacySettingsPage()),
                 );
               },
             ),
@@ -91,7 +92,7 @@ class PrivacyPage extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ThinkingDeletePage()),
+                  SlidePageRoute(page: const ThinkingDeletePage()),
                 );
               },
             ),

@@ -181,7 +181,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => StatefulBuilder(
+    page: StatefulBuilder(
       builder: (BuildContext context, StateSetter setModalState) {
 
         String? validateAmount(String value) {
@@ -307,7 +307,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
                 label: 'Add Amount',
                 backgroundColor: isValidAmount 
                     ? const Color(0xFF262626) 
-                    : const Color(0xFFA3A3A3),
+                    : const Color(0xFF8C8C8C),
                 onPressed: isValidAmount
                     ? () {
                         final amount = int.tryParse(_amountController.text);
@@ -321,7 +321,7 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
               const SizedBox(height: 10),
               AppButton(
                 label: 'Cancel',
-                backgroundColor: const Color(0xFFA3A3A3),
+                backgroundColor: const Color(0xFF8C8C8C),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -336,15 +336,15 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     final bool selected = activeTab == value;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: OutlinedButton(
+      child: AppButton(
+        label: label,
         onPressed: () => setState(() => activeTab = value),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: selected ? Colors.black : Colors.white,
-          foregroundColor: selected ? Colors.white : Colors.black,
-          side: const BorderSide(color: Colors.grey),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        child: Text(label),
+        backgroundColor: selected ? Colors.black : Colors.white,
+        textColor: selected ? Colors.white : Colors.black,
+        borderColor: Colors.grey,
+        height: 40,
+        expand: false,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       ),
     );
   }

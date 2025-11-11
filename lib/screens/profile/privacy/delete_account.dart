@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
 import 'success_delete.dart';
+import '../../../app.dart'; // For SlidePageRoute
 
 class DeleteAccountPage extends StatefulWidget {
   final String selectedReason;
@@ -59,7 +60,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     if (response.statusCode == 200) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const ReportedSuccessPage()),
+        SlidePageRoute(page: const ReportedSuccessPage()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

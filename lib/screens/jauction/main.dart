@@ -9,6 +9,8 @@ import '../../widgets/jauction_coming_soon_widget.dart';
 // import '../products/ad_banner_widget.dart';
 // import '../services/auction_service.dart';
 
+
+
 class JauctionHomePage extends StatefulWidget {
   final String adUrl1;
   final String adUrl2;

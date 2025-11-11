@@ -6,17 +6,27 @@ import '../../services/filter_state_service.dart';
 import '../services/api_service.dart';
 import '../products/product_detail.dart';
 import '../../services/profile_service.dart'; 
+import '../../../widgets/custom_appbar.dart';
+import '../../widgets/bottom_navbar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../profile/user_profile.dart';
+import '../profile/others_profile.dart';
+import '../profile/empty_state.dart';
+import '../../app.dart'; // For SlidePageRoute
+import '../../widgets/app_button.dart';
 
 class SearchResultsPage extends StatefulWidget {
   final String searchQuery;
   final Map<String, dynamic>? appliedFilters;
   final String? sortBy;
+  final String? title;
 
   const SearchResultsPage({
     super.key,
     required this.searchQuery,
     this.appliedFilters,
     this.sortBy,
+    this.title,
   });
 
   @override
@@ -51,7 +61,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     });
 
     try {
-      // Perform search
       final searchResult = await SearchService.searchProducts(
         query: widget.searchQuery.isNotEmpty ? widget.searchQuery : null,
         listingType: widget.appliedFilters?['listingType'],
@@ -63,7 +72,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         sortBy: widget.sortBy ?? 'Distance',
       );
 
-      // Save search history
       if (widget.searchQuery.isNotEmpty) {
         await ApiService.saveSearchHistory(widget.searchQuery);
       }
@@ -73,15 +81,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         isLoading = false;
       });
 
-      // Prefetch product clicks
       await _fetchAllClicks();
     } catch (e) {
       if (mounted) {
         setState(() {
-        hasError = true;
-        errorMessage = e.toString();
-        isLoading = false;
-      });
+          hasError = true;
+          errorMessage = e.toString();
+          isLoading = false;
+        });
       }
     }
   }
@@ -91,22 +98,33 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     final List<String> productIds = searchResults.map((p) => p.id).toList();
     final results = await ProductClickService.getUniqueClicksFor(productIds);
     clicksMap.addAll(results);
-    // await Future.wait(searchResults.map((product) async {
-    //   final count = await ProductClickService.getUniqueClicks(product.id);
-    //   clicksMap[product.id] = count;
-    // }));
-
     setState(() {
       _uniqueClicks = clicksMap;
     });
   }
 
-  void _handleProductClick(Product product) async {
+  Future<void> _openSellerProfile(String sellerId) async {
+    if (sellerId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final currentUserId = prefs.getString('userId');
+    if (!mounted) return;
+    if (sellerId == currentUserId) {
+      Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
+    } else {
+      Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: sellerId)));
+    }
+  }
+
+  void _handleProductClick(Product product, int index) async {
     await ApiService.trackProductClick(product.id);
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailPage(product: product),
+      SlidePageRoute(
+        page: ProductDetailPage(
+          product: product,
+          products: searchResults,
+          initialIndex: index,
+        ),
       ),
     );
   }
@@ -124,33 +142,26 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-        actions: [
-          if (hasError)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _performSearch,
-            ),
-        ],
-      ),
+      appBar: CustomAppBar(title: widget.title ?? 'Search Results'),
       body: SafeArea(
         child: Column(
           children: [
-            SearchBarWidget(
-              initialQuery: widget.searchQuery,
-              onSearch: (query) {
-                if (query != widget.searchQuery) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SearchResultsPage(searchQuery: query),
-                    ),
-                  );
-                }
-              },
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SearchBarWidget(
+                initialQuery: widget.searchQuery,
+                onSearch: (query) {
+                  if (query != widget.searchQuery) {
+                    Navigator.pushReplacement(
+                      context,
+                      SlidePageRoute(
+                        page: SearchResultsPage(searchQuery: query, title: widget.title ?? 'Search Results'),
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
             const SizedBox(height: 8),
             Expanded(
@@ -159,6 +170,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           ],
         ),
       ),
+      bottomNavigationBar: BottomNavBar(activeItem: 'home', onTap: (_) {}),
     );
   }
 
@@ -183,23 +195,19 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _performSearch, child: const Text('Try Again')),
+            AppButton(
+              label: 'Try Again',
+              onPressed: _performSearch,
+              backgroundColor: const Color(0xFFFF6705),
+              textColor: Colors.white,
+            ),
           ],
         ),
       );
     }
 
     if (searchResults.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset('assets/nodata.png', width: 200),
-            const SizedBox(height: 16),
-            const Text('Oops, no listings so far', style: TextStyle(color: Colors.grey, fontSize: 14)),
-          ],
-        ),
-      );
+      return const EmptyState(text: 'Oops, no listings so far');
     }
 
     return Column(
@@ -222,9 +230,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             itemBuilder: (context, index) {
               final product = searchResults[index];
               final imageUrl = product.images.isNotEmpty ? product.images[0].fileUrl : product.imageUrl;
+              final sellerId = product.seller?.id ?? '';
 
               return GestureDetector(
-                onTap: () => _handleProductClick(product),
+                onTap: () => _handleProductClick(product, index),
                 child: Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -237,14 +246,23 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         child: Row(
                           children: [
-                            const CircleAvatar(radius: 6, backgroundImage: AssetImage('assets/avatarpng.png')),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                product.seller?.fullName ?? 'Seller Name',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            GestureDetector(
+                              onTap: () => _openSellerProfile(sellerId),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const CircleAvatar(radius: 6, backgroundImage: AssetImage('assets/avatarpng.png')),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 140,
+                                    child: Text(
+                                      product.seller?.fullName ?? 'Seller',
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             Row(
@@ -306,8 +324,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             Text(product.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
                             Text(product.displayPrice,
-                                style: const TextStyle(fontSize: 16, color: const Color(0xFFFF6705),
- fontWeight: FontWeight.bold)),
+                                style: const TextStyle(fontSize: 16, color: Color(0xFFFF6705), fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -319,16 +336,23 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         child: Row(
                           children: [
-                            const Icon(Icons.remove_red_eye, size: 16, color: Colors.grey),
+                            Image.asset('assets/Eye.png', width: 16, height: 16),
                             const SizedBox(width: 4),
                             Text(
                               'Viewed by ${_uniqueClicks[product.id] ?? 0} others',
                               style: const TextStyle(fontSize: 12),
                             ),
                             const Spacer(),
-                            const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                            Image.asset('assets/MapPin.png', width: 16, height: 16),
                             const SizedBox(width: 4),
-                            Text(product.location ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+                            Expanded(
+                              child: Text(
+                                product.location ?? 'Unknown',
+                                style: const TextStyle(fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                       ),

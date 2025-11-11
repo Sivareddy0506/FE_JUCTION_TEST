@@ -24,15 +24,21 @@ class UserProfile {
     // Parse the addressJson field
     if (json['addressJson'] != null && json['addressJson'] is List) {
       final addressList = json['addressJson'] as List;
+      final homeAddressId = json['homeAddress'];
 
-      // Find the "Home" address, fallback to the first address if not found
-      final homeAddress = addressList.firstWhere(
-        (addr) => addr['label'] == 'Home',
-        orElse: () => addressList.isNotEmpty ? addressList[0] : null,
-      );
+      // Find the address matching the homeAddress ID, or fallback to first address
+      dynamic selectedAddress;
+      if (homeAddressId != null && homeAddressId is String) {
+        selectedAddress = addressList.firstWhere(
+          (addr) => addr['id'] == homeAddressId,
+          orElse: () => addressList.isNotEmpty ? addressList[0] : null,
+        );
+      } else if (addressList.isNotEmpty) {
+        selectedAddress = addressList[0];
+      }
 
-      if (homeAddress != null && homeAddress['address'] != null) {
-        extractedLocation = homeAddress['address'];
+      if (selectedAddress != null && selectedAddress['address'] != null) {
+        extractedLocation = selectedAddress['address'];
       }
     }
 

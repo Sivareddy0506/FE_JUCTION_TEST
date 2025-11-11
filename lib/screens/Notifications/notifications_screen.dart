@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../widgets/bottom_navbar.dart';
+import '../../widgets/app_button.dart';
 
 class NotificationModel {
   final String id;
@@ -219,13 +220,11 @@ Widget _buildBody() {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
+            AppButton(
+              label: 'Retry',
               onPressed: _getNotifications,
-              style: ElevatedButton.styleFrom(
-               backgroundColor: const Color(0xFFFF6705),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Retry'),
+              backgroundColor: const Color(0xFFFF6705),
+              textColor: Colors.white,
             ),
           ],
         ),

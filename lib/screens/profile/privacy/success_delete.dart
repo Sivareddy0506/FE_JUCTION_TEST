@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../signup/signup_page.dart';
@@ -59,8 +60,8 @@ class ReportedSuccessPage extends StatelessWidget {
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const SignupPage(),
+                  SlidePageRoute(
+                    page: const SignupPage(),
                   ),
                   (route) => false,
                 );

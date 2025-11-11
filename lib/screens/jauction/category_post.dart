@@ -27,7 +27,7 @@ class _CategoryPostPageState extends State<JauctionCategoryPostPage> {
     print("Selected category: $category");
 
     // Example:
-    // Navigator.push(context, MaterialPageRoute(builder: (_) => NextPage(category: category)));
+    // Navigator.push(context, SlidePageRoute(page: NextPage(category: category)));
   }
 
   Widget _buildProgressChips(int currentStep) {

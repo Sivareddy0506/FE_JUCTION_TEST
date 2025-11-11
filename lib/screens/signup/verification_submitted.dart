@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
-import '../products/home.dart';
-
+import '../login/login_page.dart';
+import '../../app.dart'; 
 class VerificationSubmittedPage extends StatelessWidget {
   const VerificationSubmittedPage({super.key});
 
@@ -59,8 +59,8 @@ class VerificationSubmittedPage extends StatelessWidget {
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const HomePage(),
+                  SlidePageRoute(
+                    page: const LoginPage(),
                   ),
                 );
               },

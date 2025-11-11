@@ -6,7 +6,7 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/form_text.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'package:http/http.dart' as http;
-
+import '../../../app.dart'; // For SlidePageRoute
 import 'address.dart';
 
 
@@ -124,7 +124,7 @@ class _AddMoreDetailsPageState extends State<AddMoreDetailsPage> {
 
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const AddressPage()),
+          SlidePageRoute(page: const AddressPage()),
               (Route<dynamic> route) {
             return count++ >= 3; // keep the 3rd screen and above
           },

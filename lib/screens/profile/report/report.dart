@@ -5,7 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
+import '../../../utils/image_compression.dart';
 import './reported_success.dart';
+import '../../../app.dart'; // For SlidePageRoute
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -19,6 +21,7 @@ class _ReportPageState extends State<ReportPage> {
   String selectedIssue = 'General app issue';
   File? screenshot;
   bool isSubmitting = false;
+  String? fileSizeError; // Error message for file size
 
   final List<String> issues = [
     'Product Listing',
@@ -31,12 +34,138 @@ class _ReportPageState extends State<ReportPage> {
 
   Future<void> _pickScreenshot() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final source = await _showImageSourceDialog();
+    if (source == null) return;
+    
+    final pickedFile = await picker.pickImage(source: source);
     if (pickedFile != null) {
+      // Compress image to ensure it's under 5MB
+      final compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
+      if (compressedFile == null) {
+        setState(() {
+          fileSizeError = 'Failed to process image. Please try again.';
+          screenshot = null;
+        });
+        return;
+      }
+      
       setState(() {
-        screenshot = File(pickedFile.path);
+        screenshot = compressedFile;
+        fileSizeError = null; // Clear error on success
       });
     }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return await showModalBottomSheet<ImageSource>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'Add Photo',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                AppButton(
+                  label: 'Take a Photo',
+                  backgroundColor: Colors.white,
+                  textColor: const Color(0xFF262626),
+                  borderColor: const Color(0xFF262626),
+                  onPressed: () => Navigator.pop(context, ImageSource.camera),
+                  bottomSpacing: 16,
+                ),
+                AppButton(
+                  label: 'Upload from device',
+                  backgroundColor: Colors.white,
+                  textColor: const Color(0xFF262626),
+                  borderColor: const Color(0xFF262626),
+                  onPressed: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _submitIssue() async {
@@ -62,7 +191,7 @@ class _ReportPageState extends State<ReportPage> {
 
     if (response.statusCode == 200) {
       if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ReportedSuccessPage()));
+      Navigator.pushReplacement(context, SlidePageRoute(page: const ReportedSuccessPage()));
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,13 +285,41 @@ class _ReportPageState extends State<ReportPage> {
                               style: TextStyle(fontSize: 14),
                             ),
                             SizedBox(height: 4),
-                            Text('JPG, PNG files up to 2MB', style: TextStyle(fontSize: 14, color: Color(0xFF8A8894)))
+                            Text('JPG, PNG files up to 5MB', style: TextStyle(fontSize: 14, color: Color(0xFF8A8894)))
                           ],
                         )
                       : Image.file(screenshot!, fit: BoxFit.cover),
                 ),
               ),
             ),
+            
+            // File size error message
+            if (fileSizeError != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        fileSizeError!,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 32),
             AppButton(

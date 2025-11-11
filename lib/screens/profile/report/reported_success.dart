@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../profile/account_settings_page.dart';
+import '../../../app.dart'; // For SlidePageRoute
 
 class ReportedSuccessPage extends StatelessWidget {
   const ReportedSuccessPage({super.key});
@@ -61,8 +62,8 @@ class ReportedSuccessPage extends StatelessWidget {
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const AccountSettingsPage(),
+                  SlidePageRoute(
+                    page: const AccountSettingsPage(),
                   ),
                 );
               },

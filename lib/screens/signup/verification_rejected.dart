@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import './manual_signup_page.dart';
-
+import '../../app.dart'; // For SlidePageRoute
 class VerificationRejectedPage extends StatefulWidget {
   const VerificationRejectedPage({super.key});
 
@@ -118,8 +118,8 @@ class _VerificationRejectedPageState extends State<VerificationRejectedPage> {
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ManualSignupPage(),
+                  SlidePageRoute(
+                    page: const ManualSignupPage(),
                   ),
                 );
               },

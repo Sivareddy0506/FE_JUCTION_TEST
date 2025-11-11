@@ -4,12 +4,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/app_button.dart';
 
 import 'package:junction/screens/services/chat_service.dart';
 import 'productsold.dart';
 import 'user_rating.dart';
+import '../../app.dart';
+import '../profile/user_profile.dart';
+import '../profile/others_profile.dart';
+import '../../utils/error_handler.dart';
 
 class ChatPage extends StatefulWidget {
   final String chatId;
@@ -49,17 +56,23 @@ class _ChatPageState extends State<ChatPage> {
   bool _hasDoneInitialScroll = false;
   
   // Button disabling and error handling
-  bool _isQuoteButtonDisabled = false;
   bool _isConfirmButtonDisabled = false;
-  Timer? _quoteButtonTimer;
   Timer? _confirmButtonTimer;
   String? _errorMessage;
+  DateTime? _nextQuoteAllowedAt;
   
   // Track if user is typing to prevent auto-scroll
   bool _isUserTyping = false;
   
   // Track current scroll position to prevent jumps
   double _currentScrollPosition = 0.0;
+  
+  // Product status
+  String? _productStatus;
+  Timer? _statusPollingTimer; // Timer for polling product status
+  DateTime? _pollingStartTime; // Track when polling started
+  String? _lastFetchedProductId; // Track last fetched productId to prevent redundant calls
+  bool _isFetchingProductStatus = false; // Prevent concurrent fetches
 
   @override
   void initState() {
@@ -112,6 +125,120 @@ class _ChatPageState extends State<ChatPage> {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
+    
+    // Mark messages as read immediately when chat opens (non-blocking)
+    _chatService.markMessagesAsRead(widget.chatId);
+    
+    // Fetch product status asynchronously (non-blocking)
+    _fetchProductStatus();
+  }
+  
+  Future<String?> _fetchProductStatus() async {
+    try {
+      // Wait for cached chat data to be available (from preload)
+      // This avoids making an extra Firestore query here
+      if (_cachedChatData == null) {
+        // If cache is still null, wait a bit for preload to complete
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (_cachedChatData == null) {
+          // Still null after wait, try one more fetch
+          final chatDoc = await FirebaseFirestore.instance
+              .collection('chats')
+              .doc(widget.chatId)
+              .get();
+          if (chatDoc.exists && mounted) {
+            setState(() {
+              _cachedChatData = ChatModel.fromFirestore(chatDoc.data() as Map<String, dynamic>);
+            });
+          } else {
+            return null;
+          }
+        }
+      }
+      
+      // Ensure we have productId before making API call
+      if (_cachedChatData == null || _cachedChatData!.productId.isEmpty) {
+        return null;
+      }
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      if (token == null) return null;
+      
+      final response = await http.get(
+        Uri.parse('https://api.junctionverse.com/product/${_cachedChatData!.productId}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final String newStatus = data['status']?.toString() ?? '';
+        // Only update state if status actually changed
+        if (mounted && _productStatus != newStatus) {
+          setState(() {
+            _productStatus = newStatus;
+          });
+        }
+        return newStatus;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching product status: $e');
+      return null;
+    }
+  }
+  
+  void _startStatusPolling() {
+    // Cancel any existing timer
+    _statusPollingTimer?.cancel();
+    
+    // Record polling start time
+    _pollingStartTime = DateTime.now();
+    
+    // Start polling every 2 seconds
+    _statusPollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        _statusPollingTimer = null;
+        return;
+      }
+      
+      // Safety check: Stop polling after 30 seconds to prevent infinite polling
+      if (_pollingStartTime != null) {
+        final elapsed = DateTime.now().difference(_pollingStartTime!);
+        if (elapsed.inSeconds > 30) {
+          timer.cancel();
+          _statusPollingTimer = null;
+          _pollingStartTime = null;
+          debugPrint('Chat polling timeout reached (30s). Stopping status polling.');
+          return;
+        }
+      }
+      
+      final String? status = await _fetchProductStatus();
+      
+      // Stop polling if product is confirmed as sold
+      if (status == 'Sold') {
+        timer.cancel();
+        _statusPollingTimer = null;
+        _pollingStartTime = null;
+        debugPrint('Product status confirmed as Sold. Stopping polling.');
+        
+        // Force a rebuild to update UI
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    });
+  }
+  
+  void _stopStatusPolling() {
+    _statusPollingTimer?.cancel();
+    _statusPollingTimer = null;
+    _pollingStartTime = null;
   }
 
   @override
@@ -120,8 +247,8 @@ class _ChatPageState extends State<ChatPage> {
     _scrollController.dispose();
     _messageFocusNode.dispose();
     // Clean up timers
-    _quoteButtonTimer?.cancel();
     _confirmButtonTimer?.cancel();
+    _statusPollingTimer?.cancel(); // Cancel polling timer on dispose
     // Reset flags when disposing
     _hasDoneInitialScroll = false;
     _isUserTyping = false;
@@ -173,9 +300,7 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       // Restore the message if sending failed
       _messageController.text = messageText;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e')),
-      );
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
@@ -192,9 +317,7 @@ class _ChatPageState extends State<ChatPage> {
       final chatData = ChatModel.fromFirestore(chatDoc.data()!);
       _showImagePickerBottomSheet(chatData);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to open image picker: $e')),
-      );
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
@@ -349,13 +472,33 @@ class _ChatPageState extends State<ChatPage> {
 }
 
   Widget _buildActionButtonsArea(ChatModel chatData) {
-  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  final String currentUserId = _chatService.currentUserId;
+  final bool isSeller = currentUserId.isNotEmpty && chatData.sellerId == currentUserId;
+  final bool isBuyer = currentUserId.isNotEmpty && chatData.buyerId == currentUserId;
+
+  // Removed excessive debug print - only log when values actually change (optional, can be removed entirely)
+  // debugPrint('Chat Action Buttons - Deal Status: ${chatData.dealStatus}, Product Status: $_productStatus, Is Seller: $isSeller, Is Buyer: $isBuyer');
+
+  // Check if this buyer purchased the product (orderId exists means this buyer purchased it)
+  final bool thisBuyerPurchased = chatData.orderId != null && chatData.orderId!.isNotEmpty;
+  final bool buyerPurchased = isBuyer && thisBuyerPurchased;
+
+  // Determine product status - prioritize dealStatus from Firestore as source of truth
+  // If dealStatus is 'active', the deal is NOT locked, allowing quotes and negotiations
+  final String productStatus = _productStatus ??
+      (chatData.dealStatus == 'sold' ? 'Sold' :
+       (chatData.dealStatus == 'locked' || chatData.dealStatus == 'confirmed')
+          ? 'Locked'
+          : 'For Sale');
+  final bool isProductSold = productStatus == 'Sold';
   
-  // Debug: Print deal status for troubleshooting
-  debugPrint('Chat Action Buttons - Deal Status: ${chatData.dealStatus}, Is Seller: $isSeller');
-  
-  // Show appropriate buttons if deal is locked
-  if (chatData.dealStatus == 'locked') {
+  // Deal is locked ONLY if dealStatus is 'locked' or 'confirmed' (not 'active')
+  // When dealStatus is 'active', users can quote/negotiate regardless of backend product status
+  final bool isProductLocked = !isProductSold &&
+      (chatData.dealStatus == 'locked' || chatData.dealStatus == 'confirmed');
+
+  // Show product status badge and buttons if product is sold or locked
+  if (isProductSold || isProductLocked) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -367,79 +510,151 @@ class _ChatPageState extends State<ChatPage> {
       ),
       child: Column(
         children: [
-          // Deal locked message
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.red[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red[200]!),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock, color: Colors.red[600], size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Deal is Locked',
-                  style: TextStyle(
-                    color: Colors.red[700],
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Action buttons for locked deal
-          Row(
-            children: [
-              // Mark as Sold button (for seller)
-              if (isSeller)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showMarkAsSoldConfirmation(chatData, chatData.orderId ?? ''),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Mark as Sold'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          // Product status badge - prioritize Sold over Locked
+          if (isProductSold)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.orange[600], size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Product is Sold',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
-                ),
-              
-              // User Rating button (for buyer)
-              if (!isSeller)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _navigateToRateSellerScreen(chatData),
-                    icon: const Icon(Icons.star_outline),
-                    label: const Text('Rate User'),
-                    style: ElevatedButton.styleFrom(
-                     backgroundColor: const Color(0xFFFF6705),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ],
+              ),
+            )
+          else if (isProductLocked)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock, color: Colors.red[600], size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Product Deal is Locked',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
+                ],
+              ),
+            ),
+
+          // Action buttons based on product status and user role
+          if (isProductSold) ...[
+            // Product is sold - show rating buttons
+            if (isSeller && thisBuyerPurchased)
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  label: 'Rate the Buyer',
+                  onPressed: () => _navigateToRateBuyerScreen(chatData),
+                  backgroundColor: const Color(0xFFFF6705),
+                  textColor: Colors.white,
                 ),
+              )
+            else if (buyerPurchased)
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  label: 'Rate the Seller',
+                  onPressed: () => _navigateToRateSellerScreen(chatData),
+                  backgroundColor: const Color(0xFFFF6705),
+                  textColor: Colors.white,
+                ),
+              ),
+          ] else if (isProductLocked) ...[
+            if (isSeller) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel Deal',
+                      onPressed: (_isUploading || _isConfirmingDeal)
+                          ? null
+                          : () => _showCancelDealConfirmation(chatData),
+                      backgroundColor: Colors.white,
+                      borderColor: const Color(0xFF262626),
+                      textColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Mark as Sold',
+                      onPressed: (_isUploading || _isConfirmingDeal || isProductSold)
+                          ? null
+                          : () => _showMarkAsSoldConfirmation(chatData, chatData.orderId ?? ''),
+                      backgroundColor: (_isConfirmingDeal || isProductSold)
+                          ? Colors.grey
+                          : Colors.black,
+                      textColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (buyerPurchased) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel Deal',
+                      onPressed: (_isUploading)
+                          ? null
+                          : () => _showCancelDealConfirmation(chatData),
+                      backgroundColor: Colors.white,
+                      borderColor: const Color(0xFF262626),
+                      textColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Rate the Seller',
+                      onPressed: (_isUploading)
+                          ? null
+                          : () => _navigateToRateSellerScreen(chatData),
+                      backgroundColor: const Color(0xFFFF6705),
+                      textColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ],
-          ),
+          ],
         ],
       ),
     );
   }
-  
-  // Don't show action buttons if no special status
-  if (chatData.dealStatus != 'confirmed' && chatData.dealStatus != 'active') {
+
+  if (!isProductSold && !isProductLocked && chatData.dealStatus != 'confirmed' && chatData.dealStatus != 'active') {
     return const SizedBox.shrink();
   }
-  
+
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     decoration: BoxDecoration(
@@ -451,141 +666,73 @@ class _ChatPageState extends State<ChatPage> {
     ),
     child: Column(
       children: [
-        if (chatData.dealStatus == 'confirmed') ...[
+        if (chatData.dealStatus == 'confirmed' && !isProductSold) ...[
           if (isSeller) ...[
-            // Seller sees both "Cancel Deal" and "Mark as Sold" buttons
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: (_isUploading || _isConfirmingDeal) 
-                        ? null 
+                  child: AppButton(
+                    label: 'Cancel Deal',
+                    onPressed: (_isUploading || _isConfirmingDeal)
+                        ? null
                         : () => _showCancelDealConfirmation(chatData),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: BorderSide(
-                        color: (_isUploading || _isConfirmingDeal) 
-                            ? Colors.grey[300]! 
-                            : Colors.red,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Text(
-                      'Cancel Deal',
-                      style: TextStyle(
-                        color: (_isUploading || _isConfirmingDeal) 
-                            ? Colors.grey 
-                            : Colors.red,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
+                    backgroundColor: Colors.white,
+                    borderColor: const Color(0xFF262626),
+                    textColor: const Color(0xFF262626),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: (_isUploading || _isConfirmingDeal) 
-                        ? null 
+                  child: AppButton(
+                    label: _isConfirmingDeal ? 'Confirming...' : 'Mark as Sold',
+                    onPressed: (_isUploading || _isConfirmingDeal || isProductSold)
+                        ? null
                         : () => _showMarkAsSoldConfirmation(chatData, chatData.orderId ?? ''),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: (_isUploading || _isConfirmingDeal) 
-                          ? Colors.grey 
-                          : Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isConfirmingDeal
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Mark as Sold',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
+                    backgroundColor: (_isConfirmingDeal || isProductSold)
+                        ? Colors.grey
+                        : Colors.black,
+                    textColor: Colors.white,
                   ),
                 ),
               ],
             ),
-          ] else ...[
-            // Buyer sees "Rate the Seller" button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: (_isUploading || _isConfirmingDeal) 
-                    ? null 
-                    : () => _navigateToRateSellerScreen(chatData),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: (_isUploading || _isConfirmingDeal) 
-                      ? Colors.grey 
-                      : const Color(0xFFFF6705),
-
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+          ] else if (buyerPurchased) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: 'Cancel Deal',
+                    onPressed: (_isUploading)
+                        ? null
+                        : () => _showCancelDealConfirmation(chatData),
+                    backgroundColor: Colors.white,
+                    borderColor: const Color(0xFF262626),
+                    textColor: const Color(0xFF262626),
                   ),
-                  elevation: 0,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.star, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Rate the Seller',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppButton(
+                    label: 'Rate the Seller',
+                    onPressed: (_isUploading)
+                        ? null
+                        : () => _navigateToRateSellerScreen(chatData),
+                    backgroundColor: const Color(0xFFFF6705),
+                    textColor: Colors.white,
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ] else if (chatData.dealStatus == 'active') ...[
-          // Both users see "Quote Price" button during active negotiation
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: (_isUploading || _isConfirmingDeal) 
-                  ? null 
-                  : () => _showQuotePriceBottomSheet(chatData),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: (_isUploading || _isConfirmingDeal) 
-                    ? Colors.grey 
-                    : Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Quote Price',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-            ),
+          AppButton(
+            label: 'Quote Price',
+            onPressed: (_isUploading || _isConfirmingDeal)
+                ? null
+                : () => _showQuotePriceBottomSheet(chatData),
+            backgroundColor: Colors.white,
+            borderColor: Colors.black,
+            textColor: Colors.black,
           ),
         ],
       ],
@@ -707,26 +854,18 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: AppButton(
+                        label: 'Keep Deal',
                         onPressed: isCanceling ? null : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Keep Deal',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        backgroundColor: Colors.white,
+                        borderColor: const Color(0xFF262626),
+                        textColor: const Color(0xFF262626),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
+                      child: AppButton(
+                        label: isCanceling ? 'Canceling...' : 'Cancel Deal',
                         onPressed: isCanceling ? null : () async {
                           setModalState(() {
                             isCanceling = true;
@@ -739,6 +878,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                             );
 
                             if (cancelled) {
+                              final bool isSellerCancelling = chatData.sellerId == _chatService.currentUserId;
                               // Update Firestore - reset to active status
                               await FirebaseFirestore.instance
                                   .collection('chats')
@@ -747,7 +887,9 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                                 'dealStatus': 'active',
                                 'finalPrice': null,
                                 'orderId': null,
-                                'lastMessage': 'Deal cancelled, negotiation resumed',
+                                'lastMessage': isSellerCancelling
+                                    ? 'Deal cancelled by seller. Back to negotiation.'
+                                    : 'Deal cancelled by buyer. Back to negotiation.',
                                 'lastMessageTime': Timestamp.fromDate(DateTime.now()),
                               });
 
@@ -761,31 +903,70 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                                   .set({
                                 'messageId': systemMessageId,
                                 'senderId': 'system',
-                                'receiverId': chatData.buyerId,
-                                'message': 'Deal has been cancelled by seller. You can continue negotiating.',
+                                'receiverId': isSellerCancelling ? chatData.buyerId : chatData.sellerId,
+                                'message': isSellerCancelling
+                                    ? 'Deal has been cancelled by seller. You can continue negotiating.'
+                                    : 'Deal has been cancelled by buyer. You can continue negotiating.',
                                 'timestamp': Timestamp.fromDate(DateTime.now()),
                                 'messageType': 'system',
                                 'isRead': false,
                               });
 
-                              Navigator.pop(context);
-                              
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Row(
-                                    children: [
-                                      Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('Deal cancelled successfully'),
-                                    ],
+                              // Close modal first
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+
+                              // Reset all state and force refresh
+                              if (mounted) {
+                                setState(() {
+                                  _productStatus = null; // Clear status to force fetch from backend
+                                  _cachedChatData = null; // Force refresh chat data
+                                  _isConfirmingDeal = false;
+                                  _nextQuoteAllowedAt = null;
+                                });
+                                
+                                // Fetch latest product status from backend
+                                await _fetchProductStatus();
+                                
+                                // Force UI rebuild after a brief delay to ensure StreamBuilder has updated
+                                await Future.delayed(const Duration(milliseconds: 500));
+                                if (mounted) {
+                                  setState(() {});
+                                }
+                              }
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle, color: Colors.white, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('Deal cancelled successfully. You can now quote again.'),
+                                      ],
+                                    ),
+                                   backgroundColor: const Color(0xFFFF6705),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    duration: const Duration(seconds: 3),
                                   ),
-                                 backgroundColor: const Color(0xFFFF6705),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                );
+                              }
+                            } else {
+                              setModalState(() {
+                                isCanceling = false;
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Failed to cancel deal. Please try again.'),
+                                    backgroundColor: Colors.red,
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             }
 
                           } catch (e) {
@@ -794,50 +975,11 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                             });
 
                             Navigator.pop(context);
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text('Failed to cancel deal: $e')),
-                                  ],
-                                ),
-                                backgroundColor: Colors.red,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            );
+                            ErrorHandler.showErrorSnackBar(context, e);
                           }
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isCanceling ? Colors.grey : Colors.red,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: isCanceling
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                'Cancel Deal',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
-                              ),
+                        backgroundColor: isCanceling ? Colors.grey : Colors.red,
+                        textColor: Colors.white,
                       ),
                     ),
                   ],
@@ -853,8 +995,8 @@ void _showCancelDealConfirmation(ChatModel chatData) {
 
   Widget _buildAppBarTitle(ChatModel chatData) {
     final bool isSeller = chatData.sellerId == _chatService.currentUserId;
+    final String otherUserId = isSeller ? chatData.buyerId : chatData.sellerId;
     final String otherUserName = isSeller ? chatData.buyerName : chatData.sellerName;
-    
     // Safe initials generation
     String initials = otherUserName.trim().split(' ')
         .where((name) => name.isNotEmpty)
@@ -862,34 +1004,41 @@ void _showCancelDealConfirmation(ChatModel chatData) {
         .map((name) => name[0])
         .join()
         .toUpperCase();
-
     if (initials.isEmpty) {
       initials = otherUserName.isNotEmpty ? otherUserName[0].toUpperCase() : 'U';
     }
-
-    return Row(
-      children: [
-        CircleAvatar(
-          backgroundColor: Colors.purple,
-          radius: 16,
-          child: Text(
-            initials,
+    return GestureDetector(
+      onTap: () {
+        if (otherUserId == _chatService.currentUserId) {
+          Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
+        } else {
+          Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: otherUserId)));
+        }
+      },
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.purple,
+            radius: 16,
+            child: Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            otherUserName,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
+              color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          otherUserName,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -928,19 +1077,17 @@ void _showCancelDealConfirmation(ChatModel chatData) {
         icon: const Icon(Icons.arrow_back, color: Colors.black),
         onPressed: () => Navigator.pop(context),
       ),
-      title: _cachedChatData != null 
-        ? _buildAppBarTitle(_cachedChatData!)
-        : StreamBuilder<ChatModel?>(
-            stream: _chatService.getChatStream(widget.chatId),
-            builder: (context, chatSnapshot) {
-              if (!chatSnapshot.hasData) {
-                return const Text('Loading...');
-              }
-              
-              _cachedChatData = chatSnapshot.data!;
-              return _buildAppBarTitle(chatSnapshot.data!);
-            },
-          ),
+      title: StreamBuilder<ChatModel?>(
+        stream: _chatService.getChatStream(widget.chatId),
+        builder: (context, chatSnapshot) {
+          if (!chatSnapshot.hasData) {
+            return const Text('Loading...');
+          }
+          
+          _cachedChatData = chatSnapshot.data!;
+          return _buildAppBarTitle(chatSnapshot.data!);
+        },
+      ),
     ),
     body: SafeArea(
       child: Column(
@@ -955,10 +1102,53 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                   //   return const Center(child: CircularProgressIndicator());
                   // }
                   if (messageSnapshot.hasError) {
-                    return Center(child: Text('Error: ${messageSnapshot.error}'));
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.grey[400], size: 48),
+                          const SizedBox(height: 16),
+                          Text(
+                            ErrorHandler.getErrorMessage(messageSnapshot.error),
+                            style: TextStyle(color: Colors.grey[600]),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
                   }
                 
                 List<MessageModel> messages = messageSnapshot.data ?? [];
+                
+                // Deduplicate product cards - keep only the first one for each unique productId
+                // This prevents duplicate product cards from showing in the chat
+                Map<String, MessageModel> seenProductCards = {};
+                Set<String> seenMessageIds = {}; // Also deduplicate by messageId for any duplicate messages
+                List<MessageModel> deduplicatedMessages = [];
+                
+                for (var message in messages) {
+                  // First check if we've seen this exact messageId (should never happen, but safety check)
+                  if (seenMessageIds.contains(message.messageId)) {
+                    continue; // Skip duplicate message
+                  }
+                  seenMessageIds.add(message.messageId);
+                  
+                  if (message.messageType == 'product_card') {
+                    // Use productId from productData as unique key to prevent same product showing twice
+                    String? productId = message.productData?['productId']?.toString();
+                    String uniqueKey = productId ?? message.messageId;
+                    
+                    if (!seenProductCards.containsKey(uniqueKey)) {
+                      seenProductCards[uniqueKey] = message;
+                      deduplicatedMessages.add(message);
+                    }
+                    // Skip duplicate product cards with same productId
+                  } else {
+                    deduplicatedMessages.add(message);
+                  }
+                }
+                
+                messages = deduplicatedMessages;
                 
                 // Scroll to bottom on initial load and when returning to chat
                 if (messages.isNotEmpty && _previousMessageCount == 0) {
@@ -992,25 +1182,19 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                 }
                 _previousMessageCount = messages.length;
                 
+                // Render messages - use cached chat data if available, otherwise wait for stream
+                if (_cachedChatData == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(bottom: 8),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     MessageModel message = messages[index];
-                    // Use cached chat data if available, otherwise fetch it
-                    if (_cachedChatData != null) {
-                      return _buildMessage(message, _cachedChatData!);
-                    } else {
-                      return FutureBuilder<ChatModel?>(
-                        future: _getChatDataOnce(),
-                        builder: (context, chatSnapshot) {
-                          if (!chatSnapshot.hasData) return const SizedBox();
-                          _cachedChatData = chatSnapshot.data!;
-                          return _buildMessage(message, chatSnapshot.data!);
-                        },
-                      );
-                    }
+                    // Use cached chat data
+                    return _buildMessage(message, _cachedChatData!);
                   },
                 );
               },
@@ -1021,9 +1205,45 @@ void _showCancelDealConfirmation(ChatModel chatData) {
           StreamBuilder<ChatModel?>(
             stream: _chatService.getChatStream(widget.chatId),
             builder: (context, chatSnapshot) {
-              if (!chatSnapshot.hasData) return const SizedBox.shrink();
-              _cachedChatData = chatSnapshot.data!;
-              return _buildActionButtonsArea(chatSnapshot.data!);
+              if (!chatSnapshot.hasData) {
+                // Use cached data if stream hasn't loaded yet
+                if (_cachedChatData != null) {
+                  return _buildActionButtonsArea(_cachedChatData!);
+                }
+                return const SizedBox.shrink();
+              }
+              final newChatData = chatSnapshot.data!;
+              
+              // Only update cache and fetch status if data actually changed
+              final dataChanged = _cachedChatData == null ||
+                  _cachedChatData!.dealStatus != newChatData.dealStatus ||
+                  _cachedChatData!.orderId != newChatData.orderId ||
+                  _cachedChatData!.finalPrice != newChatData.finalPrice ||
+                  _cachedChatData!.productId != newChatData.productId;
+              
+              if (dataChanged) {
+                _cachedChatData = newChatData;
+                
+                // Only fetch product status if productId changed and not already fetching
+                if (newChatData.productId.isNotEmpty && 
+                    newChatData.productId != _lastFetchedProductId &&
+                    !_isFetchingProductStatus) {
+                  _lastFetchedProductId = newChatData.productId;
+                  _isFetchingProductStatus = true;
+                  // Don't await - let it run in background
+                  _fetchProductStatus().then((_) {
+                    if (mounted) {
+                      _isFetchingProductStatus = false;
+                    }
+                  }).catchError((_) {
+                    if (mounted) {
+                      _isFetchingProductStatus = false;
+                    }
+                  });
+                }
+              }
+              
+              return _buildActionButtonsArea(newChatData);
             },
           ),
           
@@ -1035,19 +1255,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
   );
 }
 
-Future<ChatModel?> _getChatDataOnce() async {
-  try {
-    final chatDoc = await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .get();
-    
-    if (!chatDoc.exists) return null;
-    return ChatModel.fromFirestore(chatDoc.data()!);
-  } catch (e) {
-    return null;
-  }
-}
+// Removed _getChatDataOnce() - no longer needed as we preload chat data in initState
 
 
 Widget _buildMessage(MessageModel message, ChatModel chatData) {
@@ -1071,13 +1279,22 @@ Widget _buildMessage(MessageModel message, ChatModel chatData) {
 void _navigateToRateSellerScreen(ChatModel chatData) {
   Navigator.pushReplacement(
     context,
-    MaterialPageRoute(
-      builder: (context) => ReviewScreen(
-        ratedUserId: chatData.sellerId,
-        ratedById: chatData.buyerId,
-        fromProductSold: false,
-      ),
-    ),
+    FadePageRoute(page: ReviewScreen(
+      ratedUserId: chatData.sellerId,
+      ratedById: chatData.buyerId,
+      fromProductSold: false,
+    )),
+  );
+}
+
+void _navigateToRateBuyerScreen(ChatModel chatData) {
+  Navigator.pushReplacement(
+    context,
+    FadePageRoute(page: ReviewScreen(
+      ratedUserId: chatData.buyerId,
+      ratedById: chatData.sellerId,
+      fromProductSold: false,
+    )),
   );
 }
 
@@ -1097,28 +1314,39 @@ Future<void> _cancelDeal(ChatModel chatData) async {
       ),
     );
   } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Failed to cancel deal: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    ErrorHandler.showErrorSnackBar(context, e);
   }
 }
 
-void _showQuotePriceBottomSheet(ChatModel chatData) async {
-  // Check if deal is locked before allowing quote
-  if (chatData.dealStatus == 'locked') {
+void _showQuotePriceBottomSheet(ChatModel chatData) {
+  debugPrint('[QuoteSheet] Attempting to open quote sheet for chat ${chatData.chatId} with dealStatus ${chatData.dealStatus}');
+  // Only block quoting if deal is locked or confirmed (not if it's active)
+  if (chatData.dealStatus == 'locked' || chatData.dealStatus == 'confirmed') {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Deal is locked! Cannot quote on this product.'),
         backgroundColor: Colors.red,
       ),
     );
+    debugPrint('[QuoteSheet] Aborted opening sheet because deal is locked or confirmed');
     return;
   }
+  
+  // Ensure dealStatus is 'active' before allowing quotes
+  if (chatData.dealStatus != 'active') {
+    debugPrint('[QuoteSheet] Warning: dealStatus is ${chatData.dealStatus}, expected active');
+  }
+
   final TextEditingController priceController = TextEditingController();
-  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  final bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  Timer? cooldownTimer;
+  int remainingSeconds = _quoteCooldownRemainingSeconds();
+  bool hasStartedCountdown = false;
+  bool isSending = false;
+  String? localError;
+  bool modalMounted = true;
+  final messenger = ScaffoldMessenger.of(context);
+  debugPrint('[QuoteSheet] Initial cooldown remaining: $remainingSeconds seconds');
 
   showModalBottomSheet(
     context: context,
@@ -1126,157 +1354,279 @@ void _showQuotePriceBottomSheet(ChatModel chatData) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Quote Your Price',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Enter the price you want to offer for this product',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 20),
-              AppTextField(
-                label: 'Quote Price',
-                placeholder: 'Enter your price offer',
-                isMandatory: true,
-                keyboardType: TextInputType.number,
-                controller: priceController,
-                prefixText: '₹ ',
-              ),
-              const SizedBox(height: 20),
-              
-              // Error message display
-              if (_errorMessage != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    border: Border.all(color: Colors.red[200]!),
-                    borderRadius: BorderRadius.circular(8),
+    builder: (sheetContext) {
+      debugPrint('[QuoteSheet] Bottom sheet builder invoked; modalMounted=$modalMounted');
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              if (!modalMounted) {
+                debugPrint('[QuoteSheet] Builder hit after disposal; returning empty widget.');
+                return const SizedBox.shrink();
+              }
+              void startCountdown() {
+                if (hasStartedCountdown) return;
+                hasStartedCountdown = true;
+                remainingSeconds = _quoteCooldownRemainingSeconds();
+                if (remainingSeconds > 0) {
+                  cooldownTimer?.cancel();
+                  cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                    if (!modalMounted) {
+                      debugPrint('[QuoteSheet] Timer tick after modal disposed; cancelling timer.');
+                      timer.cancel();
+                      return;
+                    }
+                    final updated = _quoteCooldownRemainingSeconds();
+                    if (updated <= 0) {
+                      timer.cancel();
+                      setModalState(() {
+                        remainingSeconds = 0;
+                      });
+                      debugPrint('[QuoteSheet] Cooldown finished while sheet open.');
+                    } else {
+                      setModalState(() {
+                        remainingSeconds = updated;
+                      });
+                      debugPrint('[QuoteSheet] Cooldown tick -> $remainingSeconds seconds remaining');
+                    }
+                  });
+                  debugPrint('[QuoteSheet] Cooldown timer started with $remainingSeconds seconds remaining');
+                }
+              }
+
+              startCountdown();
+
+              final bool isInCooldown = remainingSeconds > 0;
+              final String cooldownLabel = isInCooldown
+                  ? 'Please wait ${remainingSeconds}s before sending another quote.'
+                  : '';
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quote Your Price',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  child: Row(
+                  const SizedBox(height: 8),
+                  Text(
+                    'Enter the amount you would like to offer for this product.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  AppTextField(
+                    label: 'Quote Price',
+                    placeholder: 'Enter your price offer',
+                    isMandatory: true,
+                    keyboardType: TextInputType.number,
+                    controller: priceController,
+                    prefixText: '₹ ',
+                  ),
+                  const SizedBox(height: 20),
+                  if (isInCooldown) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.timer, color: Colors.orange[700], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              cooldownLabel,
+                              style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (localError != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red[600], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              localError!,
+                              style: TextStyle(color: Colors.red[700], fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  Row(
                     children: [
-                      Icon(Icons.error, color: Colors.red[600], size: 20),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Colors.red[700], fontSize: 14),
+                      child: AppButton(
+                        label: 'Cancel',
+                        onPressed: () {
+                          if (modalMounted) {
+                            debugPrint('[QuoteSheet] Cancel button tapped; closing sheet.');
+                            modalMounted = false;
+                            cooldownTimer?.cancel();
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              priceController.clear();
+                              setState(() {
+                                _messageController.clear();
+                              });
+                            });
+                            Navigator.of(sheetContext).pop();
+                          }
+                        },
+                        backgroundColor: Colors.grey[600],
+                      ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppButton(
+                          label: isSending ? 'Sending...' : 'Send Quote',
+                          onPressed: (isSending || isInCooldown)
+                              ? null
+                              : () async {
+                                  final rawText = priceController.text.trim();
+                                  if (rawText.isEmpty) {
+                                    setModalState(() => localError = 'Please enter a price');
+                                    return;
+                                  }
+
+                                  final parsedPrice = double.tryParse(rawText.replaceAll(',', ''));
+                                  if (parsedPrice == null || parsedPrice <= 0) {
+                                    setModalState(() => localError = 'Please enter a valid price');
+                                    return;
+                                  }
+
+                                  setModalState(() {
+                                    isSending = true;
+                                    localError = null;
+                                  });
+
+                                  try {
+                                    setModalState(() => isSending = true);
+                                    final offerNumber = await _chatService.getNextOfferNumber(widget.chatId);
+                                    final receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
+
+                                    await _chatService.sendPriceQuote(
+                                      chatId: widget.chatId,
+                                      receiverId: receiverId,
+                                      price: parsedPrice,
+                                      offerNumber: offerNumber,
+                                    );
+
+                                    _nextQuoteAllowedAt = DateTime.now().add(const Duration(minutes: 1));
+                                    if (!mounted) return;
+                                    setState(() {});
+
+                                    if (modalMounted) {
+                                      debugPrint('[QuoteSheet] Quote sent successfully; dismissing sheet.');
+                                      modalMounted = false;
+                                      cooldownTimer?.cancel();
+                                      setModalState(() {
+                                        isSending = false;
+                                      });
+                                      if (Navigator.of(sheetContext).canPop()) {
+                                        Navigator.of(sheetContext).pop();
+                                      }
+                                    }
+
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Quote sent successfully!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  } catch (e, stack) {
+                                    debugPrint('[QuoteSheet] Error sending quote: $e');
+                                    debugPrint('[QuoteSheet] Stack trace: $stack');
+                                    if (modalMounted) {
+                                      setModalState(() {
+                                        localError = 'Failed to send quote. Please try again.';
+                                        isSending = false;
+                                      });
+                                    } else {
+                                      ErrorHandler.showErrorSnackBar(
+                                        context,
+                                        null,
+                                        customMessage: 'Failed to send quote. Please try again.',
+                                      );
+                                    }
+                                  }
+                                },
                         ),
                       ),
                     ],
                   ),
-                ),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      label: 'Cancel',
-                      onPressed: () => Navigator.pop(context),
-                      backgroundColor: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppButton(
-                      label: _isQuoteButtonDisabled ? 'Sending...' : 'Send Quote',
-                      onPressed: _isQuoteButtonDisabled ? null : () async {
-                        if (priceController.text.isNotEmpty) {
-                          double price = double.tryParse(
-                            priceController.text.replaceAll(',', ''),
-                          ) ?? 0;
-                          if (price > 0) {
-                            // Disable button for 1 minute
-                            setState(() {
-                              _isQuoteButtonDisabled = true;
-                              _errorMessage = null;
-                            });
-                            
-                            // Start timer to re-enable button after 1 minute
-                            _quoteButtonTimer = Timer(const Duration(minutes: 1), () {
-                              setState(() {
-                                _isQuoteButtonDisabled = false;
-                              });
-                            });
-                            
-                            try {
-                              int offerNumber = await _chatService.getNextOfferNumber(widget.chatId);
-                              String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
-                              await _chatService.sendPriceQuote(
-                                chatId: widget.chatId,
-                                receiverId: receiverId,
-                                price: price,
-                                offerNumber: offerNumber,
-                              );
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Quote sent successfully!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            } catch (e) {
-                              setState(() {
-                                _errorMessage = 'Failed to send quote: $e';
-                              });
-                            }
-                          } else {
-                            setState(() {
-                              _errorMessage = 'Please enter a valid price';
-                            });
-                          }
-                        } else {
-                          setState(() {
-                            _errorMessage = 'Please enter a price';
-                          });
-                        }
-                      },
-                    ),
-                  ),
+                  const SizedBox(height: 8),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
-      ),
-    ),
-  );
+      );
+    },
+  ).whenComplete(() {
+    modalMounted = false;
+    debugPrint('[QuoteSheet] Bottom sheet closed (whenComplete). Cleaning up resources.');
+    cooldownTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint('[QuoteSheet] Disposing priceController after frame');
+      priceController.dispose();
+    });
+  });
 }
+
+  int _quoteCooldownRemainingSeconds() {
+    if (_nextQuoteAllowedAt == null) {
+      debugPrint('[QuoteSheet] No cooldown set; returning 0');
+      return 0;
+    }
+    final diff = _nextQuoteAllowedAt!.difference(DateTime.now());
+    if (diff.isNegative) {
+      debugPrint('[QuoteSheet] Cooldown already expired (${diff.inSeconds}s); returning 0');
+      return 0;
+    }
+    debugPrint('[QuoteSheet] Cooldown remaining ${diff.inSeconds} seconds');
+    return diff.inSeconds;
+  }
 
 void _navigateToProductSoldFlow(ChatModel chatData) {
   Navigator.pushReplacement(
     context,
-    MaterialPageRoute(
-      builder: (context) => ProductSoldScreen(
-        productName: chatData.productTitle,
-        ratedUserId: chatData.buyerId,
-        ratedById: chatData.sellerId,
-        fromProductSold: true,
-      ),
-    ),
+    FadePageRoute(page: ProductSoldScreen(
+      productName: chatData.productTitle,
+      ratedUserId: chatData.buyerId,
+      ratedById: chatData.sellerId,
+      fromProductSold: true,
+    )),
   );
 }
 
@@ -1316,59 +1666,26 @@ void _showImagePickerBottomSheet(ChatModel chatData) {
               const Text(
                 'Add Photo',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 24,
                   fontWeight: FontWeight.w600,
                   color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Choose how you want to add a photo',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
               const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildImageSourceOption(
-                      icon: Icons.camera_alt_rounded,
-                      label: 'Camera',
-                      onTap: () => _handleImageSelection(ImageSource.camera, chatData),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildImageSourceOption(
-                      icon: Icons.photo_library_rounded,
-                      label: 'Gallery',
-                      onTap: () => _handleImageSelection(ImageSource.gallery, chatData),
-                    ),
-                  ),
-                ],
+              AppButton(
+                label: 'Take a Photo',
+                backgroundColor: Colors.white,
+                textColor: const Color(0xFF262626),
+                borderColor: const Color(0xFF262626),
+                onPressed: () => _handleImageSelection(ImageSource.camera, chatData),
+                bottomSpacing: 16,
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
+              AppButton(
+                label: 'Upload from device',
+                backgroundColor: Colors.white,
+                textColor: const Color(0xFF262626),
+                borderColor: const Color(0xFF262626),
+                onPressed: () => _handleImageSelection(ImageSource.gallery, chatData),
               ),
             ],
           ),
@@ -1490,21 +1807,7 @@ void _handleImageSelection(ImageSource source, ChatModel chatData) async {
         Navigator.of(context, rootNavigator: true).pop(); // Close overlay
         
         // Show error feedback
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Failed to send photo: $error')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ErrorHandler.showErrorSnackBar(context, error);
       },
     );
   } catch (e) {
@@ -1514,21 +1817,7 @@ void _handleImageSelection(ImageSource source, ChatModel chatData) async {
       _imageUploadStatus = '';
     });
     Navigator.of(context, rootNavigator: true).pop(); // Close overlay if still open
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Failed to send image: $e')),
-          ],
-        ),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    ErrorHandler.showErrorSnackBar(context, e);
   }
 }
 
@@ -1708,30 +1997,11 @@ Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatDa
               ),
               if (!isMe && !isConfirmed && chatData.dealStatus == 'active') ...[
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                   onPressed: _isConfirmingDeal ? null : () => _showConfirmPriceBottomSheet(chatData, price),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isConfirmingDeal ? Colors.grey : Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isConfirmingDeal
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Confirm',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                  ),
+                AppButton(
+                  label: _isConfirmingDeal ? 'Confirming...' : 'Confirm',
+                  onPressed: _isConfirmingDeal ? null : () => _showConfirmPriceBottomSheet(chatData, message, price),
+                  backgroundColor: _isConfirmingDeal ? Colors.grey : Colors.black,
+                  textColor: Colors.white,
                 ),
               ],
             ],
@@ -1742,10 +2012,7 @@ Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatDa
   );
 }
 
-Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, double price) async { 
-
-  final TextEditingController priceController =
-      TextEditingController(text: price.toStringAsFixed(0));
+Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, MessageModel quoteMessage, double price) async { 
   bool isSeller = chatData.sellerId == _chatService.currentUserId;
 
   showModalBottomSheet(
@@ -1773,17 +2040,48 @@ Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, double price) asyn
               ),
               const SizedBox(height: 8),
               Text(
-                'Lock this deal at the final price',
+                'Lock this deal at the quoted price',
                 style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
               const SizedBox(height: 20),
-              AppTextField(
-                label: 'Final Price',
-                placeholder: 'Enter final price to lock the deal',
-                isMandatory: true,
-                keyboardType: TextInputType.number,
-                controller: priceController,
-                prefixText: '₹ ',
+              
+              // Display the quoted price as read-only
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Quoted Price:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '₹${price.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFFF6705),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Note: The deal will be locked at this exact price. To change the price, send a new quote instead.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
               ),
               const SizedBox(height: 20),
               
@@ -1822,93 +2120,155 @@ Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, double price) asyn
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-  child: AppButton(
-    label: _isConfirmingDeal ? 'Confirming...' : 'Lock Deal',
-    onPressed: _isConfirmingDeal
-        ? null
-        : () async {
-            if (priceController.text.isEmpty) {
-              setState(() {
-                _errorMessage = 'Please enter a final price';
-              });
-              return;
-            }
+                    child: AppButton(
+                      label: _isConfirmingDeal ? 'Confirming...' : 'Lock Deal',
+                      onPressed: _isConfirmingDeal
+                          ? null
+                          : () async {
+                              // Disable button for 1 minute
+                              _confirmButtonTimer?.cancel();
+                              setModalState(() => _isConfirmingDeal = true);
+                              setState(() => _isConfirmingDeal = true);
 
-            // Disable button for 1 minute
-            setModalState(() => _isConfirmingDeal = true);
-            setState(() => _isConfirmingDeal = true);
+                              // Use the exact quoted price - no modification allowed
+                              double finalPrice = price;
 
-            _confirmButtonTimer = Timer(const Duration(minutes: 1), () {
-              setState(() {
-                _isConfirmingDeal = false;
-              });
-            });
+                              // Fetch latest chat data from Firestore to ensure we have current dealStatus
+                              ChatModel? latestChatData;
+                              try {
+                                latestChatData = await _chatService.getChat(chatData.chatId);
+                              } catch (e) {
+                                debugPrint('[ConfirmDeal] Error fetching latest chat data: $e');
+                                // Fallback to passed chatData if fetch fails
+                                latestChatData = chatData;
+                              }
 
-            double finalPrice =
-                double.tryParse(priceController.text.replaceAll(',', '')) ??
-                    price;
-            String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
+                              // Use latest data if available, otherwise use passed data
+                              final currentChatData = latestChatData ?? chatData;
+                              
+                              // Only block confirmation if deal is locked or confirmed (not if it's active)
+                              if (currentChatData.dealStatus == 'locked' || currentChatData.dealStatus == 'confirmed') {
+                                setModalState(() => _isConfirmingDeal = false);
+                                _confirmButtonTimer?.cancel();
+                                setModalState(() => _isConfirmingDeal = false);
+                                setState(() => _isConfirmingDeal = false);
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Deal is locked! Cannot confirm this deal.'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              // Ensure dealStatus is 'active' before allowing confirmation
+                              if (currentChatData.dealStatus != 'active') {
+                                debugPrint('[ConfirmDeal] Error: dealStatus is "${currentChatData.dealStatus}", expected "active". Cannot proceed.');
+                                _confirmButtonTimer?.cancel();
+                                setModalState(() => _isConfirmingDeal = false);
+                                setState(() => _isConfirmingDeal = false);
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Cannot lock deal: Deal status is "${currentChatData.dealStatus}". Please refresh and try again.'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
 
-            if (chatData.dealStatus == 'locked') {
-              setModalState(() => _isConfirmingDeal = false);
-              setState(() => _isConfirmingDeal = false);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Deal is locked! Cannot confirm this deal.'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              return;
-            }
+                              try {
+                                String orderId = await ChatService.lockDeal(
+                                  productId: currentChatData.productId,
+                                  buyerId: currentChatData.buyerId,
+                                  finalPrice: finalPrice,
+                                );
 
-            try {
-              String orderId = await ChatService.lockDeal(
-                productId: chatData.productId,
-                buyerId: chatData.buyerId,
-                finalPrice: finalPrice,
-              );
+                                if (orderId.isNotEmpty) {
+                                  if (mounted) {
+                                    setState(() {
+                                      _productStatus = 'Locked';
+                                    });
+                                  }
 
-              chatData.finalPrice = finalPrice;
-              if (orderId.isNotEmpty) {
-                chatData.orderId = orderId;
+                                  // Determine receiverId based on who is confirming
+                                  final receiverId = isSeller ? currentChatData.buyerId : currentChatData.sellerId;
+                                  
+                                  await _chatService.confirmDeal(
+                                    chatId: currentChatData.chatId,
+                                    receiverId: receiverId,
+                                    finalPrice: finalPrice,
+                                    productId: currentChatData.productId,
+                                    buyerId: currentChatData.buyerId,
+                                    orderId: orderId,
+                                  );
 
-                await _chatService.confirmDeal(
-                  chatId: chatData.chatId,
-                  receiverId: receiverId,
-                  finalPrice: finalPrice,
-                  productId: chatData.productId,
-                  buyerId: chatData.buyerId,
-                  orderId: orderId,
-                );
+                                  await FirebaseFirestore.instance
+                                      .collection('messages')
+                                      .doc(currentChatData.chatId)
+                                      .collection('messages')
+                                      .doc(quoteMessage.messageId)
+                                      .update({
+                                    'priceData.isConfirmed': true,
+                                  });
 
-                Navigator.pop(context);
+                                  Navigator.pop(context);
 
-                setState(() {
-                  _cachedChatData = null; // Force refresh
-                });
+                                  // Clear cached data to force refresh
+                                  if (mounted) {
+                                    setState(() {
+                                      _cachedChatData = null; // Force refresh
+                                      _isConfirmingDeal = false;
+                                    });
+                                  }
 
-                _showMarkAsSoldConfirmation(chatData, orderId);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Deal confirmed successfully!'),
-                    backgroundColor: Colors.green,
+                                  if (isSeller) {
+                                    // Create updated chatData with orderId for mark as sold
+                                    final updatedChatData = ChatModel(
+                                      chatId: currentChatData.chatId,
+                                      productId: currentChatData.productId,
+                                      sellerId: currentChatData.sellerId,
+                                      buyerId: currentChatData.buyerId,
+                                      sellerName: currentChatData.sellerName,
+                                      buyerName: currentChatData.buyerName,
+                                      productTitle: currentChatData.productTitle,
+                                      productImage: currentChatData.productImage,
+                                      productPrice: currentChatData.productPrice,
+                                      orderId: orderId,
+                                      lastMessage: currentChatData.lastMessage,
+                                      lastMessageTime: currentChatData.lastMessageTime,
+                                      createdAt: currentChatData.createdAt,
+                                      dealStatus: 'confirmed',
+                                      finalPrice: finalPrice,
+                                      participants: currentChatData.participants,
+                                    );
+                                    _showMarkAsSoldConfirmation(updatedChatData, orderId);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Deal confirmed successfully!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  throw Exception('Failed to lock deal: orderId is empty');
+                                }
+                              } catch (e) {
+                                _confirmButtonTimer?.cancel();
+                                setModalState(() => _isConfirmingDeal = false);
+                                setState(() => _isConfirmingDeal = false);
+                                setState(() {
+                                  _errorMessage = ErrorHandler.getErrorMessage(e);
+                                });
+                                debugPrint('[ConfirmDeal] Error locking deal: $e');
+                              }
+                              _confirmButtonTimer?.cancel();
+                            },
+                      backgroundColor: _isConfirmingDeal ? Colors.grey : Colors.black,
+                    ),
                   ),
-                );
-              }
-            } catch (e) {
-              setModalState(() => _isConfirmingDeal = false);
-              setState(() => _isConfirmingDeal = false);
-              setState(() {
-                _errorMessage = 'Failed to confirm deal: $e';
-              });
-            }
-          },
-    backgroundColor: _isConfirmingDeal ? Colors.grey : Colors.black,
-  ),
-),
-
                 ],
               ),
             ],
@@ -1921,6 +2281,11 @@ Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, double price) asyn
 
 void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
   bool isSeller = chatData.sellerId == _chatService.currentUserId;
+
+  if (!isSeller) {
+    // Safety: buyers should never see this prompt
+    return;
+  }
 
   showModalBottomSheet(
     context: context,
@@ -1947,19 +2312,23 @@ void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
+                  child: AppButton(
+                    label: 'Cancel',
                     onPressed: () {
                       setState(() {
                         _isConfirmingDeal = false;
                       });
                       Navigator.pop(context);
                     },
-                    child: const Text('Cancel'),
+                    backgroundColor: Colors.white,
+                    borderColor: const Color(0xFF262626),
+                    textColor: const Color(0xFF262626),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
+                  child: AppButton(
+                    label: 'Mark as Sold',
                     onPressed: () async {
                       Navigator.pop(context);
                       setState(() => _isConfirmingDeal = true);
@@ -1974,6 +2343,12 @@ void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
                           orderId: orderId,
                         );
 
+                        if (mounted) {
+                          setState(() {
+                            _productStatus = 'Sold';
+                          });
+                        }
+
                         setState(() => _isConfirmingDeal = false);
 
                         // ScaffoldMessenger.of(context).showSnackBar(
@@ -1983,26 +2358,23 @@ void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
                         //   ),
                         // );
 
+                        // Start polling for status updates
+                        _startStatusPolling();
+                        // Also do an immediate refresh
+                        await _fetchProductStatus();
+                        if (mounted) {
+                          setState(() {});
+                        }
+                        
+                        // Navigate to ProductSoldScreen (original flow)
                         _navigateToProductSoldFlow(chatData);
                       } catch (e) {
                         setState(() => _isConfirmingDeal = false);
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to mark as sold: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        ErrorHandler.showErrorSnackBar(context, e);
                       }
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Mark as Sold'),
+                    backgroundColor: Colors.black,
+                    textColor: Colors.white,
                   ),
                 ),
               ],
@@ -2315,26 +2687,24 @@ Widget _buildDealLockedMessage(MessageModel message, bool isMe) {
 void _showFullScreenImage(String imageUrl) {
   Navigator.push(
     context,
-    MaterialPageRoute(
-      builder: (context) => Scaffold(
+    FadePageRoute(page: Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: Center(
-          child: InteractiveViewer(
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Center(
-                child: Icon(Icons.error, color: Colors.white, size: 50),
-              ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Icon(Icons.error, color: Colors.white, size: 50),
             ),
           ),
         ),
       ),
-    ),
+    )),
   );
 }
 }

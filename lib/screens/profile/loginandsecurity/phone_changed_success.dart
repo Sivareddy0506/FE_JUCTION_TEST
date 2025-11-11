@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../profile/account_settings_page.dart';
@@ -59,8 +60,8 @@ class PhoneChangedSuccessPage extends StatelessWidget {
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const AccountSettingsPage(),
+                  SlidePageRoute(
+                    page: const AccountSettingsPage(),
                   ),
                 );
               },

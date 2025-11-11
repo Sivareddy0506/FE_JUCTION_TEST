@@ -6,6 +6,8 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'address_response.dart';
 import 'location_map.dart'; // adjust import if needed
+import '../../../app.dart'; // For SlidePageRoute
+import '../../../services/profile_service.dart';
 
 class AddressPage extends StatefulWidget {
   const AddressPage({super.key});
@@ -62,11 +64,57 @@ class _AddressPageState extends State<AddressPage> {
     }
   }
 
+  Future<void> _setDefaultAddress(String addressId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+
+      if (token == null) throw Exception('No auth token found');
+
+      final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/user/set-default-address'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'addressId': addressId}),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _defaultAddressId = addressId;
+        });
+        
+        // Invalidate profile cache so location updates immediately
+        await ProfileService.clearProfileCache();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Default address updated successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        throw Exception("Failed to set default address");
+      }
+    } catch (e) {
+      print('Error setting default address: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: ${e.toString()}"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   void _navigateToEdit(bool isItFromEdit, {Address? editingAddress}) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => LocationMapPage(
+      SlidePageRoute(
+        page: LocationMapPage(
           initialAddress: editingAddress,
           isItFromEdit: isItFromEdit,
         ),
@@ -107,10 +155,10 @@ class _AddressPageState extends State<AddressPage> {
                             Radio<String>(
                               value: addressObj.id,
                               groupValue: _defaultAddressId,
-                              onChanged: (value) {
-                                setState(() {
-                                  _defaultAddressId = value;
-                                });
+                              onChanged: (value) async {
+                                if (value != null) {
+                                  await _setDefaultAddress(value);
+                                }
                               },
                             ),
                             Text(

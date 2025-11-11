@@ -11,6 +11,7 @@ import '../services/chat_service.dart';
 import '../../services/view_tracker.dart';
 import '../services/location_helper.dart';
 import '../../services/profile_service.dart';
+import '../../../app.dart'; // For SlidePageRoute, FadePageRoute
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -247,7 +248,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
+        SlidePageRoute(page: ChatPage(chatId: chatId)),
       );
     } catch (e) {
       ScaffoldMessenger.of(context)

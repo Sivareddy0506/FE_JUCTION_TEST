@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import './filter_widget.dart';
 import '../screens/search/search_results_page.dart';
+import '../app.dart'; // For SlidePageRoute
 
 class SearchBarWidget extends StatefulWidget {
   final String? initialQuery;
@@ -43,7 +44,9 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => FilterModal(searchQuery: _searchController.text.trim()), 
+      builder: (context) => FilterModal(
+        searchQuery: _searchController.text.trim(),
+      ),
     );
   }
 
@@ -62,8 +65,8 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       // Navigate to search results page with enhanced search
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => SearchResultsPage(
+        SlidePageRoute(
+          page: SearchResultsPage(
             searchQuery: query,
           ),
         ),
@@ -81,12 +84,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       if (mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Search Error'),
             content: Text('Failed to perform search: ${e.toString()}'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(dialogContext),
                 child: const Text('OK'),
               ),
             ],

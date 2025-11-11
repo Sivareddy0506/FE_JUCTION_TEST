@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:junction/app_state.dart';
 import '../screens/products/category_post.dart';
 import '../services/navigation_manager.dart';
+import '../app.dart'; // For SlidePageRoute
 
 // Wrapper widget that always shows bottom navigation
 class BottomNavWrapper extends StatelessWidget {
@@ -63,8 +64,8 @@ class BottomNavBar extends StatelessWidget {
             AppState.instance.isJuction = false; // Default to regular listing
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const CategoryPostPage(),
+              SlidePageRoute(
+                page: const CategoryPostPage(),
               ),
             );
           } else {

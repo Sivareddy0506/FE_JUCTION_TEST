@@ -7,6 +7,7 @@ import 'package:junction/screens/profile/address/address_response.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'add_more_details.dart'; // import the new page
+import '../../../app.dart'; // For SlidePageRoute
 
 class LocationMapPage extends StatefulWidget {
   final Address? initialAddress;
@@ -150,8 +151,8 @@ class _LocationMapPageState extends State<LocationMapPage> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddMoreDetailsPage(
+      SlidePageRoute(
+        page: AddMoreDetailsPage(
           id: widget.isItFromEdit? widget.initialAddress!.id :"",
           address: _selectedAddress,
           isEditable: widget.isItFromEdit,
@@ -167,6 +168,20 @@ class _LocationMapPageState extends State<LocationMapPage> {
       appBar: const CustomAppBar(title: "Select Location"),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _currentLatLng == null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Unable to fetch your location. Please enable location services and try again.'),
+                      const SizedBox(height: 12),
+                      AppButton(
+                        label: 'Retry',
+                        onPressed: _getCurrentLocation,
+                      ),
+                    ],
+                  ),
+                )
           : Stack(
               children: [
                 GoogleMap(

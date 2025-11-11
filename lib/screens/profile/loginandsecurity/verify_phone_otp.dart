@@ -7,6 +7,7 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/headding_description.dart';
 import './phone_changed_success.dart';
+import '../../../app.dart'; // For SlidePageRoute
 
 class VerifyPhoneOTPPage extends StatefulWidget {
   final String phoneNumber;
@@ -78,7 +79,7 @@ class _VerifyPhoneOTPPageState extends State<VerifyPhoneOTPPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const PhoneChangedSuccessPage()),
+        SlidePageRoute(page: const PhoneChangedSuccessPage()),
       );
     } else {
       final responseBody = jsonDecode(response.body);
@@ -166,7 +167,7 @@ class _VerifyPhoneOTPPageState extends State<VerifyPhoneOTPPage> {
               label: isSubmitting ? 'Verifying...' : 'Verify',
               onPressed: isSubmitting ? null : _verifyOTP,
               backgroundColor: isSubmitting
-                  ? const Color(0xFFA3A3A3)
+                  ? const Color(0xFF8C8C8C)
                   : const Color(0xFF262626),
             ),
           ],

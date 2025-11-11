@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -11,14 +12,24 @@ import '../services/chat_service.dart';
 import '../../services/view_tracker.dart';
 import '../services/location_helper.dart';
 import '../../services/profile_service.dart';
+import '../../app.dart'; 
+import '../../../widgets/custom_appbar.dart';
+import '../profile/user_profile.dart';
+import '../profile/others_profile.dart';
+import '../../utils/error_handler.dart';
+import '../../widgets/app_button.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
+  final List<Product>? products;
+  final int? initialIndex;
   final VoidCallback? onFavoriteChanged;
 
   const ProductDetailPage({
     super.key,
     required this.product,
+    this.products,
+    this.initialIndex,
     this.onFavoriteChanged,
   });
 
@@ -28,6 +39,9 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
+  int currentProductIndex = 0;
+  PageController? _pageController;
+  PageController? _imagePageController;
   bool isLoadingRelated = true;
   final ChatService _chatService = ChatService();
   late FavoritesService _favoritesService;
@@ -37,12 +51,56 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   String? _cachedLocation;
   bool _isLoadingLocation = false;
   int _viewCount = 0;
+  int _currentImageIndex = 0;
+  String? _currentProductStatus; // Track product status
+  Timer? _statusPollingTimer; // Timer for polling product status
+  DateTime? _pollingStartTime; // Track when polling started
+  bool _isFetchingStatus = false; // Prevent multiple simultaneous status fetches
+  bool _hasScheduledStatusFetch = false; // Prevent scheduling multiple status fetches
+
+  // After fetching related products, use this helper:
+  void _setProductList(List<Product> fetched) {
+    if (!mounted) return;
+    
+    List<Product> withCurrent = List<Product>.from(fetched);
+    if (!withCurrent.any((p) => p.id == widget.product.id)) {
+      withCurrent.insert(0, widget.product);
+    }
+    currentProductIndex = withCurrent.indexWhere((p) => p.id == widget.product.id);
+    
+    // Dispose old controllers before creating new ones
+    _pageController?.dispose();
+    _imagePageController?.dispose();
+    
+    _pageController = PageController(initialPage: currentProductIndex);
+    _imagePageController = PageController();
+    _currentImageIndex = 0;
+    
+    if (mounted) {
+      setState(() {
+        relatedProducts = withCurrent;
+        isLoadingRelated = false;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _favoritesService = FavoritesService();
     _displayViews = widget.product.views ?? 0;
+
+    if (widget.products != null && widget.products!.isNotEmpty) {
+      relatedProducts = List<Product>.from(widget.products!);
+      currentProductIndex = widget.initialIndex ?? 0;
+      _pageController = PageController(initialPage: currentProductIndex);
+      _imagePageController = PageController();
+      _currentImageIndex = 0;
+      isLoadingRelated = false;
+    } else {
+      // Fallback to related product API
+      _fetchRelatedProducts();
+    }
 
     if (!ViewTracker.instance.isViewed(widget.product.id)) {
       _displayViews += 1;
@@ -52,29 +110,149 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     _loadSellerName();
     _loadProductLocation();
-    _fetchRelatedProducts();
     _fetchUniqueClicks();
+    _fetchProductStatus(); // Fetch product status on init
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
     });
   }
+  
+  Future<String?> _fetchProductStatus() async {
+    // Prevent multiple simultaneous fetches
+    if (_isFetchingStatus) {
+      debugPrint('Status fetch already in progress, skipping...');
+      return _currentProductStatus;
+    }
+    
+    if (!mounted) return null;
+    
+    try {
+      _isFetchingStatus = true;
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      if (token == null) {
+        _isFetchingStatus = false;
+        return null;
+      }
+      
+      // Get single product by ID
+      final response = await http.get(
+        Uri.parse('https://api.junctionverse.com/product/${widget.product.id}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final productData = jsonDecode(response.body);
+        final String newStatus = productData['status']?.toString() ?? '';
+        if (mounted) {
+          setState(() {
+            _currentProductStatus = newStatus;
+          });
+          // Return the status so we can check if polling should stop
+          _isFetchingStatus = false;
+          return newStatus;
+        }
+      }
+      _isFetchingStatus = false;
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching product status: $e');
+      _isFetchingStatus = false;
+      return null;
+    }
+  }
+  
+  void _startStatusPolling() {
+    // Cancel any existing timer
+    _statusPollingTimer?.cancel();
+    
+    // Record polling start time
+    _pollingStartTime = DateTime.now();
+    
+    // Start polling every 2 seconds
+    _statusPollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        _statusPollingTimer = null;
+        return;
+      }
+      
+      // Safety check: Stop polling after 30 seconds to prevent infinite polling
+      if (_pollingStartTime != null) {
+        final elapsed = DateTime.now().difference(_pollingStartTime!);
+        if (elapsed.inSeconds > 30) {
+          timer.cancel();
+          _statusPollingTimer = null;
+          _pollingStartTime = null;
+          debugPrint('Polling timeout reached (30s). Stopping status polling.');
+          return;
+        }
+      }
+      
+      final String? status = await _fetchProductStatus();
+      
+      // Check if widget is still mounted after async operation
+      if (!mounted) {
+        timer.cancel();
+        _statusPollingTimer = null;
+        return;
+      }
+      
+      // Stop polling if product is confirmed as sold
+      if (status == 'Sold') {
+        timer.cancel();
+        _statusPollingTimer = null;
+        _pollingStartTime = null;
+        debugPrint('Product status confirmed as Sold. Stopping polling.');
+        
+        // Force a rebuild to update UI
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    });
+  }
+  
+  void _stopStatusPolling() {
+    _statusPollingTimer?.cancel();
+    _statusPollingTimer = null;
+    _pollingStartTime = null;
+  }
 
   @override
   void dispose() {
+    // Cancel timer first to prevent any async operations
+    _statusPollingTimer?.cancel();
+    _statusPollingTimer = null;
+    _pollingStartTime = null;
+    
+    // Remove listener to prevent callbacks after dispose
     _favoritesService.removeListener(_onFavoritesChanged);
+    
+    // Dispose controllers
+    _pageController?.dispose();
+    _imagePageController?.dispose();
+    
     super.dispose();
   }
 
   void _onFavoritesChanged() {
-    setState(() {}); 
+    if (mounted) {
+      setState(() {}); 
+    }
   }
 
   Future<void> _loadSellerName() async {
     final name = widget.product.seller?.fullName;
-    setState(() {
-      _sellerName = (name != null && name.isNotEmpty) ? name : 'Unknown Seller';
-    });
+    if (mounted) {
+      setState(() {
+        _sellerName = (name != null && name.isNotEmpty) ? name : 'Unknown Seller';
+      });
+    }
   }
 
   Future<void> _loadProductLocation() async {
@@ -101,6 +279,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             _cachedLocation = 'Location unavailable';
             _isLoadingLocation = false;
           });
+          // Don't show error snackbar for location loading failures
+          // as they're handled gracefully with fallback text
         }
       }
     }
@@ -123,21 +303,26 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         final success = await _favoritesService.addToFavorites(productId);
         if (success) widget.onFavoriteChanged?.call();
       }
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Network error. Please try again.')));
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
   Future<void> _fetchRelatedProducts() async {
+    if (!mounted) return;
     setState(() => isLoadingRelated = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('authToken');
 
     if (token == null || token.isEmpty) {
-      setState(() => isLoadingRelated = false);
+      if (mounted) {
+        setState(() => isLoadingRelated = false);
+        _setProductList([]);
+      }
       return;
     }
 
@@ -149,8 +334,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         'Accept': 'application/json',
       });
 
+      if (!mounted) return;
+      
       if (response.statusCode != 200) {
-        setState(() => isLoadingRelated = false);
+        if (mounted) {
+          setState(() => isLoadingRelated = false);
+          _setProductList([]);
+        }
         return;
       }
 
@@ -191,15 +381,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         );
       }).toList();
 
-      if (mounted) {
-        setState(() {
-          relatedProducts = fetched;
-          isLoadingRelated = false;
-        });
-      }
+      _setProductList(fetched);
     } catch (e) {
       debugPrint('Error fetching related products: $e');
-      if (mounted) setState(() => isLoadingRelated = false);
+      if (mounted) {
+        setState(() => isLoadingRelated = false);
+        _setProductList([]);
+      }
     }
   }
 
@@ -215,18 +403,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     //   debugPrint('Error fetching unique clicks: $e');
     // }
     final result = await ProductClickService.getUniqueClicksFor([widget.product.id]);
-    setState(() {
-          _viewCount = result[widget.product.id] ?? 0;
-        });
+    if (mounted) {
+      setState(() {
+        _viewCount = result[widget.product.id] ?? 0;
+      });
+    }
   }
 
   void startChat(BuildContext context) async {
-    if (widget.product.seller?.id == _chatService.currentUserId) return;
+    final Product currentProduct = relatedProducts.isNotEmpty
+        ? relatedProducts[currentProductIndex]
+        : widget.product;
+
+    if (currentProduct.seller?.id == _chatService.currentUserId) return;
 
     try {
-      String sellerId = widget.product.seller?.id ?? '';
+      String sellerId = currentProduct.seller?.id ?? '';
       String buyerId = _chatService.currentUserId;
-      String productId = widget.product.id;
+      String productId = currentProduct.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
       final prefs = await SharedPreferences.getInstance();
       String buyerName = prefs.getString('fullName') ?? 'You';
@@ -237,198 +431,80 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           productId: productId,
           sellerId: sellerId,
           buyerId: buyerId,
-          sellerName: widget.product.seller?.fullName ?? 'Seller',
+          sellerName: currentProduct.seller?.fullName ?? 'Seller',
           buyerName: buyerName,
-          productTitle: widget.product.title,
-          productImage: widget.product.imageUrl,
-          productPrice: widget.product.price?.toString() ?? '0',
+          productTitle: currentProduct.title,
+          productImage: currentProduct.imageUrl ?? '',
+          productPrice: currentProduct.price ?? '',
         );
       }
 
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ChatPage(chatId: chatId)),
+        SlidePageRoute(
+          page: ChatPage(chatId: chatId),
+        ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (!mounted) return;
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final product = widget.product;
+    // Refresh product status when build is called (e.g., when returning to page)
+    // Only fetch if status is null, not already fetching, and haven't scheduled a fetch yet
+    if (_currentProductStatus == null && !_isFetchingStatus && !_hasScheduledStatusFetch) {
+      _hasScheduledStatusFetch = true;
+      // Use a one-time callback to avoid multiple calls
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _hasScheduledStatusFetch = false;
+        if (mounted && _currentProductStatus == null && !_isFetchingStatus) {
+          _fetchProductStatus();
+        }
+      });
+    }
+    
+    if (isLoadingRelated || relatedProducts.isEmpty) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final product = relatedProducts[currentProductIndex];
     final bool isSellerViewing = product.seller?.id == _chatService.currentUserId;
-    final bool isProductForSale = product.status == 'For Sale';
-    final bool isDealLocked = product.status == 'Sold' || product.status == 'Locked';
+    // Use current status if available, otherwise fallback to product.status
+    final String productStatus = _currentProductStatus ?? product.status ?? 'For Sale';
+    final bool isProductForSale = productStatus == 'For Sale';
+    final bool isDealLocked = productStatus == 'Sold' || productStatus == 'Locked' || productStatus == 'Deal Locked';
+    final bool isProductSold = productStatus == 'Sold';
+    final bool isProductLocked = productStatus == 'Locked' || productStatus == 'Deal Locked';
 
     return Scaffold(
-      appBar: AppBar(title: Text(product.title)),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-            16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
-        children: [
-          // Seller info
-          Row(
+      appBar: CustomAppBar(title: product.title),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: relatedProducts.length,
+        onPageChanged: (index) {
+          setState(() {
+            currentProductIndex = index;
+            _currentImageIndex = 0;
+          });
+          _imagePageController?.jumpToPage(0);
+        },
+        itemBuilder: (context, index) {
+          final product = relatedProducts[index];
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+                16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
             children: [
-              Image.asset('assets/avatarpng.png', width: 12, height: 12),
-              const SizedBox(width: 8),
-              Text(_sellerName ?? 'Loading seller...',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              const Spacer(),
-              Row(
-                children: [
-                  Image.asset('assets/ClockCountdown.png', width: 14, height: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    product.createdAt != null ? _timeAgo(product.createdAt!) : '',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+              _buildPrimaryCard(product, isSellerViewing),
 
-          // Product images
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.35,
-            child: PageView(
-              children: product.images.isNotEmpty
-                  ? product.images
-                      .map((img) => ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              img.fileUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Image.asset('assets/placeholder.png', fit: BoxFit.cover),
-                            ),
-                          ))
-                      .toList()
-                  : [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.asset('assets/placeholder.png', fit: BoxFit.cover),
-                      )
-                    ],
-            ),
-          ),
+              const SizedBox(height: 16),
 
-          const SizedBox(height: 12),
+              _buildActionRow(product),
 
-          // Badges (Age, Usage, Condition)
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              if (product.yearOfPurchase != null)
-                _buildBadge('Age: > ${DateTime.now().year - product.yearOfPurchase!}Y'),
-              if (product.usage != null) _buildBadge('Usage: ${product.usage}'),
-              if (product.condition != null) _buildBadge('Condition: ${product.condition}'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          if (product.category != null)
-            Text(product.category!, style: const TextStyle(fontSize: 10, color: Color(0xFF505050))),
-
-          const SizedBox(height: 12),
-
-          // Title & Price
-          Text(product.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(product.price ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF6705))),
-
-          const SizedBox(height: 12),
-
-          // Views & Location
-          Row(
-            children: [
-              Image.asset('assets/Eye.png', width: 16, height: 16),
-              const SizedBox(width: 4),
-              // Text('Viewed by $_displayViews others'),
-              Text('Viewed by $_viewCount others'),
-              const Spacer(),
-              const Icon(Icons.location_on, size: 16, color: Colors.grey),
-              const SizedBox(width: 4),
-              Expanded(child: _buildLocationText(product)),
-            ],
-          ),
-          const SizedBox(height: 16),
-// Favorite & Share
-Container(
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: const Color(0xFFF9F9F9),
-    borderRadius: BorderRadius.circular(8),
-  ),
-  child: Row(
-    children: [
-      // Favorite button
-      Expanded(
-        child: TextButton.icon(
-          style: TextButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.black87,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
-          onPressed: _favoritesService.isLoading
-              ? null
-              : () => _toggleFavorite(product.id),
-          icon: _favoritesService.isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Colors.grey),
-                  ),
-                )
-              : Icon(
-                  _favoritesService.isFavorited(product.id)
-                      ? Icons.favorite
-                      : Icons.favorite_border,
-                  color: _favoritesService.isFavorited(product.id)
-                      ? Color(0xFFFF6705)
-                      : Colors.black54,
-                ),
-          label: _favoritesService.isLoading
-              ? const Text('Loading...')
-              : Text(
-                  _favoritesService.isFavorited(product.id)
-                      ? 'Favourited'
-                      : 'Favourite',
-                ),
-        ),
-      ),
-
-      // Divider
-      Container(
-        height: 40,
-        width: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        color: Colors.grey.shade300,
-      ),
-
-      // Share button
-      Expanded(
-        child: TextButton.icon(
-          style: TextButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.black87,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-          ),
-          onPressed: () {},
-          icon: const Icon(Icons.share, color: Colors.black54),
-          label: const Text('Share'),
-        ),
-      ),
-    ],
-  ),
-),
-const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
 
           // Description & Pickup Location
@@ -454,7 +530,32 @@ const SizedBox(height: 16),
           const SizedBox(height: 16),
 
           // Deal Status Badge
-          if (isDealLocked)
+          if (isProductSold)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                border: Border.all(color: Colors.orange[200]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.orange[600], size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Product is Sold',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (isProductLocked)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -469,7 +570,7 @@ const SizedBox(height: 16),
                   Icon(Icons.lock, color: Colors.red[600], size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    'Product Deal is Locked!',
+                    'Product Deal is Locked',
                     style: TextStyle(
                       color: Colors.red[700],
                       fontWeight: FontWeight.bold,
@@ -485,75 +586,65 @@ const SizedBox(height: 16),
           const SizedBox(height: 8),
           if (isLoadingRelated)
             const Center(child: CircularProgressIndicator())
-          else if (relatedProducts.isEmpty)
-            const EmptyState(text: 'No related products found.')
-          else
-            ProductGridWidget(products: relatedProducts),
+          else ...[
+            Builder(
+              builder: (context) {
+                final current = product;
+                final List<Product> candidates = relatedProducts
+                    .where((p) =>
+                        p.id != current.id &&
+                        p.category != null &&
+                        current.category != null &&
+                        p.category == current.category &&
+                        // Exclude products from the same seller
+                        (p.seller?.id ?? '') != (current.seller?.id ?? ''))
+                    .toList();
+                if (candidates.isEmpty) {
+                  return const EmptyState(text: 'No related products found.');
+                }
+                return ProductGridWidget(products: candidates);
+              },
+            ),
+          ],
         ],
+      );
+        },
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(isSellerViewing, isProductForSale, isDealLocked),
+      bottomNavigationBar: _buildBottomNavigationBar(isSellerViewing, isProductForSale, isDealLocked, isProductLocked, isProductSold),
     );
   }
-Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bool isDealLocked) {
+Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bool isDealLocked, bool isProductLocked, bool isProductSold) {
   return SafeArea(
     top: false,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          // Mark as Sold button (only for seller, if deal not locked)
-          if (widget.product.seller?.id == _chatService.currentUserId && !isDealLocked)
+          // For seller: Show "Mark as Sold" button (if product is not sold)
+          // Only visible to seller, not to buyers
+          if (isSellerViewing && !isProductSold)
             Expanded(
-              child: SizedBox(
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: _showMarkAsSoldDialog,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Mark as Sold'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+              child: AppButton(
+                label: 'Mark as Sold',
+                onPressed: isProductSold ? null : _showMarkAsSoldDialog,
+                backgroundColor: isProductSold ? Colors.grey : const Color(0xFF262626),
+                textColor: Colors.white,
               ),
             ),
 
-          // Rate User button (only for buyer, if deal not locked)
-          if (widget.product.seller?.id != _chatService.currentUserId && !isDealLocked)
-            // Expanded(
-            //   child: SizedBox(
-            //     height: 56,
-            //     child: ElevatedButton.icon(
-            //       onPressed: _showUserRating,
-            //       icon: const Icon(Icons.star_outline),
-            //       label: const Text('Rate User'),
-            //       style: ElevatedButton.styleFrom(
-            //        backgroundColor: const Color(0xFFFF6705),
-            //         foregroundColor: Colors.white,
-            //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            //       ),
-            //     ),
-            //   ),
-            // ),
-
-          // Always show Chat button
-          Expanded(
-            child: SizedBox(
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () => startChat(context),
-                icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('Chat'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Color(0xFFE3E3E3)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+          // Chat button - only for buyers (sellers don't see chat button)
+          // Disabled for buyer if product is Sold
+          if (!isSellerViewing)
+            Expanded(
+              child: AppButton(
+                label: 'Chat',
+                icon: Icons.chat_bubble_outline,
+                onPressed: isProductSold ? null : () => startChat(context),
+                backgroundColor: Colors.white,
+                borderColor: isProductSold ? Colors.grey : const Color(0xFFE3E3E3),
+                textColor: isProductSold ? Colors.grey : Colors.black,
               ),
             ),
-          ),
         ],
       ),
     ),
@@ -570,6 +661,249 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(text, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+    );
+  }
+
+  Widget _buildPrimaryCard(Product product, bool isSellerViewing) {
+     final sellerName = product.seller?.fullName?.isNotEmpty == true
+         ? product.seller!.fullName!
+         : (_sellerName ?? 'Unknown Seller');
+     final sellerId = product.seller?.id ?? '';
+ 
+     final imageUrls = product.images.isNotEmpty
+         ? product.images.map((img) => img.fileUrl).whereType<String>().toList()
+         : [(product.imageUrl?.isNotEmpty == true) ? product.imageUrl! : 'assets/placeholder.png'];
+ 
+     final badgeChips = <Widget>[];
+     if (product.yearOfPurchase != null) {
+       final age = (DateTime.now().year - product.yearOfPurchase!).clamp(0, 99);
+       badgeChips.add(_buildBadge('Age: < ${age.toInt()}Y'));
+     }
+     if ((product.usage ?? '').isNotEmpty) {
+       badgeChips.add(_buildBadge('Usage: ${product.usage}'));
+     }
+     if ((product.condition ?? '').isNotEmpty) {
+       badgeChips.add(_buildBadge('Condition: ${product.condition}'));
+     }
+ 
+     final controller = _imagePageController ??= PageController();
+ 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (sellerId.isEmpty) return;
+            if (sellerId == _chatService.currentUserId) {
+              Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
+            } else {
+              Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: sellerId)));
+            }
+          },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.black.withOpacity(0.08),
+                    child: Text(
+                      sellerName.isNotEmpty ? sellerName[0].toUpperCase() : 'U',
+                      style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    sellerName,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Image.asset('assets/ClockCountdown.png', width: 14, height: 14, color: const Color(0xFF8A8894)),
+                  const SizedBox(width: 4),
+                  Text(
+                    product.createdAt != null ? _timeAgo(product.createdAt!) : '',
+                    style: const TextStyle(color: Color(0xFF8A8894), fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE7E8ED)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: PageView.builder(
+                    controller: controller,
+                    itemCount: imageUrls.length,
+                    onPageChanged: (value) {
+                      setState(() => _currentImageIndex = value);
+                    },
+                    itemBuilder: (_, pageIndex) {
+                      final url = imageUrls[pageIndex];
+                      final isNetwork = url.startsWith('http');
+                      return isNetwork
+                          ? Image.network(
+                              url,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Image.asset('assets/placeholder.png', fit: BoxFit.cover),
+                            )
+                          : Image.asset(url, fit: BoxFit.cover);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (imageUrls.length > 1)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(imageUrls.length, (index) {
+                      final isActive = index == _currentImageIndex;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        height: 6,
+                        width: isActive ? 18 : 6,
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.black87 : const Color(0xFFD9D9D9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (badgeChips.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: badgeChips,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    if ((product.category ?? '').isNotEmpty)
+                      Text(
+                        product.category!,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF8A8894)),
+                      ),
+                    if ((product.category ?? '').isNotEmpty) const SizedBox(height: 6),
+                    Text(
+                      product.title,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      product.price ?? '',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFFFF6705)),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Image.asset('assets/Eye.png', width: 16, height: 16),
+                        const SizedBox(width: 6),
+                        Text('Viewed by $_viewCount others', style: const TextStyle(fontSize: 13, color: Color(0xFF8A8894))),
+                        const Spacer(),
+                        Image.asset('assets/MapPin.png', width: 16, height: 16),
+                        const SizedBox(width: 6),
+                        Expanded(child: _buildLocationText(product)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionRow(Product product) {
+    final isFav = _favoritesService.isFavorited(product.id);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE7E8ED)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: _favoritesService.isLoading ? null : () => _toggleFavorite(product.id),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_favoritesService.isLoading)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Icon(
+                      isFav ? Icons.favorite : Icons.favorite_border,
+                      color: isFav ? const Color(0xFFFF6705) : Colors.black87,
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isFav ? 'Favourited' : 'Favourite',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Container(width: 1, height: 32, color: const Color(0xFFE7E8ED)),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {},
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.share_outlined, color: Colors.black87),
+                  SizedBox(width: 8),
+                  Text('Share', style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -602,26 +936,268 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
   }
 
   void _showMarkAsSoldDialog() {
-    showDialog(
+    // Prevent opening dialog if product is already sold
+    final String currentStatus = _currentProductStatus ?? widget.product.status ?? 'For Sale';
+    if (currentStatus == 'Sold') {
+      ErrorHandler.showErrorSnackBar(
+        context,
+        null,
+        customMessage: 'Product is already marked as sold.',
+      );
+      return;
+    }
+    
+    // Check if product is locked
+    final bool isProductLocked = currentStatus == 'Locked' || currentStatus == 'Deal Locked';
+    
+    showModalBottomSheet(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Mark as Sold'),
-          content: const Text('Are you sure you want to mark this product as sold? This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        // Initialize state variables inside the builder
+        String? selectedOption = isProductLocked ? 'junction' : null;
+        List<dynamic>? chats;
+        Map<String, dynamic>? selectedChat;
+        bool isLoadingChats = false;
+        bool hasInitializedChats = false;
+        
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Initialize chats if product is locked and Junction is pre-selected
+            if (isProductLocked && selectedOption == 'junction' && !hasInitializedChats && !isLoadingChats) {
+              setModalState(() {
+                isLoadingChats = true;
+                hasInitializedChats = true;
+              });
+              _fetchProductChats().then((fetchedChats) {
+                final chatsWithOrders = fetchedChats
+                    .where((chat) => chat['orderId'] != null && chat['orderId'].toString().isNotEmpty)
+                    .toList();
+                setModalState(() {
+                  chats = chatsWithOrders;
+                  isLoadingChats = false;
+                });
+              }).catchError((e) {
+                setModalState(() {
+                  chats = [];
+                  isLoadingChats = false;
+                });
+              });
+            }
+          
+          // Determine if Mark as Sold button should be enabled
+          bool canMarkAsSold = false;
+          if (isProductLocked) {
+            // If product is locked, only allow Junction option
+            if (selectedOption == 'junction' && selectedChat != null && chats != null && chats!.isNotEmpty) {
+              canMarkAsSold = true;
+            }
+          } else {
+            // If product is not locked, allow both options
+            if (selectedOption == 'outside') {
+              canMarkAsSold = true;
+            } else if (selectedOption == 'junction' && selectedChat != null && chats != null && chats!.isNotEmpty) {
+              canMarkAsSold = true;
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _markProductAsSold();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Mark as Sold', style: TextStyle(color: Colors.white)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Did you sell the Product in Junction or Outside?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                RadioListTile<String>(
+                  title: const Text('Junction'),
+                  value: 'junction',
+                  groupValue: selectedOption,
+                  onChanged: (value) async {
+                    setModalState(() {
+                      selectedOption = value;
+                      selectedChat = null;
+                      chats = null;
+                      isLoadingChats = true;
+                      hasInitializedChats = false;
+                    });
+                    
+                    // Fetch chats when Inside Junction is selected
+                    try {
+                      final fetchedChats = await _fetchProductChats();
+                      final chatsWithOrders = fetchedChats
+                          .where((chat) => chat['orderId'] != null && chat['orderId'].toString().isNotEmpty)
+                          .toList();
+                      
+                      setModalState(() {
+                        chats = chatsWithOrders;
+                        isLoadingChats = false;
+                        hasInitializedChats = true;
+                      });
+                    } catch (e) {
+                      setModalState(() {
+                        chats = [];
+                        isLoadingChats = false;
+                        hasInitializedChats = true;
+                      });
+                    }
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Outside Junction'),
+                  value: 'outside',
+                  groupValue: selectedOption,
+                  onChanged: isProductLocked 
+                      ? null 
+                      : (value) {
+                          setModalState(() {
+                            selectedOption = value;
+                            selectedChat = null;
+                            chats = null;
+                            hasInitializedChats = false;
+                          });
+                        },
+                  subtitle: isProductLocked 
+                      ? const Text(
+                          'Product has a locked deal. Please sell within Junction.',
+                          style: TextStyle(fontSize: 12, color: Colors.red),
+                        )
+                      : null,
+                ),
+                
+                // Show dropdown for Inside Junction
+                if (selectedOption == 'junction') ...[
+                  const SizedBox(height: 16),
+                  if (isLoadingChats)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (chats == null)
+                    const SizedBox.shrink()
+                  else if (chats!.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        'No locked deals found. Please lock a deal with a buyer first.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<Map<String, dynamic>>(
+                          isExpanded: true,
+                          hint: const Text('Select Buyer'),
+                          value: selectedChat,
+                          items: chats!.map((chat) {
+                            final buyerName = chat['buyerName'] ?? 'Unknown Buyer';
+                            return DropdownMenuItem<Map<String, dynamic>>(
+                              value: chat as Map<String, dynamic>,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    buyerName,
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                  if (chat['orderId'] != null)
+                                    Text(
+                                      'Order: ${chat['orderId']}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setModalState(() {
+                              selectedChat = value;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+                
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Cancel',
+                        onPressed: () => Navigator.pop(context),
+                        backgroundColor: Colors.white,
+                        textColor: const Color(0xFF262626),
+                        borderColor: const Color(0xFF262626),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: AppButton(
+                        label: 'Mark as Sold',
+                        onPressed: canMarkAsSold
+                            ? () async {
+                                // Double-check product status before marking as sold
+                                final String currentStatus = _currentProductStatus ?? widget.product.status ?? 'For Sale';
+                                if (currentStatus == 'Sold') {
+                                  Navigator.pop(context);
+                                  ErrorHandler.showErrorSnackBar(
+                                    context,
+                                    null,
+                                    customMessage: 'Product is already marked as sold.',
+                                  );
+                                  return;
+                                }
+                                
+                                Navigator.pop(context);
+                                
+                                if (selectedOption == 'junction' && selectedChat != null) {
+                                  final buyerId = selectedChat!['buyerId'] ?? '';
+                                  final orderId = selectedChat!['orderId'];
+                                  await _markProductAsSoldWithBuyer(buyerId, orderId);
+                                } else if (selectedOption == 'outside') {
+                                  await _markProductAsSoldOutside();
+                                }
+                              }
+                            : null,
+                        backgroundColor: canMarkAsSold ? const Color(0xFF262626) : Colors.grey,
+                        textColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
-          ],
+          );
+          },
         );
       },
     );
@@ -631,38 +1207,119 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Rate User'),
-          content: const Text('Rate your experience with this seller.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _rateUser();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6705)),
-              child: const Text('Submit Rating', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+        return AnimatedScale(
+          scale: 1.0,
+          duration: Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          child: AlertDialog(
+            title: const Text('Rate User'),
+            content: const Text('Rate your experience with this seller.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: AppButton(
+                  label: 'Submit Rating',
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _rateUser();
+                  },
+                  backgroundColor: const Color(0xFFFF6705),
+                  textColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  Future<void> _markProductAsSold() async {
+  Future<List<dynamic>> _fetchProductChats() async {
     try {
-      // Call API to mark product as sold
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('authToken');
       
       if (token == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please login to perform this action')),
+        ErrorHandler.showErrorSnackBar(context, Exception('Please login to perform this action'));
+        return [];
+      }
+
+      final response = await http.get(
+        Uri.parse('https://api.junctionverse.com/chats/product-chats?productId=${widget.product.id}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> chats = data['chats'] ?? [];
+        return chats;
+      } else {
+        ErrorHandler.showErrorSnackBar(context, null, response: response);
+        return [];
+      }
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, e);
+      return [];
+    }
+  }
+
+
+  Future<void> _markProductAsSoldWithBuyer(String buyerId, String? orderId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      
+      if (token == null) {
+        ErrorHandler.showErrorSnackBar(context, Exception('Please login to perform this action'));
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/product/mark-sold'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'orderId': orderId,
+          'soldInJunction': true,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ErrorHandler.showSuccessSnackBar(
+          context,
+          'Product marked as sold successfully!',
         );
+        // Start polling for status updates
+        _startStatusPolling();
+        // Also do an immediate refresh
+        await _fetchProductStatus();
+        if (mounted) {
+          setState(() {});
+        }
+      } else {
+        ErrorHandler.showErrorSnackBar(context, null, response: response);
+      }
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, e);
+    }
+  }
+
+  Future<void> _markProductAsSoldOutside() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      
+      if (token == null) {
+        ErrorHandler.showErrorSnackBar(context, Exception('Please login to perform this action'));
         return;
       }
 
@@ -674,31 +1331,27 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
         },
         body: jsonEncode({
           'productId': widget.product.id,
-          'buyerId': _chatService.currentUserId,
+          'soldInJunction': false,
         }),
       );
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Product marked as sold successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        ErrorHandler.showSuccessSnackBar(
+          context,
+          'Product marked as sold successfully!',
         );
-        // Update product status locally
-        setState(() {
-          // This would need to be handled by refreshing the product data
-        });
+        // Start polling for status updates
+        _startStatusPolling();
+        // Also do an immediate refresh
+        await _fetchProductStatus();
+        if (mounted) {
+          setState(() {});
+        }
       } else {
-        throw Exception('Failed to mark product as sold');
+        ErrorHandler.showErrorSnackBar(context, null, response: response);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
@@ -716,19 +1369,12 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
       }
 
       // For now, just show a success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Rating submitted successfully!'),
-          backgroundColor: Colors.green,
-        ),
+      ErrorHandler.showSuccessSnackBar(
+        context,
+        'Rating submitted successfully!',
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 }

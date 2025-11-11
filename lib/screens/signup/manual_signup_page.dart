@@ -7,6 +7,8 @@ import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
 import './otp_verification_non_edu.dart';
+import '../../app.dart'; // For SlidePageRoute
+import '../../utils/error_handler.dart';
 
 class ManualSignupPage extends StatefulWidget {
   const ManualSignupPage({super.key});
@@ -207,16 +209,14 @@ class _ManualSignupPageState extends State<ManualSignupPage> {
       if (response.statusCode == 200) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => OtpVerificationNonEduPage(email: personalEmailController.text)),
+          SlidePageRoute(page: OtpVerificationNonEduPage(email: personalEmailController.text)),
         );
       } else {
-        final resp = jsonDecode(response.body);
-        final error = resp['message'] ?? 'Something went wrong';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+        ErrorHandler.showErrorSnackBar(context, null, response: response);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ErrorHandler.showErrorSnackBar(context, e);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -241,9 +241,9 @@ class _ManualSignupPageState extends State<ManualSignupPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Secure your spot', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF262626))),
+                    const Text('Personal Information', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF262626))),
                     const SizedBox(height: 4),
-                    const Text('Get verified in minutes.', style: TextStyle(fontSize: 12, color: Color(0xFF323537))),
+                    const Text('We just need a few details to keep Junction safe and personalized for you. Your info is always secure with us!', style: TextStyle(fontSize: 12, color: Color(0xFF323537))),
                     const SizedBox(height: 32),
                     const Text('Personal Details', style: TextStyle(fontSize: 14, color: Color(0xFF212121))),
                     const SizedBox(height: 16),
@@ -253,23 +253,50 @@ class _ManualSignupPageState extends State<ManualSignupPage> {
                     const SizedBox(height: 16),
                     _buildTextField('Personal Email ID *', personalEmailController, _onEmailChanged, emailError, null, TextInputType.emailAddress),
                     const SizedBox(height: 16),
-                    _buildTextField('Home Address *', homeAddressController, _onHomeAddressChanged, homeAddressError, maxHomeAddressLength, TextInputType.text),
-                    const SizedBox(height: 32),
-                    const Divider(),
-                    const SizedBox(height: 16),
+                    _buildTextField('Address *', homeAddressController, _onHomeAddressChanged, homeAddressError, maxHomeAddressLength, TextInputType.text),
+                    const SizedBox(height: 20),
+                       const SizedBox(height: 8),
+Container(
+  height: 1,
+  color: Color(0xFFE0E0E0), // light gray border line
+),
+const SizedBox(height: 16),
                     const Text('University Details', style: TextStyle(fontSize: 14, color: Color(0xFF212121))),
-                    const SizedBox(height: 16),
+                const SizedBox(height: 16),
                     _buildTextField('College Name *', collegeNameController, _onUniversityChanged, universityError, maxUniversityNameLength),
                     const SizedBox(height: 16),
-                    _buildDualDropdown(label: 'Enrollment', monthValue: enrollmentMonth, yearValue: enrollmentYear,
-                        onMonthChanged: (val) => setState(() { enrollmentMonth = val; _onDateChanged(); }),
-                        onYearChanged: (val) => setState(() { enrollmentYear = val; _onDateChanged(); }),
-                        isEnrollment: true),
-                    const SizedBox(height: 16),
-                    _buildDualDropdown(label: 'Graduation', monthValue: graduationMonth, yearValue: graduationYear,
-                        onMonthChanged: (val) => setState(() { graduationMonth = val; _onDateChanged(); }),
-                        onYearChanged: (val) => setState(() { graduationYear = val; _onDateChanged(); }),
-                        isEnrollment: false),
+                   _buildDualDropdown(
+  label: 'Enrollment',
+  monthValue: enrollmentMonth,
+  yearValue: enrollmentYear,
+  onMonthChanged: (val) => setState(() {
+    enrollmentMonth = val;
+    _onDateChanged();
+  }),
+  onYearChanged: (val) => setState(() {
+    enrollmentYear = val;
+    _onDateChanged();
+  }),
+  isEnrollment: true,
+),
+
+const SizedBox(height: 16),
+
+_buildDualDropdown(
+  label: 'Graduation',
+  monthValue: graduationMonth,
+  yearValue: graduationYear,
+  onMonthChanged: (val) => setState(() {
+    graduationMonth = val;
+    _onDateChanged();
+  }),
+  onYearChanged: (val) => setState(() {
+    graduationYear = val;
+    _onDateChanged();
+  }),
+  isEnrollment: false,
+),
+
                     if (dateError != null) Padding(padding: const EdgeInsets.only(top: 8, left: 12), child: Text(dateError!, style: const TextStyle(color: Colors.red, fontSize: 12))),
                     const SizedBox(height: 32),
                   ],
@@ -307,55 +334,80 @@ class _ManualSignupPageState extends State<ManualSignupPage> {
       ],
     );
   }
+Widget _buildDualDropdown({
+  required String label,
+  required String? monthValue,
+  required String? yearValue,
+  required ValueChanged<String?> onMonthChanged,
+  required ValueChanged<String?> onYearChanged,
+  required bool isEnrollment,
+}) {
+  const borderColor = Color(0xFF212121);
+  final yearsList = isEnrollment ? enrollmentYears : graduationYears;
 
-  Widget _buildDualDropdown({
-    required String label,
-    required String? monthValue,
-    required String? yearValue,
-    required ValueChanged<String?> onMonthChanged,
-    required ValueChanged<String?> onYearChanged,
-    required bool isEnrollment,
-  }) {
-    const borderColor = Color(0xFF212121);
-    final yearsList = isEnrollment ? enrollmentYears : graduationYears;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF212121))),
-        const SizedBox(height: 8),
-        Row(
+  return Row(
+    children: [
+      // Left dropdown (Month) with inline label
+      Expanded(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: monthValue,
-                decoration: _dropdownDecoration('Month', borderColor),
-                items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: onMonthChanged,
-              ),
+            DropdownButtonFormField<String>(
+              value: monthValue,
+              decoration: _dropdownDecoration('', borderColor),
+              items: months
+                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                  .toList(),
+              onChanged: onMonthChanged,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: yearValue,
-                decoration: _dropdownDecoration('Year', borderColor),
-                items: yearsList.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
-                onChanged: onYearChanged,
+            Positioned(
+              left: 12,
+              top: -8,
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  '* $label',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF212121),
+                  ),
+                ),
               ),
             ),
           ],
         ),
-      ],
-    );
-  }
+      ),
 
-  InputDecoration _dropdownDecoration(String hint, Color borderColor) {
-    return InputDecoration(
-      hintText: hint,
-      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderColor, width: 1), borderRadius: BorderRadius.circular(6)),
-      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: borderColor, width: 1), borderRadius: BorderRadius.circular(6)),
-      border: OutlineInputBorder(borderSide: BorderSide(color: borderColor, width: 1), borderRadius: BorderRadius.circular(6)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-    );
-  }
+      const SizedBox(width: 16),
+
+      // Right dropdown (Year)
+      Expanded(
+        child: DropdownButtonFormField<String>(
+          value: yearValue,
+          decoration: _dropdownDecoration('', borderColor),
+          items: yearsList
+              .map((y) => DropdownMenuItem(value: y, child: Text(y)))
+              .toList(),
+          onChanged: onYearChanged,
+        ),
+      ),
+    ],
+  );
+}
+
+InputDecoration _dropdownDecoration(String hint, Color borderColor) {
+  return InputDecoration(
+    hintText: hint.isNotEmpty ? hint : null,
+    enabledBorder: OutlineInputBorder(
+      borderSide: BorderSide(color: borderColor, width: 1),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderSide: BorderSide(color: borderColor, width: 1),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+  );
+}
 }
