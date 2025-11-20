@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/search/search_results_page.dart';
+import '../app.dart';
 
 class CategoryGrid extends StatelessWidget {
   const CategoryGrid({super.key});
