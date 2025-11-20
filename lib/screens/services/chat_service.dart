@@ -541,7 +541,7 @@ Future<String> confirmDeal({
     await sendMessage(
       chatId: chatId,
       receiverId: receiverId,
-      message: 'Deal locked at ₹${finalPrice.toStringAsFixed(0)}',
+      message: 'Deal has been locked for ₹${finalPrice.toStringAsFixed(0)}',
       messageType: 'deal_locked',
       priceData: {
         'price': finalPrice,

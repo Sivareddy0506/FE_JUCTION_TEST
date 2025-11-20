@@ -167,6 +167,7 @@ class _HomePageState extends State<HomePage> {
       );
     } else {
       content = SafeArea(
+        minimum: const EdgeInsets.only(top: 24), // extra push-down
         child: RefreshIndicator(
           onRefresh: _handleForceRefresh,
           edgeOffset: 0,

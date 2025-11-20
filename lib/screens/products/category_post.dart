@@ -14,14 +14,15 @@ class CategoryPostPage extends StatefulWidget {
 class _CategoryPostPageState extends State<CategoryPostPage> {
   final List<String> categories = [
     "Electronics",
-    "Computers  & Networking",
     "Furniture",
-    "Sports Equipment",
-    "Clothing & Accessories",
-    "Musical Instruments",
-    "Gaming",
-    "Tickets & Vouchers",
     "Books",
+    "Sports",
+    "Fashion",
+    "Gaming",
+    "Hobbies",
+    "Tickets",
+    "Vehicles",
+    "Miscellaneous",
   ];
 
  void _onCategorySelected(String category) {
