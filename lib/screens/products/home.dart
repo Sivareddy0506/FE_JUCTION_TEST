@@ -188,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                   height: 130,
                   child: CategoryGrid(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 ..._buildProductSection(
                   title: 'Last Viewed',
                   products: lastViewedProducts,
