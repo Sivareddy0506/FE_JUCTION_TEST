@@ -13,9 +13,8 @@
 - ✅ Updated application label from "junction" to "Junction"
 - ✅ Added `usesCleartextTraffic="false"` for security
 - ✅ Fixed duplicate `ACCESS_FINE_LOCATION` permission
-- ✅ Updated storage permissions for Android 13+ compatibility:
-  - Added `maxSdkVersion` for legacy storage permissions
-  - Added `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO` for Android 13+
+- ✅ Scoped storage permissions to legacy devices only (`maxSdkVersion`)
+- ✅ Using Android Photo Picker on Android 13+ (no `READ_MEDIA_*` permissions)
 - ✅ Organized permissions with comments
 
 ### 3. **Version Information**
