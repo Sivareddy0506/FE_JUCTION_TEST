@@ -44,6 +44,19 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // Pull-to-refresh: clear caches and fetch fresh data
+  Future<void> _handleForceRefresh() async {
+    try {
+      // Optional: clear any cached home data before refetching. Implementations vary.
+      // await AppCacheService.clearHomeFeed();
+
+      setState(() => _productsReady = false);
+      await fetchHomeData();
+    } finally {
+      if (mounted) setState(() => _productsReady = true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -154,57 +167,63 @@ class _HomePageState extends State<HomePage> {
       );
     } else {
       content = SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              debugLogWidget('LogoAndIconsWidget'),
-              const LogoAndIconsWidget(),
-              const SizedBox(height: 16),
-              debugLogWidget('SearchBarWidget'),
-              const SearchBarWidget(),
-              const SizedBox(height: 20),
-              debugLogWidget('CategoryGrid'),
-              const SizedBox(
-                height: 130,
-                child: CategoryGrid(),
-              ),
-              const SizedBox(height: 24),
-              ..._buildProductSection(
-                title: 'Last Viewed',
-                products: lastViewedProducts,
-                source: 'lastViewed',
-                requireLogin: true,
-                emptyMessage: 'You haven\'t viewed any products yet. Start exploring to see them here.',
-              ),
-              ..._buildProductSection(
-                title: 'Fresh Listings',
-                products: allProducts,
-                source: 'fresh',
-                emptyMessage: 'No fresh listings available right now. Check back soon!',
-              ),
-              if (adUrl1.isNotEmpty) ...[
-                debugLogWidget('AdBannerWidget: adUrl1'),
-                AdBannerWidget(mediaUrl: adUrl1),
-                const SizedBox(height: 24),
-              ],
-              ..._buildProductSection(
-                title: 'Trending in your location',
-                products: trendingProducts,
-                source: 'trending',
-                emptyMessage: 'No trending items nearby yet. Be the first to list!',
-              ),
-              if (previousSearchProducts.isNotEmpty) ...[
-                debugLogWidget('HorizontalProductList: Based on your Previous Search'),
-                HorizontalProductList(
-                  title: 'Based on your Previous Search',
-                  products: previousSearchProducts,
-                  source: 'searched',
-                  onFavoriteChanged: _refreshFavorites,
+        minimum: const EdgeInsets.only(top: 24), // extra push-down
+        child: RefreshIndicator(
+          onRefresh: _handleForceRefresh,
+          edgeOffset: 0,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                debugLogWidget('LogoAndIconsWidget'),
+                const LogoAndIconsWidget(),
+                const SizedBox(height: 16),
+                debugLogWidget('SearchBarWidget'),
+                const SearchBarWidget(),
+                const SizedBox(height: 20),
+                debugLogWidget('CategoryGrid'),
+                const SizedBox(
+                  height: 130,
+                  child: CategoryGrid(),
                 ),
+                const SizedBox(height: 16),
+                ..._buildProductSection(
+                  title: 'Last Viewed',
+                  products: lastViewedProducts,
+                  source: 'lastViewed',
+                  requireLogin: true,
+                  emptyMessage: 'You haven\'t viewed any products yet. Start exploring to see them here.',
+                ),
+                ..._buildProductSection(
+                  title: 'Fresh Listings',
+                  products: allProducts,
+                  source: 'fresh',
+                  emptyMessage: 'No fresh listings available right now. Check back soon!',
+                ),
+                if (adUrl1.isNotEmpty) ...[
+                  debugLogWidget('AdBannerWidget: adUrl1'),
+                  AdBannerWidget(mediaUrl: adUrl1),
+                  const SizedBox(height: 24),
+                ],
+                ..._buildProductSection(
+                  title: 'Trending in your location',
+                  products: trendingProducts,
+                  source: 'trending',
+                  emptyMessage: 'No trending items nearby yet. Be the first to list!',
+                ),
+                if (previousSearchProducts.isNotEmpty) ...[
+                  debugLogWidget('HorizontalProductList: Based on your Previous Search'),
+                  HorizontalProductList(
+                    title: 'Based on your Previous Search',
+                    products: previousSearchProducts,
+                    source: 'searched',
+                    onFavoriteChanged: _refreshFavorites,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );

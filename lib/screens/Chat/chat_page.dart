@@ -2622,66 +2622,57 @@ Widget _buildSystemMessage(MessageModel message) {
 }
 
 Widget _buildDealLockedMessage(MessageModel message, bool isMe) {
+  /*
+  // Previous deal-locked UI (grey card with price pill) – commented out per new design
   final priceData = message.priceData;
   if (priceData == null) return const SizedBox();
-
   double price = priceData['price']?.toDouble() ?? 0;
-
   return Container(
     margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
     child: Column(
       children: [
-        Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
-          ),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                '₹${price.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Deal Locked',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _formatMessageTime(message.timestamp),
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.grey,
+        // ... prior UI removed for brevity ...
+      ],
+    ),
+  );
+  */
+
+  // New: full-width green banner identical to system messages, price text in bold
+  return Container(
+    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.green[50],
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.green[200]!),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.check_circle, color: Colors.green[600], size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.w500),
+              children: _buildBoldPriceSpans(message.message),
+            ),
           ),
         ),
       ],
     ),
   );
+}
+
+// Helper: splits text and makes the price segment bold (₹123…)
+List<InlineSpan> _buildBoldPriceSpans(String text) {
+  final regex = RegExp(r'(₹[\d,]+)');
+  final match = regex.firstMatch(text);
+  if (match == null) return [TextSpan(text: text)];
+  return [
+    TextSpan(text: text.substring(0, match.start)),
+    TextSpan(text: match.group(0), style: const TextStyle(fontWeight: FontWeight.bold)),
+    TextSpan(text: text.substring(match.end)),
+  ];
 }
 
 void _showFullScreenImage(String imageUrl) {

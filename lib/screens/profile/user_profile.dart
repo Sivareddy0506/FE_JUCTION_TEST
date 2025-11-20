@@ -52,11 +52,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
   bool get _allDataReady => _favoritesReady && _profileReady && _activeListingsReady; // Wait for all data on first load
 
   final List<String> tabs = [
+    'Favorites',    
     'Active Listings',
     'About',
     'Purchases',
-    'Sold',
-    'Favorites'
+    'Sold'
   ];
 
   @override

@@ -140,14 +140,15 @@ class _FilterModalState extends State<FilterModal> {
                 }),
                 _buildMultiSelectButtonGroup("Category", [
                   "Electronics",
-                  "Computers & Networking",
                   "Furniture",
                   "Books",
-                  "Sports Equipment",
-                  "Clothes",
+                  "Sports",
+                  "Fashion",
                   "Gaming",
-                  "Activities",
-                  "Tickets"
+                  "Hobbies",
+                  "Tickets",
+                  "Vehicles",
+                  "Miscellaneous"
                 ], selectedCategories, (value) {
                   setState(() => selectedCategories = value);
                   _saveFilterState(); // Save state when changed
