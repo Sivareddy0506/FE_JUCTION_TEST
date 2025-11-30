@@ -929,18 +929,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             builder: (context) {
                               switch (selectedTabIndex) {
                                 case 0:
+                                  return const FavoritesTab();
+                                case 1:
                                   return ActiveAuctionsTab(
                                     hideLoadingIndicator: !_allDataReady,
                                     startLoading: _allDataReady, // Only start loading when parent is ready
                                   );
-                                case 1:
-                                  return const AboutTab();
                                 case 2:
-                                  return const PurchasedTab();
+                                  return const AboutTab();
                                 case 3:
-                                  return const SoldTab();
+                                  return const PurchasedTab();
                                 case 4:
-                                  return const FavoritesTab(); // Or EmptyState widget
+                                  return const SoldTab();
                                 default:
                                   return const Center(child: Text("Invalid Tab"));
                               }
