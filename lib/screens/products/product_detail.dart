@@ -60,6 +60,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   final TextEditingController _reportNotesController = TextEditingController();
   String? _selectedReportReasonCode;
   bool _isSubmittingReport = false;
+  
+  // Swipe hint tutorial
+  bool _showSwipeHint = false;
+  Timer? _swipeHintTimer;
 
   static const List<Map<String, String>> _reportReasonOptions = [
     {'code': 'SCAM', 'label': 'Scam / Fraud'},
@@ -123,10 +127,51 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _loadProductLocation();
     _fetchUniqueClicks();
     _fetchProductStatus(); // Fetch product status on init
+    _checkAndShowSwipeHint(); // Check if swipe hint should be shown
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
     });
+  }
+  
+  /// Check if user has seen swipe hint before, and show if needed
+  Future<void> _checkAndShowSwipeHint() async {
+    // Only show if there are multiple products to swipe through
+    if (relatedProducts.length <= 1) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenHint = prefs.getBool('hasSeenSwipeHint') ?? false;
+    
+    if (!hasSeenHint && mounted) {
+      // Show hint after a short delay to ensure UI is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() {
+            _showSwipeHint = true;
+          });
+          
+          // Auto-dismiss after 5 seconds
+          _swipeHintTimer = Timer(const Duration(seconds: 5), () {
+            if (mounted) {
+              _dismissSwipeHint();
+            }
+          });
+        }
+      });
+    }
+  }
+  
+  /// Dismiss swipe hint and save preference
+  void _dismissSwipeHint() async {
+    if (mounted) {
+      setState(() {
+        _showSwipeHint = false;
+      });
+    }
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenSwipeHint', true);
+    _swipeHintTimer?.cancel();
   }
   
   Future<String?> _fetchProductStatus() async {
@@ -465,10 +510,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   void dispose() {
-    // Cancel timer first to prevent any async operations
+    // Cancel timers first to prevent any async operations
     _statusPollingTimer?.cancel();
     _statusPollingTimer = null;
     _pollingStartTime = null;
+    _swipeHintTimer?.cancel();
     
     // Remove listener to prevent callbacks after dispose
     _favoritesService.removeListener(_onFavoritesChanged);
@@ -757,19 +803,26 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         title: product.title,
         actions: _buildAppBarActions(product, isSellerViewing),
       ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: relatedProducts.length,
-        onPageChanged: (index) {
-          setState(() {
-            currentProductIndex = index;
-            _currentImageIndex = 0;
-          });
-          _imagePageController?.jumpToPage(0);
-        },
-        itemBuilder: (context, index) {
-          final product = relatedProducts[index];
-          return ListView(
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: relatedProducts.length,
+            onPageChanged: (index) {
+              setState(() {
+                currentProductIndex = index;
+                _currentImageIndex = 0;
+              });
+              _imagePageController?.jumpToPage(0);
+              
+              // Dismiss swipe hint on first swipe
+              if (_showSwipeHint) {
+                _dismissSwipeHint();
+              }
+            },
+            itemBuilder: (context, index) {
+              final product = relatedProducts[index];
+              return ListView(
             padding: EdgeInsets.fromLTRB(
                 16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
             children: [
@@ -884,6 +937,47 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ],
       );
         },
+      ),
+          
+          // Swipe hint banner (one-time tutorial)
+          if (_showSwipeHint && relatedProducts.length > 1)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: AnimatedOpacity(
+                opacity: _showSwipeHint ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.swipe, color: Colors.grey[700], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Swipe left or right to view more products',
+                          style: TextStyle(
+                            color: Colors.grey[800],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(isSellerViewing, isProductForSale, isDealLocked, isProductLocked, isProductSold),
     );
