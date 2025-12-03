@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
+import '../../widgets/privacy_policy_link.dart';
 import 'manual_signup_page.dart';
 import '../login/login_page.dart';
 import 'otp_verification_signup_page.dart';
@@ -190,6 +191,7 @@ class _SignupPageState extends State<SignupPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        const PrivacyPolicyLink(),
                         AppButton(
                           label: isLoading ? 'Sending...' : 'Send Verification Code',
                           onPressed: isValidEmail && !isLoading ? _sendVerification : null,

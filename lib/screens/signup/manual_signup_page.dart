@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
+import '../../widgets/privacy_policy_link.dart';
 import './otp_verification_non_edu.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../../utils/error_handler.dart';
@@ -305,13 +306,18 @@ _buildDualDropdown(
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+            child: const PrivacyPolicyLink(),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: AppButton(
               bottomSpacing: 0,
               label: loading ? 'Saving...' : 'Save',
               onPressed: (loading || !isFormValid) ? null : _submitForm,
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );

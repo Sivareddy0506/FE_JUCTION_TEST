@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
+import '../../widgets/privacy_policy_link.dart';
 import '../signup/signup_page.dart';
 import '../../widgets/headding_description.dart';
 import './otp_verification_login.dart';
@@ -164,6 +165,7 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        const PrivacyPolicyLink(),
                         AppButton(
                           label: isLoading ? 'Sending...' : 'Send Verification Code',
                           onPressed: isValidEmail && !isLoading ? _login : null,
