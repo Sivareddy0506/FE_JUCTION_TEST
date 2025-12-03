@@ -73,6 +73,21 @@ class _ChatPageState extends State<ChatPage> {
   DateTime? _pollingStartTime; // Track when polling started
   String? _lastFetchedProductId; // Track last fetched productId to prevent redundant calls
   bool _isFetchingProductStatus = false; // Prevent concurrent fetches
+  
+  // Report user state
+  static const List<Map<String, String>> _reportReasonOptions = [
+    {'code': 'SCAM', 'label': 'Scam / Fraud'},
+    {'code': 'SPAM', 'label': 'Spam'},
+    {'code': 'INAPPROPRIATE', 'label': 'Inappropriate behavior'},
+    {'code': 'MISLEADING', 'label': 'Misleading information'},
+    {'code': 'OTHER', 'label': 'Other'},
+  ];
+  String? _selectedReportReasonCode;
+  final TextEditingController _reportNotesController = TextEditingController();
+  bool _isSubmittingReport = false;
+  bool _isChatBlocked = false; // Track if chat is blocked after reporting
+  Timer? _blockStatusPollingTimer; // Timer for polling block status
+  String? _peerUserId; // Store peer user ID for block checking
 
   @override
   void initState() {
@@ -131,6 +146,116 @@ class _ChatPageState extends State<ChatPage> {
     
     // Fetch product status asynchronously (non-blocking)
     _fetchProductStatus();
+    
+    // Check block status immediately when entering chat (no delay)
+    _startBlockStatusPolling();
+  }
+  
+  /// Start periodic polling to check if chat is blocked
+  void _startBlockStatusPolling() {
+    // Extract peer user ID from chatId directly (format: productId_sellerId_buyerId)
+    _extractPeerUserIdFromChatId();
+    
+    if (_peerUserId == null || _peerUserId!.isEmpty) {
+      // If peer ID not available yet, try again in 1 second
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) _startBlockStatusPolling();
+      });
+      return;
+    }
+    
+    // Check immediately first
+    _checkBlockStatus();
+    
+    // Then poll every 30 seconds
+    _blockStatusPollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted && !_isChatBlocked) {
+        _checkBlockStatus();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  /// Extract peer user ID directly from chatId (format: productId_sellerId_buyerId)
+  void _extractPeerUserIdFromChatId() {
+    try {
+      final parts = widget.chatId.split('_');
+      
+      if (parts.length >= 3) {
+        final currentUserId = _chatService.currentUserId;
+        final sellerId = parts[1];
+        final buyerId = parts[2];
+        
+        // Determine which one is the peer (the other user)
+        _peerUserId = (currentUserId == buyerId) ? sellerId : buyerId;
+      }
+    } catch (e) {
+      debugPrint('[BlockCheck] Error extracting peer ID: $e');
+    }
+  }
+  
+  /// Update peer user ID from cached chat data (backup method)
+  void _updatePeerUserId() {
+    if (_cachedChatData != null) {
+      final currentUserId = _chatService.currentUserId;
+      final newPeerUserId = _cachedChatData!.buyerId == currentUserId
+          ? _cachedChatData!.sellerId
+          : _cachedChatData!.buyerId;
+      
+      // If peer ID just became available, check block status immediately
+      if (_peerUserId == null && newPeerUserId.isNotEmpty) {
+        _peerUserId = newPeerUserId;
+        _checkBlockStatus(); // Immediate check
+      } else {
+        _peerUserId = newPeerUserId;
+      }
+    }
+  }
+  
+  /// Check if current user is blocked by or has blocked the peer user
+  Future<void> _checkBlockStatus() async {
+    if (_peerUserId == null || _isChatBlocked) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      
+      if (token == null) return;
+      
+      final response = await http.get(
+        Uri.parse('https://api.junctionverse.com/user/check-block/$_peerUserId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        final isBlocked = data['isBlocked'] == true;
+        
+        if (isBlocked && mounted) {
+          setState(() {
+            _isChatBlocked = true;
+          });
+          
+          // Cancel polling timer since we found a block
+          _blockStatusPollingTimer?.cancel();
+          
+          // Show notification
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This chat has been blocked. You can no longer message this user.'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[BlockCheck] Error: $e');
+      // Silently fail - don't interrupt user experience
+    }
   }
   
   Future<String?> _fetchProductStatus() async {
@@ -249,6 +374,7 @@ class _ChatPageState extends State<ChatPage> {
     // Clean up timers
     _confirmButtonTimer?.cancel();
     _statusPollingTimer?.cancel(); // Cancel polling timer on dispose
+    _blockStatusPollingTimer?.cancel(); // Cancel block status polling timer
     // Reset flags when disposing
     _hasDoneInitialScroll = false;
     _isUserTyping = false;
@@ -259,6 +385,17 @@ class _ChatPageState extends State<ChatPage> {
   // Static method that doesn't depend on chatData parameter
   void _sendMessageStatic(String message) async {
     if (message.trim().isEmpty) return;
+    
+    // Check if chat is blocked before sending
+    if (_isChatBlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This chat is blocked. You cannot send messages.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
 
     // Store the message before clearing
     final messageText = message.trim();
@@ -396,21 +533,44 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ],
             
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    focusNode: _messageFocusNode,
-                    enabled: !_isUploading && !_isConfirmingDeal && !_isImageUploading,
-                    textInputAction: TextInputAction.send,
-                    textCapitalization: TextCapitalization.sentences,
-                    maxLines: null, // Allow multiple lines
-                    minLines: 1, // Start with single line
-                    decoration: InputDecoration(
-                      hintText: (_isUploading || _isConfirmingDeal || _isImageUploading) 
-                          ? 'Processing...' 
-                          : 'Write a message...',
+            // Show blocked message if chat is blocked
+            if (_isChatBlocked)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.block, color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This chat is blocked. You cannot send messages to this user.',
+                        style: TextStyle(color: Colors.red[900], fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      focusNode: _messageFocusNode,
+                      enabled: !_isUploading && !_isConfirmingDeal && !_isImageUploading && !_isChatBlocked,
+                      textInputAction: TextInputAction.send,
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLines: null, // Allow multiple lines
+                      minLines: 1, // Start with single line
+                      decoration: InputDecoration(
+                        hintText: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                            ? 'Processing...' 
+                            : (_isChatBlocked ? 'Chat is blocked' : 'Write a message...'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
                         borderSide: BorderSide(color: Colors.grey[300]!),
@@ -430,7 +590,7 @@ class _ChatPageState extends State<ChatPage> {
                       filled: true,
                       fillColor: Colors.white,
                     ),
-                    onSubmitted: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                    onSubmitted: (_isUploading || _isConfirmingDeal || _isImageUploading || _isChatBlocked) 
                         ? null 
                         : (text) {
                             if (text.trim().isNotEmpty) {
@@ -441,23 +601,23 @@ class _ChatPageState extends State<ChatPage> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                  onPressed: (_isUploading || _isConfirmingDeal || _isImageUploading || _isChatBlocked) 
                       ? null 
                       : _showImagePickerBottomSheetStatic,
                   icon: Icon(
                     Icons.camera_alt_rounded,
-                    color: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                    color: (_isUploading || _isConfirmingDeal || _isImageUploading || _isChatBlocked) 
                         ? Colors.grey 
                         : Colors.black,
                   ),
                 ),
                 CircleAvatar(
-                  backgroundColor: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                  backgroundColor: (_isUploading || _isConfirmingDeal || _isImageUploading || _isChatBlocked) 
                       ? Colors.grey 
                       : Colors.black,
                   child: IconButton(
                     icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    onPressed: (_isUploading || _isConfirmingDeal || _isImageUploading) 
+                    onPressed: (_isUploading || _isConfirmingDeal || _isImageUploading || _isChatBlocked) 
                         ? null 
                         : () => _sendMessageStatic(_messageController.text),
                   ),
@@ -1085,9 +1245,27 @@ void _showCancelDealConfirmation(ChatModel chatData) {
           }
           
           _cachedChatData = chatSnapshot.data!;
+          _updatePeerUserId(); // Update peer user ID when chat data is available
           return _buildAppBarTitle(chatSnapshot.data!);
         },
       ),
+      actions: [
+        StreamBuilder<ChatModel?>(
+          stream: _chatService.getChatStream(widget.chatId),
+          builder: (context, chatSnapshot) {
+            if (!chatSnapshot.hasData) return const SizedBox.shrink();
+            final chatData = chatSnapshot.data!;
+            final peerUserId = chatData.buyerId == _chatService.currentUserId
+                ? chatData.sellerId
+                : chatData.buyerId;
+            return IconButton(
+              icon: const Icon(Icons.flag_outlined, color: Colors.black),
+              onPressed: () => _openReportUserBottomSheet(peerUserId, chatData),
+              tooltip: 'Report user',
+            );
+          },
+        ),
+      ],
     ),
     body: SafeArea(
       child: Column(
@@ -2673,6 +2851,224 @@ List<InlineSpan> _buildBoldPriceSpans(String text) {
     TextSpan(text: match.group(0), style: const TextStyle(fontWeight: FontWeight.bold)),
     TextSpan(text: text.substring(match.end)),
   ];
+}
+
+void _openReportUserBottomSheet(String peerUserId, ChatModel chatData) {
+  _selectedReportReasonCode = null;
+  _reportNotesController.clear();
+  
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Report User',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(sheetContext),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Select a reason for reporting this user:',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _reportReasonOptions.map((option) {
+                    final code = option['code']!;
+                    final label = option['label']!;
+                    final isSelected = _selectedReportReasonCode == code;
+                    return ChoiceChip(
+                      label: Text(label),
+                      selected: isSelected,
+                      onSelected: (_) {
+                        setModalState(() {
+                          _selectedReportReasonCode = code;
+                        });
+                        setState(() {
+                          _selectedReportReasonCode = code;
+                        });
+                      },
+                      selectedColor: const Color(0xFF262626),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _reportNotesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Additional details (optional)',
+                    hintText: 'Describe what happened...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  maxLength: 500,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Important: Reporting this user will also block them from interacting with you on the platform. Do you wish to proceed?',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[900],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                AppButton(
+                  label: _isSubmittingReport ? 'Submitting...' : 'Submit report',
+                  onPressed: _selectedReportReasonCode == null || _isSubmittingReport
+                      ? null
+                      : () => _submitUserReport(peerUserId, chatData, sheetContext),
+                  backgroundColor: const Color(0xFF262626),
+                  textColor: Colors.white,
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> _submitUserReport(String peerUserId, ChatModel chatData, BuildContext sheetContext) async {
+  if (_selectedReportReasonCode == null) return;
+  
+  setState(() => _isSubmittingReport = true);
+  
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
+    
+    if (token == null) {
+      if (!mounted) return;
+      Navigator.pop(sheetContext);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to report users')),
+      );
+      return;
+    }
+    
+    final payload = {
+      'conversationId': widget.chatId,
+      'reasonCode': _selectedReportReasonCode,
+      'reasonText': _reportNotesController.text.trim().isNotEmpty
+          ? _reportNotesController.text.trim()
+          : null,
+    };
+    
+    final response = await http.post(
+      Uri.parse('https://api.junctionverse.com/user/$peerUserId/report'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+    
+    if (!mounted) return;
+    
+    Navigator.pop(sheetContext);
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      final alreadyReported = data['alreadyReported'] == true || data['status'] == 'duplicate';
+      final userBlocked = data['userBlocked'] == true;
+      
+      // Immediately lock the chat
+      if (userBlocked || alreadyReported) {
+        setState(() {
+          _isChatBlocked = true;
+        });
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(alreadyReported
+              ? 'You already reported this user. This chat is now blocked.'
+              : 'User reported and blocked. You can no longer chat with them.'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } else {
+      // Extract error message from response
+      String errorMessage;
+      try {
+        final data = jsonDecode(response.body);
+        errorMessage = data['message']?.toString() ?? 'Failed to submit report. Please try again.';
+      } catch (_) {
+        errorMessage = 'Failed to submit report. Please try again.';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
+  } catch (e) {
+    debugPrint('Error submitting user report: $e');
+    if (!mounted) return;
+    Navigator.pop(sheetContext);
+    
+    String errorMessage = 'An error occurred. Please try again.';
+    if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+      errorMessage = 'Network error. Please check your connection.';
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(errorMessage)),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _isSubmittingReport = false);
+    }
+  }
 }
 
 void _showFullScreenImage(String imageUrl) {
