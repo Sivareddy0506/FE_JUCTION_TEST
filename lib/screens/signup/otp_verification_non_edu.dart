@@ -8,7 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
-import './referral_code_page_non_edu.dart';
+import './referral_code_page_non_edu.dart' as non_edu;
 import '../../app.dart'; // For SlidePageRoute
 
 class OtpVerificationNonEduPage extends StatefulWidget {
@@ -117,7 +117,7 @@ class _OTPVerificationNonEduPageState extends State<OtpVerificationNonEduPage> {
         Navigator.pushReplacement(
           context,
           SlidePageRoute(
-            page: ReferralCodePage(email: widget.email, otp: code),
+            page: non_edu.ReferralCodePage(email: widget.email, otp: code),
           ),
         );
       } else {

@@ -13,6 +13,7 @@ import '../../widgets/headding_description.dart';
 import '../profile/user_profile.dart';
 import '../signup/verification_submitted.dart';
 import '../signup/verification_rejected.dart';
+import '../signup/eula_acceptance_page.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../services/chat_service.dart';
 class OTPVerificationLoginPage extends StatefulWidget {
@@ -113,6 +114,7 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
         final bool isOnboarded = user['isOnboarded'] ?? false;
         final String userStatus = user['userStatus'] ?? '';
         final String fullName = user['fullName'] ?? 'User';
+        final bool eulaAccepted = user['eulaAccepted'] ?? false;
 
         if (!isOnboarded) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -206,11 +208,24 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               // Don't block login if FCM token retrieval fails
             }
 
-            Navigator.pushAndRemoveUntil(
-              context,
-              SlidePageRoute(page: const UserProfilePage()),
-              (Route<dynamic> route) => false,
-            );
+            // Check if user has accepted EULA
+            if (!eulaAccepted) {
+              // Show EULA screen before entering app
+              Navigator.pushAndRemoveUntil(
+                context,
+                SlidePageRoute(
+                  page: const EULAAcceptancePage(isSignupFlow: false),
+                ),
+                (Route<dynamic> route) => false,
+              );
+            } else {
+              // EULA already accepted, proceed to app
+              Navigator.pushAndRemoveUntil(
+                context,
+                SlidePageRoute(page: const UserProfilePage()),
+                (Route<dynamic> route) => false,
+              );
+            }
           } else {
             final errorBody = customTokenResponse.body;
             debugPrint('Firebase custom token creation failed: ${customTokenResponse.statusCode}');
