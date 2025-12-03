@@ -29,19 +29,19 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>App needs access to camera.</string>
+	<string>JunctionVerse uses your camera to capture photos of products you want to list, verification documents during signup, and images you want to share in chat conversations.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>This app uses contacts only if you share referrals.</string>
+	<string>Contact access may be used for future referral sharing features to help you easily invite friends to join the platform.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs access to your location to show your position on the map and improve address selection.</string>
+	<string>Location access allows JunctionVerse to show you nearby listings, help you set accurate product locations, and provide better address suggestions when you're using maps.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>This app uses your location to improve address selection.</string>
+	<string>Continuous location access helps us provide real-time nearby listing notifications and improve address suggestions even when the app is closed. You can choose 'While Using' instead for privacy.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs access to your location to show your position on the map.</string>
+	<string>Turning on location will allow us to show nearby listings to you, help you set product locations when creating listings, and enable accurate address selection on maps. Your location is only used when you're actively using the app.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>App needs access to microphone.</string>
+	<string>Microphone access may be used for future features like voice notes and voice search.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>App needs access to share content.</string>
+	<string>JunctionVerse needs access to your photo library to upload product images for your listings, verification documents, profile pictures, and images you want to share in conversations.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

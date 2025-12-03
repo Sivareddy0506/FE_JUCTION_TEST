@@ -1,0 +1,201 @@
+END USER LICENSE AGREEMENT (EULA)
+Last Updated: December 3, 2025
+Version: 1.0.3
+
+PLEASE READ THIS END USER LICENSE AGREEMENT CAREFULLY BEFORE USING THE JUNCTIONVERSE APPLICATION.
+
+BY CLICKING "I ACCEPT" OR BY DOWNLOADING, INSTALLING, OR USING THE JUNCTIONVERSE APPLICATION ("APP"), YOU AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT USE THE APP.
+
+1. ACCEPTANCE OF TERMS
+
+This End User License Agreement ("Agreement") is a legal agreement between you ("User," "you," or "your") and JunctionVerse ("Company," "we," "us," or "our") for the use of the JunctionVerse mobile application and associated services.
+
+By creating an account and using our services, you acknowledge that you have read, understood, and agree to be bound by this Agreement and our Privacy Policy.
+
+2. ELIGIBILITY
+
+You must be at least 18 years of age, or the age of majority in your jurisdiction, to use this App. By using the App, you represent and warrant that you meet this age requirement and have the legal capacity to enter into this Agreement.
+
+For student users, you must be enrolled in or affiliated with an educational institution to access certain features of the platform.
+
+3. LICENSE GRANT
+
+Subject to your compliance with this Agreement, we grant you a limited, non-exclusive, non-transferable, revocable license to:
+   a) Download and install the App on devices you own or control
+   b) Access and use the App for personal, non-commercial purposes
+   c) Buy, sell, or exchange products through the platform
+
+4. USER ACCOUNTS
+
+To access certain features of the App, you must create an account by providing accurate, current, and complete information. You are responsible for:
+   a) Maintaining the confidentiality of your account credentials
+   b) All activities that occur under your account
+   c) Notifying us immediately of any unauthorized use
+   d) Ensuring your account information remains accurate and up-to-date
+
+We reserve the right to suspend or terminate accounts that violate this Agreement or contain false or misleading information.
+
+5. USER CONDUCT AND PROHIBITED ACTIVITIES
+
+You agree NOT to:
+   a) Use the App for any unlawful purpose or in violation of any local, state, national, or international law
+   b) Post false, misleading, or fraudulent listings
+   c) Engage in price manipulation or unfair trading practices
+   d) Harass, abuse, threaten, or discriminate against other users
+   e) Impersonate any person or entity
+   f) Upload viruses, malware, or malicious code
+   g) Scrape, data mine, or collect user information without authorization
+   h) Attempt to gain unauthorized access to any portion of the App
+   i) Interfere with or disrupt the App's operation or servers
+   j) Use the App to sell prohibited items (weapons, drugs, stolen goods, counterfeit items, etc.)
+   k) Create multiple accounts to manipulate ratings, reviews, or transactions
+   l) Engage in any form of spam or unsolicited commercial communications
+
+6. MARKETPLACE TRANSACTIONS
+
+a) Buyer-Seller Relationship: JunctionVerse is a platform that connects buyers and sellers. We are not a party to transactions between users and are not responsible for the quality, safety, legality, or accuracy of listings.
+
+b) Payment Processing: All transactions are processed securely through our platform. Users agree to pay all applicable fees and taxes.
+
+c) Seller Obligations: Sellers must:
+   - Provide accurate descriptions and photos of items
+   - Honor confirmed transactions
+   - Ship items within the agreed timeframe
+   - Not engage in fraudulent or deceptive practices
+
+d) Buyer Obligations: Buyers must:
+   - Pay for confirmed purchases
+   - Communicate respectfully with sellers
+   - Report any issues through proper channels
+   - Not file false claims or disputes
+
+e) Disputes: In case of disputes, users should first attempt to resolve issues directly. JunctionVerse may provide mediation support but is not obligated to resolve disputes or provide refunds.
+
+7. CONTENT AND INTELLECTUAL PROPERTY
+
+a) User Content: You retain ownership of content you post but grant us a worldwide, non-exclusive, royalty-free license to use, reproduce, modify, and display your content for platform operation and promotional purposes.
+
+b) Platform Content: All App design, features, text, graphics, logos, and software are owned by or licensed to JunctionVerse and protected by copyright, trademark, and other intellectual property laws.
+
+c) Prohibited Content: You may not post content that is:
+   - Illegal, obscene, or pornographic
+   - Defamatory or libelous
+   - Infringing on intellectual property rights
+   - Containing personal information of others without consent
+   - Misleading or fraudulent
+
+8. VERIFICATION AND IDENTITY
+
+To maintain platform integrity, we may require identity verification including:
+   - Educational institution verification
+   - Government-issued ID verification
+   - Phone number verification
+   - Address verification
+
+You consent to our verification processes and understand that failure to verify may result in limited or suspended account access.
+
+9. FEES AND PAYMENTS
+
+JunctionVerse may charge fees for certain services. Current fee structures are displayed in the App. We reserve the right to modify fees with prior notice. All fees are non-refundable except as required by law.
+
+10. PRIVACY AND DATA PROTECTION
+
+Your use of the App is subject to our Privacy Policy, which describes how we collect, use, and protect your personal information. By accepting this Agreement, you acknowledge that you have read and understood our Privacy Policy.
+
+11. RATINGS AND REVIEWS
+
+Users may rate and review transactions. You agree that:
+   a) Reviews must be honest and based on actual experiences
+   b) Reviews must not contain offensive, defamatory, or inappropriate content
+   c) JunctionVerse may remove reviews that violate these terms
+   d) Attempting to manipulate ratings through fake reviews is prohibited
+
+12. TERMINATION AND SUSPENSION
+
+We reserve the right to suspend or terminate your account at any time, with or without notice, for:
+   a) Violation of this Agreement
+   b) Fraudulent or illegal activity
+   c) Abuse of other users
+   d) Extended inactivity
+   e) Any reason we deem necessary to protect the platform or other users
+
+Upon termination, your right to use the App ceases immediately, and we may delete your account data in accordance with our Privacy Policy.
+
+13. DISCLAIMERS AND LIMITATION OF LIABILITY
+
+a) AS IS" BASIS: THE APP IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
+
+b) NO GUARANTEE: We do not guarantee that:
+   - The App will be error-free or uninterrupted
+   - Defects will be corrected
+   - The App is free from viruses or harmful components
+   - Any specific results will be achieved through use of the App
+
+c) USER TRANSACTIONS: WE ARE NOT RESPONSIBLE FOR:
+   - Quality, safety, or legality of items listed
+   - Accuracy of listings or user representations
+   - Ability of sellers to deliver items
+   - Ability of buyers to pay for items
+   - Disputes between users
+
+d) LIMITATION OF LIABILITY: TO THE MAXIMUM EXTENT PERMITTED BY LAW, JUNCTIONVERSE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS, LOST DATA, OR BUSINESS INTERRUPTION, ARISING FROM YOUR USE OF THE APP.
+
+IN NO EVENT SHALL OUR TOTAL LIABILITY EXCEED THE AMOUNT YOU PAID TO US IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR ONE HUNDRED DOLLARS ($100), WHICHEVER IS GREATER.
+
+14. INDEMNIFICATION
+
+You agree to indemnify, defend, and hold harmless JunctionVerse, its officers, directors, employees, and agents from any claims, liabilities, damages, losses, or expenses (including legal fees) arising from:
+   a) Your use of the App
+   b) Your violation of this Agreement
+   c) Your violation of any rights of another party
+   d) Your content or listings
+
+15. MODIFICATIONS TO THE AGREEMENT
+
+We reserve the right to modify this Agreement at any time. We will notify users of material changes via email or in-app notification. Continued use of the App after changes constitutes acceptance of the modified Agreement.
+
+For version updates, we may require re-acceptance if changes are significant.
+
+16. GOVERNING LAW AND DISPUTE RESOLUTION
+
+This Agreement shall be governed by and construed in accordance with the laws of India, without regard to its conflict of law provisions.
+
+Any disputes arising from this Agreement shall be resolved through:
+   a) First, good faith negotiations between parties
+   b) If unresolved, binding arbitration in accordance with applicable arbitration rules
+   c) Litigation only as a last resort, in the courts of [Your Jurisdiction]
+
+You agree to waive any right to a jury trial or to participate in a class action lawsuit.
+
+17. MISCELLANEOUS PROVISIONS
+
+a) Entire Agreement: This Agreement, together with our Privacy Policy, constitutes the entire agreement between you and JunctionVerse.
+
+b) Severability: If any provision is found to be unenforceable, the remaining provisions will remain in full effect.
+
+c) Waiver: Our failure to enforce any right or provision shall not constitute a waiver of such right or provision.
+
+d) Assignment: You may not assign this Agreement without our prior written consent. We may assign our rights and obligations without restriction.
+
+e) Force Majeure: We shall not be liable for any failure to perform due to circumstances beyond our reasonable control.
+
+18. CONTACT INFORMATION
+
+For questions about this Agreement, please contact us at:
+
+Email: support@junctionverse.com
+Website: https://www.junctionverse.com
+
+19. ACKNOWLEDGMENT
+
+BY CLICKING "I ACCEPT" OR BY USING THE APP, YOU ACKNOWLEDGE THAT:
+   - You have read this entire Agreement
+   - You understand the terms and conditions
+   - You agree to be bound by this Agreement
+   - You have the authority to enter into this Agreement
+   - You are at least 18 years old or the age of majority in your jurisdiction
+
+This Agreement is effective as of the date you first access or use the App.
+
+© 2025 JunctionVerse. All rights reserved.
+
