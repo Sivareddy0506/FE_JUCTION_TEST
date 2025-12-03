@@ -42,48 +42,46 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyB8Daj4xs8iO_dcicU7L8oFXn1ufSxzO_g',
-    appId: '1:939748137916:web:c94784cf74815f6c5969b9',
-    messagingSenderId: '939748137916',
-    projectId: 'junction-testing',
-    authDomain: 'junction-testing.firebaseapp.com',
-    storageBucket: 'junction-testing.firebasestorage.app',
-    measurementId: 'G-NSWSL52N36',
+    appId: '1:944746529789:web',
+    messagingSenderId: '944746529789',
+    projectId: 'junction-e0625',
+    authDomain: 'junction-e0625.firebaseapp.com',
+    storageBucket: 'junction-e0625.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDIzJ56tzKSj39v8_U761-ReTD_aINe5kc',
-    appId: '1:939748137916:android:b1001a08f76866b15969b9',
-    messagingSenderId: '939748137916',
-    projectId: 'junction-testing',
-    storageBucket: 'junction-testing.firebasestorage.app',
+    apiKey: 'AIzaSyASqmjASEB7EEQrRK-RySC45IZu6f6-A7E',
+    appId: '1:944746529789:android:0109c186117f845cc1cf94',
+    messagingSenderId: '944746529789',
+    projectId: 'junction-e0625',
+    storageBucket: 'junction-e0625.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCI9_dV_uRwumRcIQ9qUoxZK-h1c0bXBN4',
-    appId: '1:939748137916:ios:979bd82f103341f45969b9',
-    messagingSenderId: '939748137916',
-    projectId: 'junction-testing',
-    storageBucket: 'junction-testing.firebasestorage.app',
-    iosBundleId: 'com.example.junction',
+    apiKey: 'AIzaSyDzguQmJW2l8ZY5effSJ9zRrZ03i9lYpvQ',
+    appId: '1:944746529789:ios:44abe864937cfd47c1cf94',
+    messagingSenderId: '944746529789',
+    projectId: 'junction-e0625',
+    storageBucket: 'junction-e0625.firebasestorage.app',
+    iosBundleId: 'com.junction.verse',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCI9_dV_uRwumRcIQ9qUoxZK-h1c0bXBN4',
-    appId: '1:939748137916:ios:979bd82f103341f45969b9',
-    messagingSenderId: '939748137916',
-    projectId: 'junction-testing',
-    storageBucket: 'junction-testing.firebasestorage.app',
-    iosBundleId: 'com.example.junction',
+    apiKey: 'AIzaSyDzguQmJW2l8ZY5effSJ9zRrZ03i9lYpvQ',
+    appId: '1:944746529789:ios:44abe864937cfd47c1cf94',
+    messagingSenderId: '944746529789',
+    projectId: 'junction-e0625',
+    storageBucket: 'junction-e0625.firebasestorage.app',
+    iosBundleId: 'com.junction.verse',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyB8Daj4xs8iO_dcicU7L8oFXn1ufSxzO_g',
-    appId: '1:939748137916:web:05759eb99025e7c65969b9',
-    messagingSenderId: '939748137916',
-    projectId: 'junction-testing',
-    authDomain: 'junction-testing.firebaseapp.com',
-    storageBucket: 'junction-testing.firebasestorage.app',
-    measurementId: 'G-RZ8DGV3M53',
+    appId: '1:944746529789:web',
+    messagingSenderId: '944746529789',
+    projectId: 'junction-e0625',
+    authDomain: 'junction-e0625.firebaseapp.com',
+    storageBucket: 'junction-e0625.firebasestorage.app',
   );
 
 }

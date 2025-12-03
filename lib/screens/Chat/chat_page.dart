@@ -423,7 +423,7 @@ class _ChatPageState extends State<ChatPage> {
       if (!chatDoc.exists) return;
       
       final chatData = ChatModel.fromFirestore(chatDoc.data()!);
-      bool isSeller = chatData.sellerId == _chatService.currentUserId;
+      bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
       String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
 
       await _chatService.sendMessage(
@@ -632,7 +632,7 @@ class _ChatPageState extends State<ChatPage> {
 }
 
   Widget _buildActionButtonsArea(ChatModel chatData) {
-  final String currentUserId = _chatService.currentUserId;
+  final String currentUserId = _chatService.currentUserIdSync;
   final bool isSeller = currentUserId.isNotEmpty && chatData.sellerId == currentUserId;
   final bool isBuyer = currentUserId.isNotEmpty && chatData.buyerId == currentUserId;
 
@@ -1038,7 +1038,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                             );
 
                             if (cancelled) {
-                              final bool isSellerCancelling = chatData.sellerId == _chatService.currentUserId;
+                              final bool isSellerCancelling = chatData.sellerId == _chatService.currentUserIdSync;
                               // Update Firestore - reset to active status
                               await FirebaseFirestore.instance
                                   .collection('chats')
@@ -1154,7 +1154,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
 }
 
   Widget _buildAppBarTitle(ChatModel chatData) {
-    final bool isSeller = chatData.sellerId == _chatService.currentUserId;
+    final bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
     final String otherUserId = isSeller ? chatData.buyerId : chatData.sellerId;
     final String otherUserName = isSeller ? chatData.buyerName : chatData.sellerName;
     // Safe initials generation
@@ -1169,7 +1169,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
     }
     return GestureDetector(
       onTap: () {
-        if (otherUserId == _chatService.currentUserId) {
+        if (otherUserId == _chatService.currentUserIdSync) {
           Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
         } else {
           Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: otherUserId)));
@@ -1437,7 +1437,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
 
 
 Widget _buildMessage(MessageModel message, ChatModel chatData) {
-  bool isMe = message.senderId == _chatService.currentUserId;
+  bool isMe = message.senderId == _chatService.currentUserIdSync;
   switch (message.messageType) {
     case 'product_card':
       return _buildProductCard(message);
@@ -1516,7 +1516,7 @@ void _showQuotePriceBottomSheet(ChatModel chatData) {
   }
 
   final TextEditingController priceController = TextEditingController();
-  final bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  final bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
   Timer? cooldownTimer;
   int remainingSeconds = _quoteCooldownRemainingSeconds();
   bool hasStartedCountdown = false;
@@ -1923,7 +1923,7 @@ Widget _buildImageSourceOption({
 void _handleImageSelection(ImageSource source, ChatModel chatData) async {
   Navigator.pop(context);
   
-  final bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  final bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
   String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
 
   // Set initial upload state
@@ -2191,7 +2191,7 @@ Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatDa
 }
 
 Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, MessageModel quoteMessage, double price) async { 
-  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
 
   showModalBottomSheet(
     context: context,
@@ -2458,7 +2458,7 @@ Future<void> _showConfirmPriceBottomSheet(ChatModel chatData, MessageModel quote
 }
 
 void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
-  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
 
   if (!isSeller) {
     // Safety: buyers should never see this prompt
@@ -2569,7 +2569,7 @@ void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
 
 
 Widget _buildRegularMessage(MessageModel message, bool isMe, ChatModel chatData) {
-  bool isSeller = chatData.sellerId == _chatService.currentUserId;
+  bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
   String otherUserName = isSeller ? chatData.buyerName : chatData.sellerName;
   
   return Container(

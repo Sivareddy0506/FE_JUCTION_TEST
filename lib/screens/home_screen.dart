@@ -17,7 +17,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final bool _showMainContent = false;
+  bool _showMainContent = false;
+  bool _isFirstTime = true;
+  bool _isInitializing = true;
 
   final PageController _pageController = PageController();
   int _currentSlide = 0;
@@ -27,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'image': 'assets/slide1.png',
       'title': 'A Marketplace Built for Students',
       'description':
-          'Buy and sell essentials within Junction’s verified network of student community',
+          "Buy and sell essentials within Junction's verified network of student community",
     },
     {
       'image': 'assets/slide2.png',
@@ -51,39 +53,84 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeApp() async {
     try {
-      await AppCacheService.initializeCache();
+      // Show splash immediately
+      setState(() {
+        _isInitializing = true;
+      });
+
+      // Initialize cache with timeout
+      try {
+        await AppCacheService.initializeCache().timeout(
+          const Duration(seconds: 5),
+        );
+      } catch (e) {
+        debugPrint('AppCacheService initialization error or timeout: $e');
+      }
+
       MemoryMonitorService().startMonitoring();
 
       final prefs = await SharedPreferences.getInstance();
+      
+      // Check if it's the first time
+      _isFirstTime = prefs.getBool('isFirstTime') ?? true;
+      
       bool? isLoggedIn = prefs.getBool('isLogin');
       bool shouldGoToHome = false;
 
       if (isLoggedIn == true) {
-        final result = await AuthHealthService.refreshAuthToken();
-        if (result['status'] == 'refreshed') {
-          if (result['token'] != null) {
-            await prefs.setString('authToken', result['token']);
+        try {
+          final result = await AuthHealthService.refreshAuthToken().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => {'status': 'timeout'},
+          );
+          if (result['status'] == 'refreshed') {
+            if (result['token'] != null) {
+              await prefs.setString('authToken', result['token']);
+            }
+            shouldGoToHome = true;
+          } else {
+            await prefs.remove('authToken');
+            await prefs.setBool('isLogin', false);
+            shouldGoToHome = false;
           }
-          shouldGoToHome = true;
-        } else {
+        } catch (e) {
+          debugPrint('Token refresh error: $e');
           await prefs.remove('authToken');
           await prefs.setBool('isLogin', false);
           shouldGoToHome = false;
         }
       }
 
-      await Future.delayed(const Duration(milliseconds: 1200));
+      // Show splash logo for at least 1.5 seconds
+      await Future.delayed(const Duration(milliseconds: 1500));
 
+      if (!mounted) return;
+
+      // If it's the first time, show the onboarding slides
+      if (_isFirstTime) {
+        setState(() {
+          _isInitializing = false;
+          _showMainContent = true;
+        });
+        // Don't navigate away - let user go through slides
+        return;
+      }
+
+      // If not first time, navigate directly to login/home
       if (mounted) {
         Navigator.pushReplacement(
           context,
           SlidePageRoute(page: shouldGoToHome ? HomePage() : LoginPage()),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Initialization error: $e');
+      debugPrint('Stack trace: $stackTrace');
       // On any error, go to login
       if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
         Navigator.pushReplacement(
           context,
           SlidePageRoute(page: LoginPage()),
@@ -92,11 +139,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    MemoryMonitorService().stopMonitoring();
-    super.dispose();
-  }
 
   /// Responsive + high-quality image helper
   Widget _logoImage(String asset, {double? size}) {
@@ -270,6 +312,10 @@ class _HomeScreenState extends State<HomeScreen> {
         bottomSpacing: 24, // Controls distance from bottom of screen
         onPressed: () {
           if (_currentSlide == _slides.length - 1) {
+            // Mark that user has seen the onboarding
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.setBool('isFirstTime', false);
+            });
             Navigator.pushReplacement(
               context,
               FadePageRoute(page: const AppOverviewScreen()),
@@ -309,5 +355,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    MemoryMonitorService().stopMonitoring();
+    super.dispose();
   }
 }

@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -75,6 +77,36 @@ class _OTPVerificationNonEduPageState extends State<OtpVerificationNonEduPage> {
         if (token != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('authToken', token);
+          
+          // Register FCM token after OTP verification
+          try {
+            debugPrint('📱 [FCM] Registering FCM token after non-edu OTP verification...');
+            final fcmToken = await FirebaseMessaging.instance.getToken();
+            if (fcmToken != null) {
+              debugPrint('📱 [FCM] FCM token retrieved: ${fcmToken.substring(0, 20)}...');
+              
+              // Register with backend
+              try {
+                final fcmResponse = await http.post(
+                  Uri.parse('https://api.junctionverse.com/user/fcm-token'),
+                  headers: {
+                    'Authorization': 'Bearer $token',
+                    'Content-Type': 'application/json',
+                  },
+                  body: jsonEncode({'token': fcmToken}),
+                ).timeout(const Duration(seconds: 10));
+                
+                debugPrint('📱 [FCM] Backend registration status: ${fcmResponse.statusCode}');
+                // Note: Firestore save will happen after user logs in and Firebase Auth is signed in
+              } catch (e) {
+                debugPrint('📱 [FCM] ⚠️ Failed to register FCM token with backend: $e');
+                // Don't block OTP verification if FCM registration fails
+              }
+            }
+          } catch (e) {
+            debugPrint('📱 [FCM] ⚠️ Error getting FCM token after non-edu OTP verification: $e');
+            // Don't block OTP verification if FCM token retrieval fails
+          }
         }
 
         if (!mounted) return;

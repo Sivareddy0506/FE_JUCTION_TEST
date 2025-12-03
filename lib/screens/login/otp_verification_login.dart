@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -11,6 +14,7 @@ import '../profile/user_profile.dart';
 import '../signup/verification_submitted.dart';
 import '../signup/verification_rejected.dart';
 import '../../app.dart'; // For SlidePageRoute
+import '../services/chat_service.dart';
 class OTPVerificationLoginPage extends StatefulWidget {
   final String email;
 
@@ -75,11 +79,19 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
     try {
       final payload = {'email': widget.email, 'otp': code};
 
+      debugPrint('Verifying OTP for email: ${widget.email}');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('OTP verification timed out');
+        },
       );
+      
+      debugPrint('OTP verification response status: ${response.statusCode}');
 
       if (!mounted) return;
       setState(() => isSubmitting = false);
@@ -121,17 +133,78 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isLogin', true);
 
+          debugPrint('Creating Firebase custom token for userId: $userId');
           final customTokenResponse = await http.post(
             Uri.parse('https://api.junctionverse.com/user/firebase/createcustomtoken'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'userId': userId}),
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Firebase token creation timed out');
+            },
           );
 
+          debugPrint('Custom token response status: ${customTokenResponse.statusCode}');
+          
           if (customTokenResponse.statusCode == 200) {
             final customToken = jsonDecode(customTokenResponse.body)['token'];
             await FirebaseAuth.instance.signInWithCustomToken(customToken);
             await prefs.setString('firebaseUserId', FirebaseAuth.instance.currentUser?.uid ?? '');
             await prefs.setString('firebaseToken', customToken);
+            
+            // Initialize ChatService userId cache
+            await ChatService.initializeUserId();
+
+            // Register FCM token after successful login
+            try {
+              debugPrint('📱 [FCM] Getting FCM token after login...');
+              final fcmToken = await FirebaseMessaging.instance.getToken();
+              if (fcmToken != null) {
+                debugPrint('📱 [FCM] FCM token retrieved: ${fcmToken.substring(0, 20)}...');
+                
+                // Register with backend
+                try {
+                  final fcmResponse = await http.post(
+                    Uri.parse('https://api.junctionverse.com/user/fcm-token'),
+                    headers: {
+                      'Authorization': 'Bearer $token',
+                      'Content-Type': 'application/json',
+                    },
+                    body: jsonEncode({'token': fcmToken}),
+                  ).timeout(const Duration(seconds: 10));
+                  
+                  debugPrint('📱 [FCM] Backend registration status: ${fcmResponse.statusCode}');
+                } catch (e) {
+                  debugPrint('📱 [FCM] ⚠️ Failed to register FCM token with backend: $e');
+                  // Don't block login if FCM registration fails
+                }
+                
+                // Also save to Firestore for Cloud Function
+                try {
+                  final firebaseUser = FirebaseAuth.instance.currentUser;
+                  if (firebaseUser != null) {
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(userId)
+                        .set({
+                      'fcmTokens': FieldValue.arrayUnion([fcmToken]),
+                    }, SetOptions(merge: true));
+                    debugPrint('📱 [FCM] ✅ FCM token saved to Firestore after login');
+                  } else {
+                    debugPrint('📱 [FCM] ⚠️ Firebase Auth not signed in, skipping Firestore save');
+                  }
+                } catch (e) {
+                  debugPrint('📱 [FCM] ⚠️ Failed to save FCM token to Firestore: $e');
+                  // Don't block login if Firestore save fails
+                }
+              } else {
+                debugPrint('📱 [FCM] ⚠️ FCM token is null');
+              }
+            } catch (e) {
+              debugPrint('📱 [FCM] ⚠️ Error getting FCM token after login: $e');
+              // Don't block login if FCM token retrieval fails
+            }
 
             Navigator.pushAndRemoveUntil(
               context,
@@ -139,8 +212,20 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               (Route<dynamic> route) => false,
             );
           } else {
+            final errorBody = customTokenResponse.body;
+            debugPrint('Firebase custom token creation failed: ${customTokenResponse.statusCode}');
+            debugPrint('Error response: $errorBody');
+            
+            String errorMsg = 'Failed to login. Please try again.';
+            try {
+              final errorData = jsonDecode(errorBody);
+              errorMsg = errorData['message'] ?? errorMsg;
+            } catch (_) {
+              // If parsing fails, use default message
+            }
+            
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to login. Please try again.')),
+              SnackBar(content: Text(errorMsg)),
             );
           }
         } else if (userStatus == 'Pending' || userStatus == 'Submitted') {
@@ -170,7 +255,23 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
       setState(() {
         isSubmitting = false;
         hasError = true;
-        errorMessage = 'Network error. Please try again.';
+      });
+      
+      // Provide more specific error messages
+      String errorMsg = 'Network error. Please try again.';
+      if (e.toString().contains('SocketException') || 
+          e.toString().contains('Failed host lookup')) {
+        errorMsg = 'No internet connection. Please check your network.';
+      } else if (e.toString().contains('TimeoutException') || 
+                 e.toString().contains('timeout')) {
+        errorMsg = 'Request timed out. Please try again.';
+      } else if (e.toString().contains('FormatException')) {
+        errorMsg = 'Invalid response from server. Please try again.';
+      }
+      
+      debugPrint('Login error: $e');
+      setState(() {
+        errorMessage = errorMsg;
       });
     }
   }

@@ -52,7 +52,7 @@ class ChatListPage extends StatelessWidget {
             ),
             itemBuilder: (context, index) {
               ChatModel chat = chats[index];
-              String otherUserName = chat.sellerId == _chatService.currentUserId
+              String otherUserName = chat.sellerId == _chatService.currentUserIdSync
                   ? chat.buyerName
                   : chat.sellerName;
 

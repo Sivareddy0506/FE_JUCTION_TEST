@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:async';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
@@ -308,6 +311,54 @@ void _onHomeAddressChanged(String value) {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        
+        // Save userId if returned in response
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          if (responseBody['user'] != null && responseBody['user']['id'] != null) {
+            await prefs.setString('userId', responseBody['user']['id']);
+            debugPrint('📱 [Signup] User ID saved: ${responseBody['user']['id']}');
+          }
+        } catch (e) {
+          debugPrint('📱 [Signup] ⚠️ Failed to save userId: $e');
+        }
+        
+        // Register FCM token after onboarding completes
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final authToken = prefs.getString('authToken');
+          
+          if (authToken != null) {
+            debugPrint('📱 [FCM] Registering FCM token after onboarding...');
+            final fcmToken = await FirebaseMessaging.instance.getToken();
+            if (fcmToken != null) {
+              debugPrint('📱 [FCM] FCM token retrieved: ${fcmToken.substring(0, 20)}...');
+              
+              // Register with backend
+              try {
+                final fcmResponse = await http.post(
+                  Uri.parse('https://api.junctionverse.com/user/fcm-token'),
+                  headers: {
+                    'Authorization': 'Bearer $authToken',
+                    'Content-Type': 'application/json',
+                  },
+                  body: jsonEncode({'token': fcmToken}),
+                ).timeout(const Duration(seconds: 10));
+                
+                debugPrint('📱 [FCM] Backend registration status: ${fcmResponse.statusCode}');
+                // Note: Firestore save will happen after user logs in and Firebase Auth is signed in
+              } catch (e) {
+                debugPrint('📱 [FCM] ⚠️ Failed to register FCM token with backend: $e');
+                // Don't block onboarding if FCM registration fails
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('📱 [FCM] ⚠️ Error getting FCM token after onboarding: $e');
+          // Don't block onboarding if FCM token retrieval fails
+        }
+        
         Navigator.pushReplacement(
           context,
           FadePageRoute(page: const TermsAndConditionsPage()),
