@@ -82,21 +82,22 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
   Widget build(BuildContext context) {
     debugPrint('JauctionHomePage: build called');
 
-    // TODO: Uncomment when restoring auction functionality
-    // Widget content;
-    // 
-    // if (isLoading) {
-    //   content = const Center(child: CircularProgressIndicator());
-    // } else {
-    //   content = SafeArea(
-    //     child: SingleChildScrollView(
-    //       padding: const EdgeInsets.symmetric(horizontal: 16),
-    //       child: Column(
-    //         crossAxisAlignment: CrossAxisAlignment.start,
-    //         children: [
-    //           debugLogWidget('LogoAndIconsWidget'),
-    //           const LogoAndIconsWidget(),
-    //           const SizedBox(height: 16),
+  // TODO: Uncomment when restoring auction functionality
+  // Widget content;
+  // 
+  // if (isLoading) {
+  //   content = const Center(child: CircularProgressIndicator());
+  // } else {
+  //   content = SafeArea(
+  //     minimum: const EdgeInsets.only(top: 24), // extra push-down (same as home page)
+  //     child: SingleChildScrollView(
+  //       padding: const EdgeInsets.symmetric(horizontal: 16),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           debugLogWidget('LogoAndIconsWidget'),
+  //           const LogoAndIconsWidget(),
+  //           const SizedBox(height: 16),
     //           debugLogWidget('SearchBarWidget'),
     //           const SearchBarWidget(),
     //           const SizedBox(height: 16),
@@ -167,6 +168,7 @@ class _JauctionHomePageState extends State<JauctionHomePage> {
 
     // Current implementation - Coming Soon screen
     Widget content = SafeArea(
+      minimum: const EdgeInsets.only(top: 24), // extra push-down (same as home page)
       child: Column(
         children: [
           Padding(

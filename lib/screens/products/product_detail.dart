@@ -57,6 +57,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   DateTime? _pollingStartTime; // Track when polling started
   bool _isFetchingStatus = false; // Prevent multiple simultaneous status fetches
   bool _hasScheduledStatusFetch = false; // Prevent scheduling multiple status fetches
+  final TextEditingController _reportNotesController = TextEditingController();
+  String? _selectedReportReasonCode;
+  bool _isSubmittingReport = false;
+  
+  // Swipe hint tutorial
+  bool _showSwipeHint = false;
+  Timer? _swipeHintTimer;
+
+  static const List<Map<String, String>> _reportReasonOptions = [
+    {'code': 'SCAM', 'label': 'Scam / Fraud'},
+    {'code': 'SPAM', 'label': 'Spam or promotion'},
+    {'code': 'INAPPROPRIATE', 'label': 'Inappropriate content'},
+    {'code': 'MISLEADING', 'label': 'Misleading information'},
+    {'code': 'OTHER', 'label': 'Other'},
+  ];
 
   // After fetching related products, use this helper:
   void _setProductList(List<Product> fetched) {
@@ -112,10 +127,51 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _loadProductLocation();
     _fetchUniqueClicks();
     _fetchProductStatus(); // Fetch product status on init
+    _checkAndShowSwipeHint(); // Check if swipe hint should be shown
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
     });
+  }
+  
+  /// Check if user has seen swipe hint before, and show if needed
+  Future<void> _checkAndShowSwipeHint() async {
+    // Only show if there are multiple products to swipe through
+    if (relatedProducts.length <= 1) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenHint = prefs.getBool('hasSeenSwipeHint') ?? false;
+    
+    if (!hasSeenHint && mounted) {
+      // Show hint after a short delay to ensure UI is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() {
+            _showSwipeHint = true;
+          });
+          
+          // Auto-dismiss after 5 seconds
+          _swipeHintTimer = Timer(const Duration(seconds: 5), () {
+            if (mounted) {
+              _dismissSwipeHint();
+            }
+          });
+        }
+      });
+    }
+  }
+  
+  /// Dismiss swipe hint and save preference
+  void _dismissSwipeHint() async {
+    if (mounted) {
+      setState(() {
+        _showSwipeHint = false;
+      });
+    }
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenSwipeHint', true);
+    _swipeHintTimer?.cancel();
   }
   
   Future<String?> _fetchProductStatus() async {
@@ -223,12 +279,242 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _pollingStartTime = null;
   }
 
+  void _resetReportState() {
+    _selectedReportReasonCode = null;
+    _reportNotesController.clear();
+    _isSubmittingReport = false;
+  }
+
+  List<Widget> _buildAppBarActions(Product product, bool isSellerViewing) {
+    final bool isLoggedIn = _chatService.currentUserId != null;
+    final bool canReport = isLoggedIn && !isSellerViewing;
+
+    if (!canReport) return const [];
+
+    return [
+      IconButton(
+        icon: const Icon(Icons.flag_outlined, color: Color(0xFF262626)),
+        tooltip: 'Report listing',
+        onPressed: () => _openReportBottomSheet(product),
+      ),
+    ];
+  }
+
+  void _openReportBottomSheet(Product product) {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Report listing',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              Navigator.of(sheetContext).pop();
+                              setState(_resetReportState);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Let us know what\'s wrong with this listing.',
+                        style: TextStyle(color: Color(0xFF5F5F5F)),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _reportReasonOptions.map((option) {
+                          final code = option['code']!;
+                          final label = option['label']!;
+                          final isSelected = _selectedReportReasonCode == code;
+                          return ChoiceChip(
+                            label: Text(label),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF262626),
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : const Color(0xFF262626),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            backgroundColor: const Color(0xFFEDEDED),
+                            onSelected: (_) {
+                              setModalState(() {
+                                _selectedReportReasonCode = code;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _reportNotesController,
+                        maxLines: 4,
+                        maxLength: 1000,
+                        decoration: const InputDecoration(
+                          labelText: 'Additional details (optional)',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AppButton(
+                        label: _isSubmittingReport ? 'Submitting...' : 'Submit report',
+                        onPressed: (_selectedReportReasonCode == null || _isSubmittingReport)
+                            ? null
+                            : () => _submitListingReport(
+                                  product,
+                                  sheetContext,
+                                  setModalState,
+                                ),
+                        backgroundColor: const Color(0xFF262626),
+                        textColor: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(_resetReportState);
+      } else {
+        _resetReportState();
+      }
+    });
+  }
+
+  Future<void> _submitListingReport(
+    Product product,
+    BuildContext sheetContext,
+    void Function(void Function())? refreshSheetState,
+  ) async {
+    if (_selectedReportReasonCode == null || _isSubmittingReport) return;
+
+    void updateSubmitting(bool value) {
+      if (mounted) {
+        setState(() {
+          _isSubmittingReport = value;
+        });
+      } else {
+        _isSubmittingReport = value;
+      }
+      refreshSheetState?.call(() {});
+    }
+
+    updateSubmitting(true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+
+      if (token == null || token.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to report listings.')),
+        );
+        Navigator.of(sheetContext).pop();
+        return;
+      }
+
+      final uri = Uri.parse(
+          'https://api.junctionverse.com/product/products/${product.id}/report');
+      final payload = {
+        'reasonCode': _selectedReportReasonCode,
+        if (_reportNotesController.text.trim().isNotEmpty)
+          'reasonText': _reportNotesController.text.trim(),
+      };
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+
+      final int statusCode = response.statusCode;
+      if (statusCode == 401) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session expired. Please log in again.')),
+        );
+        Navigator.of(sheetContext).pop();
+        return;
+      }
+
+      if (statusCode == 200 || statusCode == 201) {
+        final Map<String, dynamic> body =
+            response.body.isNotEmpty ? jsonDecode(response.body) : {};
+        final bool alreadyReported =
+            body['alreadyReported'] == true || body['status'] == 'duplicate';
+
+        Navigator.of(sheetContext).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                alreadyReported ? 'You already reported this listing.' : 'Thanks for the report. Our team will review it.'),
+          ),
+        );
+        return;
+      }
+
+      final String errorMessage = () {
+        try {
+          final Map<String, dynamic> body = jsonDecode(response.body);
+          return body['message']?.toString();
+        } catch (_) {
+          return null;
+        }
+      }() ??
+          'Something went wrong. Please try again later.';
+
+      Navigator.of(sheetContext).pop();
+      ErrorHandler.showErrorSnackBar(context, errorMessage);
+    } catch (e) {
+      Navigator.of(sheetContext).pop();
+      ErrorHandler.showErrorSnackBar(context, e);
+    } finally {
+      updateSubmitting(false);
+    }
+  }
+
   @override
   void dispose() {
-    // Cancel timer first to prevent any async operations
+    // Cancel timers first to prevent any async operations
     _statusPollingTimer?.cancel();
     _statusPollingTimer = null;
     _pollingStartTime = null;
+    _swipeHintTimer?.cancel();
     
     // Remove listener to prevent callbacks after dispose
     _favoritesService.removeListener(_onFavoritesChanged);
@@ -236,6 +522,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     // Dispose controllers
     _pageController?.dispose();
     _imagePageController?.dispose();
+    _reportNotesController.dispose();
     
     super.dispose();
   }
@@ -424,6 +711,37 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       String chatId = '${productId}_${sellerId}_$buyerId';
       final prefs = await SharedPreferences.getInstance();
       String buyerName = prefs.getString('fullName') ?? 'You';
+      final token = prefs.getString('authToken');
+
+      // Check if user is blocked before allowing chat
+      if (token != null) {
+        try {
+          final blockCheckResponse = await http.get(
+            Uri.parse('https://api.junctionverse.com/user/check-block/$sellerId'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+
+          if (blockCheckResponse.statusCode == 200) {
+            final blockData = jsonDecode(blockCheckResponse.body);
+            if (blockData['isBlocked'] == true) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('You cannot chat with this user. They have been blocked.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              return; // Prevent chat from starting
+            }
+          }
+        } catch (e) {
+          debugPrint('Error checking block status: $e');
+          // Continue with chat if block check fails (don't block legitimate users due to errors)
+        }
+      }
 
       bool exists = await _chatService.chatExists(chatId);
       if (!exists) {
@@ -481,20 +799,30 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final bool isProductLocked = productStatus == 'Locked' || productStatus == 'Deal Locked';
 
     return Scaffold(
-      appBar: CustomAppBar(title: product.title),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: relatedProducts.length,
-        onPageChanged: (index) {
-          setState(() {
-            currentProductIndex = index;
-            _currentImageIndex = 0;
-          });
-          _imagePageController?.jumpToPage(0);
-        },
-        itemBuilder: (context, index) {
-          final product = relatedProducts[index];
-          return ListView(
+      appBar: CustomAppBar(
+        title: product.title,
+        actions: _buildAppBarActions(product, isSellerViewing),
+      ),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: relatedProducts.length,
+            onPageChanged: (index) {
+              setState(() {
+                currentProductIndex = index;
+                _currentImageIndex = 0;
+              });
+              _imagePageController?.jumpToPage(0);
+              
+              // Dismiss swipe hint on first swipe
+              if (_showSwipeHint) {
+                _dismissSwipeHint();
+              }
+            },
+            itemBuilder: (context, index) {
+              final product = relatedProducts[index];
+              return ListView(
             padding: EdgeInsets.fromLTRB(
                 16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
             children: [
@@ -609,6 +937,47 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ],
       );
         },
+      ),
+          
+          // Swipe hint banner (one-time tutorial)
+          if (_showSwipeHint && relatedProducts.length > 1)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: AnimatedOpacity(
+                opacity: _showSwipeHint ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.swipe, color: Colors.grey[700], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Swipe left or right to view more products',
+                          style: TextStyle(
+                            color: Colors.grey[800],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(isSellerViewing, isProductForSale, isDealLocked, isProductLocked, isProductSold),
     );
