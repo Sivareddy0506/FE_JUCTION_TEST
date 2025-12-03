@@ -21,6 +21,7 @@ import '../../services/profile_service.dart';
 import '../../utils/image_compression.dart';
 import 'account_settings_page.dart';
 import '../../app.dart'; // For SlidePageRoute, FadePageRoute
+import '../services/chat_service.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -67,6 +68,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   Future<void> _initializeApp() async {
     debugPrint('UserProfilePage: Starting initialization');
+    
+    // Initialize ChatService userId cache
+    await ChatService.initializeUserId();
     
     // Check if profile is already cached
     final isProfileCached = await ProfileService.isProfileCached();

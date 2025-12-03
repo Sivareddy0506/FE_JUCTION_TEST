@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'image': 'assets/slide1.png',
       'title': 'A Marketplace Built for Students',
       'description':
-          'Buy and sell essentials within Junction's verified network of student community',
+          "Buy and sell essentials within Junction's verified network of student community",
     },
     {
       'image': 'assets/slide2.png',
@@ -53,7 +53,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeApp() async {
     try {
-      await AppCacheService.initializeCache();
+      // Show splash immediately
+      setState(() {
+        _isInitializing = true;
+      });
+
+      // Initialize cache with timeout
+      try {
+        await AppCacheService.initializeCache().timeout(
+          const Duration(seconds: 5),
+        );
+      } catch (e) {
+        debugPrint('AppCacheService initialization error or timeout: $e');
+      }
+
       MemoryMonitorService().startMonitoring();
 
       final prefs = await SharedPreferences.getInstance();
@@ -65,13 +78,23 @@ class _HomeScreenState extends State<HomeScreen> {
       bool shouldGoToHome = false;
 
       if (isLoggedIn == true) {
-        final result = await AuthHealthService.refreshAuthToken();
-        if (result['status'] == 'refreshed') {
-          if (result['token'] != null) {
-            await prefs.setString('authToken', result['token']);
+        try {
+          final result = await AuthHealthService.refreshAuthToken().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => {'status': 'timeout'},
+          );
+          if (result['status'] == 'refreshed') {
+            if (result['token'] != null) {
+              await prefs.setString('authToken', result['token']);
+            }
+            shouldGoToHome = true;
+          } else {
+            await prefs.remove('authToken');
+            await prefs.setBool('isLogin', false);
+            shouldGoToHome = false;
           }
-          shouldGoToHome = true;
-        } else {
+        } catch (e) {
+          debugPrint('Token refresh error: $e');
           await prefs.remove('authToken');
           await prefs.setBool('isLogin', false);
           shouldGoToHome = false;
@@ -100,10 +123,14 @@ class _HomeScreenState extends State<HomeScreen> {
           SlidePageRoute(page: shouldGoToHome ? HomePage() : LoginPage()),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Initialization error: $e');
+      debugPrint('Stack trace: $stackTrace');
       // On any error, go to login
       if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
         Navigator.pushReplacement(
           context,
           SlidePageRoute(page: LoginPage()),

@@ -13,8 +13,8 @@ android {
     applicationId = "com.junction"
     minSdk = 23        // ✅ Kotlin DSL syntax
     targetSdk = 34     // ✅ Kotlin DSL syntax
-    versionCode = 2
-    versionName = "1.0.1"
+    versionCode = 30
+    versionName = "1.0.3"
     multiDexEnabled = true
 }
 configurations.all {

@@ -415,11 +415,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ? relatedProducts[currentProductIndex]
         : widget.product;
 
-    if (currentProduct.seller?.id == _chatService.currentUserId) return;
+    if (currentProduct.seller?.id == _chatService.currentUserIdSync) return;
 
     try {
       String sellerId = currentProduct.seller?.id ?? '';
-      String buyerId = _chatService.currentUserId;
+      String buyerId = await _chatService.currentUserId;
       String productId = currentProduct.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
       final prefs = await SharedPreferences.getInstance();
@@ -472,7 +472,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       );
     }
     final product = relatedProducts[currentProductIndex];
-    final bool isSellerViewing = product.seller?.id == _chatService.currentUserId;
+    final bool isSellerViewing = product.seller?.id == _chatService.currentUserIdSync;
     // Use current status if available, otherwise fallback to product.status
     final String productStatus = _currentProductStatus ?? product.status ?? 'For Sale';
     final bool isProductForSale = productStatus == 'For Sale';
@@ -695,7 +695,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
           behavior: HitTestBehavior.opaque,
           onTap: () {
             if (sellerId.isEmpty) return;
-            if (sellerId == _chatService.currentUserId) {
+            if (sellerId == _chatService.currentUserIdSync) {
               Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
             } else {
               Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: sellerId)));

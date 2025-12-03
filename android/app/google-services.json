@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "939748137916",
-    "project_id": "junction-testing",
-    "storage_bucket": "junction-testing.firebasestorage.app"
+    "project_number": "944746529789",
+    "project_id": "junction-e0625",
+    "storage_bucket": "junction-e0625.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:939748137916:android:b1001a08f76866b15969b9",
+        "mobilesdk_app_id": "1:944746529789:android:ebf092a4bf6db816c1cf94",
+        "android_client_info": {
+          "package_name": "com.example.junction"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASqmjASEB7EEQrRK-RySC45IZu6f6-A7E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:944746529789:android:0109c186117f845cc1cf94",
         "android_client_info": {
           "package_name": "com.junction"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDIzJ56tzKSj39v8_U761-ReTD_aINe5kc"
+          "current_key": "AIzaSyASqmjASEB7EEQrRK-RySC45IZu6f6-A7E"
         }
       ],
       "services": {

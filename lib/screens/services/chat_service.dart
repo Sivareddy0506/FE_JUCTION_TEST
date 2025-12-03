@@ -7,6 +7,7 @@ import 'backend_file_upload_service';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../utils/image_compression.dart';
 
 class ChatModel {
@@ -194,8 +195,62 @@ class ChatService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
-  String get currentUserId => _auth.currentUser?.uid ?? '';
+  // Static cached userId to avoid repeated async calls (shared across all instances)
+  static String? _cachedUserId;
+  static bool _isInitialized = false;
+  
+  // Get backend userId from SharedPreferences (used in Firestore participants array)
+  // This is async but we cache the result
+  Future<String> get currentUserId async {
+    if (_cachedUserId != null) {
+      return _cachedUserId!;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _cachedUserId = prefs.getString('userId') ?? '';
+    _isInitialized = true;
+    return _cachedUserId!;
+  }
+  
+  // Synchronous getter that returns cached value (may be empty if not loaded yet)
+  String get currentUserIdSync {
+    if (!_isInitialized && _cachedUserId == null) {
+      // Try to initialize synchronously (this is a best-effort attempt)
+      // For proper initialization, call initializeUserId() or await currentUserId
+      return '';
+    }
+    return _cachedUserId ?? '';
+  }
+  
+  // Get Firebase Auth UID (used for senderId in messages)
+  String get firebaseUserId => _auth.currentUser?.uid ?? '';
   String orderId = '';
+  
+  // Helper to get userId synchronously for Stream queries
+  Future<String> _getUserId() async {
+    if (_cachedUserId != null) {
+      return _cachedUserId!;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _cachedUserId = prefs.getString('userId') ?? '';
+    _isInitialized = true;
+    return _cachedUserId!;
+  }
+  
+  // Initialize userId cache (call this when user logs in)
+  static Future<void> initializeUserId() async {
+    if (_cachedUserId != null) {
+      return; // Already initialized
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _cachedUserId = prefs.getString('userId') ?? '';
+    _isInitialized = true;
+  }
+  
+  // Clear cache (call this when user logs out)
+  static void clearCache() {
+    _cachedUserId = null;
+    _isInitialized = false;
+  }
 
   Future<bool> chatExists(String chatId) async {
     try {
@@ -473,9 +528,10 @@ Stream<ChatModel?> getChatStream(String chatId) {
   }) async {
     try {
       String messageId = DateTime.now().millisecondsSinceEpoch.toString();
+      final userId = await currentUserId;
       MessageModel newMessage = MessageModel(
         messageId: messageId,
-        senderId: currentUserId,
+        senderId: userId,
         receiverId: receiverId,
         message: message,
         timestamp: DateTime.now(),
@@ -484,6 +540,7 @@ Stream<ChatModel?> getChatStream(String chatId) {
         attachmentData: attachmentData,
       );
 
+      // Write to Firestore first (for real-time updates)
       await _firestore
           .collection('messages')
           .doc(chatId)
@@ -497,8 +554,140 @@ Stream<ChatModel?> getChatStream(String chatId) {
         'lastMessage': lastMessageText,
         'lastMessageTime': Timestamp.fromDate(DateTime.now()),
       });
+
+      // 🔔 Call backend API to trigger push notifications
+      // This is non-blocking - if it fails, message is still saved to Firestore
+      _triggerBackendNotification(chatId: chatId, senderId: userId, messageText: message, hasAttachment: messageType == 'image')
+          .catchError((error) {
+        debugPrint('⚠️ [Chat] Failed to trigger backend notification: $error');
+        // Don't throw - message is already saved to Firestore
+      });
     } catch (e) {
       throw Exception('Failed to send message: $e');
+    }
+  }
+
+  // Helper method to call backend API for push notifications
+  Future<void> _triggerBackendNotification({
+    required String chatId,
+    required String senderId,
+    required String messageText,
+    bool hasAttachment = false,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final authToken = prefs.getString('authToken');
+      
+      if (authToken == null || authToken.isEmpty) {
+        return;
+      }
+
+      String? productId, sellerId, buyerId;
+      try {
+        final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+        if (chatDoc.exists && chatDoc.data() != null) {
+          final chatData = chatDoc.data()!;
+          productId = chatData['productId']?.toString();
+          sellerId = chatData['sellerId']?.toString();
+          buyerId = chatData['buyerId']?.toString();
+        }
+      } catch (e) {
+        debugPrint('Error fetching chat data: $e');
+        return;
+      }
+      
+      if (productId == null || sellerId == null || buyerId == null) {
+        return;
+      }
+      
+      String? backendChatId = await _findOrCreateBackendChat(
+        authToken: authToken,
+        productId: productId,
+        sellerId: sellerId,
+        buyerId: buyerId,
+        senderId: senderId,
+      );
+      
+      if (backendChatId == null) {
+        return;
+      }
+      
+      final uri = Uri.parse('https://api.junctionverse.com/chats/add-messages');
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $authToken';
+      request.fields['chatId'] = backendChatId;
+      request.fields['senderId'] = senderId;
+      request.fields['messageText'] = messageText;
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode != 200) {
+        debugPrint('Backend notification failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error triggering backend notification: $e');
+    }
+  }
+
+  Future<String?> _findOrCreateBackendChat({
+    required String authToken,
+    required String productId,
+    required String sellerId,
+    required String buyerId,
+    required String senderId,
+  }) async {
+    try {
+      final findUri = Uri.parse('https://api.junctionverse.com/chats/get-chats')
+          .replace(queryParameters: {
+        'buyerId': buyerId,
+        'sellerId': sellerId,
+      });
+      
+      final findResponse = await http.get(
+        findUri,
+        headers: {
+          'Authorization': 'Bearer $authToken',
+          'Content-Type': 'application/json',
+        },
+      );
+      
+      if (findResponse.statusCode == 200) {
+        final findData = jsonDecode(findResponse.body);
+        if (findData['success'] == true && findData['chat'] != null) {
+          final chatId = findData['chat']['id']?.toString();
+          if (chatId != null && chatId.isNotEmpty) {
+            return chatId;
+          }
+        }
+      }
+      
+      final createUri = Uri.parse('https://api.junctionverse.com/chats/createchat');
+      final createResponse = await http.post(
+        createUri,
+        headers: {
+          'Authorization': 'Bearer $authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'productId': productId,
+          'buyerId': buyerId,
+          'sellerId': sellerId,
+          'senderId': senderId,
+        }),
+      );
+      
+      if (createResponse.statusCode == 201) {
+        final createData = jsonDecode(createResponse.body);
+        if (createData['success'] == true && createData['chatId'] != null) {
+          return createData['chatId']?.toString();
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Error finding/creating backend chat: $e');
+      return null;
     }
   }
 
@@ -517,7 +706,7 @@ Stream<ChatModel?> getChatStream(String chatId) {
         'price': price,
         'isConfirmed': false,
         'offerNumber': offerNumber,
-        'quotedBy': currentUserId,  // Track who made the quote
+        'quotedBy': await currentUserId,  // Track who made the quote
       },
     );
   }
@@ -546,7 +735,7 @@ Future<String> confirmDeal({
       priceData: {
         'price': finalPrice,
         'isConfirmed': true,
-        'confirmedBy': currentUserId,
+        'confirmedBy': await currentUserId,
       },
     );
 
@@ -788,14 +977,20 @@ static Future<String> lockDeal({
   }
 
   Stream<List<ChatModel>> getUserChats() {
-    return _firestore
-        .collection('chats')
-        .where('participants', arrayContains: currentUserId)
-        .orderBy('lastMessageTime', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatModel.fromFirestore(doc.data()))
-            .toList());
+    return Stream.fromFuture(_getUserId()).asyncExpand((userId) {
+      if (userId.isEmpty) {
+        return Stream.value(<ChatModel>[]);
+      }
+      
+      return _firestore
+          .collection('chats')
+          .where('participants', arrayContains: userId)
+          .orderBy('lastMessageTime', descending: true)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => ChatModel.fromFirestore(doc.data()))
+              .toList());
+    });
   }
 
   Future<int> getNextOfferNumber(String chatId) async {
@@ -813,11 +1008,12 @@ static Future<String> lockDeal({
   Future<void> markMessagesAsRead(String chatId) async {
     try {
       // Get all unread messages where current user is the receiver
+      final userId = await currentUserId;
       final unreadMessages = await _firestore
           .collection('messages')
           .doc(chatId)
           .collection('messages')
-          .where('receiverId', isEqualTo: currentUserId)
+          .where('receiverId', isEqualTo: userId)
           .where('isRead', isEqualTo: false)
           .get();
 
