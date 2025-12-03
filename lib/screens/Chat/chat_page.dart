@@ -183,12 +183,13 @@ class _ChatPageState extends State<ChatPage> {
       final parts = widget.chatId.split('_');
       
       if (parts.length >= 3) {
-        final currentUserId = _chatService.currentUserId;
+        final currentUserId = _chatService.currentUserIdSync;
         final sellerId = parts[1];
         final buyerId = parts[2];
         
         // Determine which one is the peer (the other user)
-        _peerUserId = (currentUserId == buyerId) ? sellerId : buyerId;
+        // If current user is the seller, peer is buyer; otherwise peer is seller
+        _peerUserId = (currentUserId == sellerId) ? buyerId : sellerId;
       }
     } catch (e) {
       debugPrint('[BlockCheck] Error extracting peer ID: $e');
@@ -198,10 +199,11 @@ class _ChatPageState extends State<ChatPage> {
   /// Update peer user ID from cached chat data (backup method)
   void _updatePeerUserId() {
     if (_cachedChatData != null) {
-      final currentUserId = _chatService.currentUserId;
-      final newPeerUserId = _cachedChatData!.buyerId == currentUserId
-          ? _cachedChatData!.sellerId
-          : _cachedChatData!.buyerId;
+      final currentUserId = _chatService.currentUserIdSync;
+      // If current user is the seller, peer is buyer; otherwise peer is seller
+      final newPeerUserId = _cachedChatData!.sellerId == currentUserId
+          ? _cachedChatData!.buyerId
+          : _cachedChatData!.sellerId;
       
       // If peer ID just became available, check block status immediately
       if (_peerUserId == null && newPeerUserId.isNotEmpty) {
@@ -632,6 +634,11 @@ class _ChatPageState extends State<ChatPage> {
 }
 
   Widget _buildActionButtonsArea(ChatModel chatData) {
+  // If chat is blocked, don't show any action buttons
+  if (_isChatBlocked) {
+    return const SizedBox.shrink();
+  }
+  
   final String currentUserId = _chatService.currentUserIdSync;
   final bool isSeller = currentUserId.isNotEmpty && chatData.sellerId == currentUserId;
   final bool isBuyer = currentUserId.isNotEmpty && chatData.buyerId == currentUserId;
@@ -1255,9 +1262,11 @@ void _showCancelDealConfirmation(ChatModel chatData) {
           builder: (context, chatSnapshot) {
             if (!chatSnapshot.hasData) return const SizedBox.shrink();
             final chatData = chatSnapshot.data!;
-            final peerUserId = chatData.buyerId == _chatService.currentUserId
-                ? chatData.sellerId
-                : chatData.buyerId;
+            final currentUserId = _chatService.currentUserIdSync;
+            // If current user is the seller, peer is buyer; otherwise peer is seller
+            final peerUserId = chatData.sellerId == currentUserId
+                ? chatData.buyerId
+                : chatData.sellerId;
             return IconButton(
               icon: const Icon(Icons.flag_outlined, color: Colors.black),
               onPressed: () => _openReportUserBottomSheet(peerUserId, chatData),
