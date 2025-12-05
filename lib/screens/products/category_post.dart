@@ -18,11 +18,9 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
     "Books",
     "Sports",
     "Fashion",
-    "Gaming",
     "Hobbies",
-    "Tickets",
     "Vehicles",
-    "Miscellaneous",
+    "Other",
   ];
 
  void _onCategorySelected(String category) {

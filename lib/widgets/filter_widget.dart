@@ -144,11 +144,9 @@ class _FilterModalState extends State<FilterModal> {
                   "Books",
                   "Sports",
                   "Fashion",
-                  "Gaming",
                   "Hobbies",
-                  "Tickets",
                   "Vehicles",
-                  "Miscellaneous"
+                  "Other"
                 ], selectedCategories, (value) {
                   setState(() => selectedCategories = value);
                   _saveFilterState(); // Save state when changed

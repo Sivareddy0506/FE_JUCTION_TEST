@@ -75,15 +75,16 @@ class PrivacyPage extends StatelessWidget {
                 );
               },
             ),
-            _buildPrivacyItem(
-              context: context,
-              title: "Download My Data",
-              description:
-                  "Request a copy of your profile, listings, and transaction history.",
-              onTap: () {
-                // Future implementation
-              },
-            ),
+            // Hidden: Download My Data option
+            // _buildPrivacyItem(
+            //   context: context,
+            //   title: "Download My Data",
+            //   description:
+            //       "Request a copy of your profile, listings, and transaction history.",
+            //   onTap: () {
+            //     // Future implementation
+            //   },
+            // ),
             _buildPrivacyItem(
               context: context,
               title: "Delete My Account",

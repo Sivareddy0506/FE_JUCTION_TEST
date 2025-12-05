@@ -7,6 +7,7 @@ import '../../../widgets/app_dropdown.dart';
 import '../../widgets/tune_auction.dart';
 import './add_product_images.dart';
 import '../../app.dart'; // For SlidePageRoute
+import '../../constants/category_placeholders.dart';
 
 class DescribeProductPage extends StatefulWidget {
   final String selectedCategory;
@@ -363,7 +364,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           const SizedBox(height: 16),
                           AppTextField(
                             label: 'Title *',
-                            placeholder: 'Eg: Samsung A14 for urgent sale',
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'title'),
                             controller: titleController,
                           ),
                           const SizedBox(height: 16),
@@ -373,7 +374,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                             children: [
                               AppTextField(
                                 label: 'Price *',
-                                placeholder: '34000',
+                                placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'price'),
                                 controller: priceController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 onChanged: _onPriceChanged,
@@ -396,7 +397,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           
                           AppTextField(
                             label: 'Product Description *',
-                            placeholder: 'Good condition, box included',
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'description'),
                             controller: descriptionController,
                             maxLines: 5,
                           ),
@@ -409,7 +410,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           const SizedBox(height: 16),
                           AppTextField(
                             label: 'Product Name *',
-                            placeholder: 'Eg: Product Name',
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'productName'),
                             controller: productNameController,
                           ),
                           const SizedBox(height: 16),
@@ -422,7 +423,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                                 child: AbsorbPointer(
                                   child: AppTextField(
                                     label: 'Year of Purchase *',
-                                    placeholder: 'Eg: 2020',
+                                    placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'year'),
                                     controller: yearController,
                                   ),
                                 ),
@@ -480,7 +481,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
 
                           AppTextField(
                             label: 'Brand Name *',
-                            placeholder: 'Eg: Samsung, Apple, etc.',
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'brandName'),
                             controller: brandController,
                           ),
                         ],

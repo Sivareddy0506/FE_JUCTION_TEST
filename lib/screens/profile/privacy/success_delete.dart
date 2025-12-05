@@ -1,11 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/app_button.dart';
+import '../../../services/profile_service.dart';
 import '../../signup/signup_page.dart';
 
-class ReportedSuccessPage extends StatelessWidget {
+class ReportedSuccessPage extends StatefulWidget {
   const ReportedSuccessPage({super.key});
+
+  @override
+  State<ReportedSuccessPage> createState() => _ReportedSuccessPageState();
+}
+
+class _ReportedSuccessPageState extends State<ReportedSuccessPage> {
+  @override
+  void initState() {
+    super.initState();
+    _clearAllLocalData();
+  }
+
+  /// Clear all local data, caches, and authentication tokens
+  Future<void> _clearAllLocalData() async {
+    try {
+      debugPrint('Account deletion: Clearing all local data');
+      
+      // 1. Clear SharedPreferences (auth token, login status, etc.)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      debugPrint('Account deletion: Cleared SharedPreferences (includes auth token)');
+      
+      // 2. Clear ProfileService cache
+      await ProfileService.clearProfileCache();
+      debugPrint('Account deletion: Cleared ProfileService cache');
+      
+      // Note: FavoritesService will automatically return empty on next init
+      // since auth token is cleared from SharedPreferences
+      
+      debugPrint('Account deletion: All local data cleared successfully');
+    } catch (e) {
+      debugPrint('Account deletion: Error clearing local data - $e');
+      // Continue even if clearing fails
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,3 +110,4 @@ class ReportedSuccessPage extends StatelessWidget {
     );
   }
 }
+
