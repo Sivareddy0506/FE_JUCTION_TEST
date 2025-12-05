@@ -39,10 +39,15 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
     final url = Uri.parse("https://api.junctionverse.com/user/delete");
 
+    // If user provides no description, send "no description" to satisfy backend validation
+    final description = _feedbackController.text.trim().isEmpty 
+        ? "no description" 
+        : _feedbackController.text.trim();
+
     final payload = {
       "reasonForDeletion": {
         "reason": widget.selectedReason,
-        "description": _feedbackController.text.trim()
+        "description": description
       }
     };
 

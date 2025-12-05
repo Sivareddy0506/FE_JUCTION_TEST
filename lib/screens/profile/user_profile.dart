@@ -690,14 +690,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
             Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8, bottom: 0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(width: 48),
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
                           CircleAvatar(
                             radius: 36,
                             backgroundColor: avatarBackground,
@@ -808,6 +811,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             ),
                           ),
                         ],
+                        ),
                       ),
                       IconButton(
                         onPressed: () {
@@ -828,7 +832,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Text(
                   name,
                   style: const TextStyle(
@@ -838,7 +842,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     height: 36 / 28,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -880,15 +884,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 48),
                 Expanded(
                   child: Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(40),
-                        topRight: Radius.circular(40),
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
                       ),
                     ),
                     child: Column(
@@ -898,8 +902,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                        
                         ClipRRect(
   borderRadius: const BorderRadius.only(
-    topLeft: Radius.circular(40),
-    topRight: Radius.circular(40),
+    topLeft: Radius.circular(20),
+    topRight: Radius.circular(20),
   ),
   child: Container(
     height: 50,

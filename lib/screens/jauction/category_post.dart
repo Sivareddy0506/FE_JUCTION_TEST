@@ -15,11 +15,9 @@ class _CategoryPostPageState extends State<JauctionCategoryPostPage> {
     "Books",
     "Sports",
     "Fashion",
-    "Gaming",
     "Hobbies",
-    "Tickets",
     "Vehicles",
-    "Miscellaneous",
+    "Other",
   ];
 
   void _onCategorySelected(String category) {

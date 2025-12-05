@@ -163,6 +163,8 @@ class _LogoAndIconsWidgetState extends State<LogoAndIconsWidget> {
 
     return Row(
       children: [
+        // Add 16px left padding to align logo with search bar content
+        const SizedBox(width: 16),
         // Logos
         ...logoAssets.map(
           (asset) => Padding(
