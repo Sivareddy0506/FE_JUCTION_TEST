@@ -4,7 +4,6 @@ import '../../../app.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../services/profile_service.dart';
-import '../../../services/favorites_service.dart';
 import '../../signup/signup_page.dart';
 
 class ReportedSuccessPage extends StatefulWidget {
@@ -29,15 +28,14 @@ class _ReportedSuccessPageState extends State<ReportedSuccessPage> {
       // 1. Clear SharedPreferences (auth token, login status, etc.)
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      debugPrint('Account deletion: Cleared SharedPreferences');
+      debugPrint('Account deletion: Cleared SharedPreferences (includes auth token)');
       
       // 2. Clear ProfileService cache
       await ProfileService.clearProfileCache();
       debugPrint('Account deletion: Cleared ProfileService cache');
       
-      // 3. Clear FavoritesService
-      await FavoritesService().clearAllFavorites();
-      debugPrint('Account deletion: Cleared FavoritesService');
+      // Note: FavoritesService will automatically return empty on next init
+      // since auth token is cleared from SharedPreferences
       
       debugPrint('Account deletion: All local data cleared successfully');
     } catch (e) {
