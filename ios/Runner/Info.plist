@@ -42,6 +42,8 @@
 	<string>Microphone access may be used for future features like voice notes and voice search.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>JunctionVerse needs access to your photo library to upload product images for your listings, verification documents, profile pictures, and images you want to share in conversations.</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyDac5AofLm9WaxphZKhpWgmT7qqW1kF3Ek</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

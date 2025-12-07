@@ -150,7 +150,7 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: AppButton(
                 bottomSpacing: 20,
-                label: 'Add New Address',
+                label: 'Review Guidelines',
                 backgroundColor: const Color(0xFF262626),
                 onPressed: () {
                   Navigator.push(

@@ -12,7 +12,7 @@ class JauctionComingSoonWidget extends StatelessWidget {
           Image.asset('assets/inventing.png', width: 200),
           const SizedBox(height: 16),
           const Text(
-            'Something great is coming here soon !',
+            'Something great is coming here soon!',
             style: TextStyle(
               color: Colors.grey,
               fontSize: 16,

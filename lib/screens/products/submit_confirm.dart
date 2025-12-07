@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
-import '../profile/user_profile.dart';
+import 'listing_submitted.dart';
 
 class PostGuidelinesPage extends StatefulWidget {
   final String selectedCategory;
@@ -100,20 +100,12 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Product submitted successfully'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
+          Navigator.pushAndRemoveUntil(
+            context,
+            SlidePageRoute(page: const ListingSubmittedPage()),
+            (Route<dynamic> route) => false, // ⬅️ removes all previous routes
           );
         }
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          SlidePageRoute(page: const UserProfilePage()),
-              (Route<dynamic> route) => false, // ⬅️ removes all previous routes
-        );
     } else {
         debugPrint('❌ Submission failed: ${response.statusCode}');
         debugPrint(response.body);
