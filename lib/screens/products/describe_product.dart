@@ -357,64 +357,49 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           ),
                           const SizedBox(height: 32),
 
-                          const Text(
-                            "Ad Details",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
+                          // 1. Title
                           AppTextField(
                             label: 'Title *',
                             placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'title'),
                             controller: titleController,
                           ),
                           const SizedBox(height: 16),
-                          
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AppTextField(
-                                label: 'Price *',
-                                placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'price'),
-                                controller: priceController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                onChanged: _onPriceChanged,
-                                prefixText: '₹ ',
-                              ),
-                              if (priceError != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4, left: 12),
-                                  child: Text(
-                                    priceError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          AppTextField(
-                            label: 'Product Description *',
-                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'description'),
-                            controller: descriptionController,
-                            maxLines: 5,
-                          ),
-                          const SizedBox(height: 32),
 
-                          const Text(
-                            "Product Details",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
+                          // 2. Product Name
                           AppTextField(
                             label: 'Product Name *',
                             placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'productName'),
                             controller: productNameController,
                           ),
                           const SizedBox(height: 16),
-                          
+
+                          // 3. Product Description
+                          AppTextField(
+                            label: 'Product Description *',
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'description'),
+                            controller: descriptionController,
+                            maxLines: 5,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 4. Brand / Author / Artist
+                          AppTextField(
+                            label: 'Brand / Author / Artist *',
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'brandName'),
+                            controller: brandController,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 5. Condition
+                          AppDropdown(
+                            label: 'Condition *',
+                            items: conditionOptions,
+                            value: selectedCondition,
+                            onChanged: (val) => setState(() => selectedCondition = val),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 6. Year of Purchase
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -463,26 +448,30 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           ),
                           const SizedBox(height: 16),
 
-                          // AppDropdown(
-                          //   label: 'Usage',
-                          //   items: usageOptions,
-                          //   value: selectedUsage,
-                          //   onChanged: (val) => setState(() => selectedUsage = val),
-                          // ),
-                          // const SizedBox(height: 16),
-
-                          AppDropdown(
-                            label: 'Condition *',
-                            items: conditionOptions,
-                            value: selectedCondition,
-                            onChanged: (val) => setState(() => selectedCondition = val),
-                          ),
-                          const SizedBox(height: 16),
-
-                          AppTextField(
-                            label: 'Brand Name *',
-                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'brandName'),
-                            controller: brandController,
+                          // 7. Price
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppTextField(
+                                label: 'Price *',
+                                placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'price'),
+                                controller: priceController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                onChanged: _onPriceChanged,
+                                prefixText: '₹ ',
+                              ),
+                              if (priceError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4, left: 12),
+                                  child: Text(
+                                    priceError!,
+                                    style: const TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ),

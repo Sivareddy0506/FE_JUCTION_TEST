@@ -7,7 +7,7 @@ class CategoryPlaceholders {
     'Electronics': {
       'title': 'Eg: Samsung A14 for urgent sale',
       'price': '15000',
-      'description': 'Good condition, charger and box included',
+      'description': 'Charger and box included',
       'productName': 'Eg: Samsung Galaxy A14',
       'year': '2023',
       'brandName': 'Eg: Samsung, Apple, OnePlus',
@@ -31,7 +31,7 @@ class CategoryPlaceholders {
     'Sports': {
       'title': 'Eg: Badminton racket with cover',
       'price': '1200',
-      'description': 'Used for 6 months, strings in good condition',
+      'description': 'Used for 6 months, strings intact',
       'productName': 'Eg: Yonex Nanoray Light',
       'year': '2023',
       'brandName': 'Eg: Yonex, Nike, Adidas',
@@ -87,7 +87,7 @@ class CategoryPlaceholders {
       case 'price':
         return '1000';
       case 'description':
-        return 'Describe your product condition and features';
+        return 'Describe your product features';
       case 'productName':
         return 'Eg: Product Name';
       case 'year':

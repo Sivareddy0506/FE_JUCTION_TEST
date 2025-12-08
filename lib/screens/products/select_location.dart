@@ -41,11 +41,12 @@ class SelectLocationPage extends StatefulWidget {
 
 class _SelectLocationPageState extends State<SelectLocationPage> {
   GoogleMapController? mapController;
-  LatLng _currentLatLng = const LatLng(17.385044, 78.486671); // Default to Hyderabad
+  LatLng? _currentLatLng; // Start as null, will be set after location is fetched
   String _address = 'Fetching address...';
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   bool _userSearched = false;
+  bool _isLoading = true; // Loading state for map initialization
 
   @override
   void initState() {
@@ -61,28 +62,44 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
   }
 
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      await Geolocator.requestPermission();
-    }
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      permission = await Geolocator.requestPermission();
-    }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
 
-    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      _updatePosition(LatLng(position.latitude, position.longitude));
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        _updatePosition(LatLng(position.latitude, position.longitude));
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Location error: $e");
+      setState(() => _isLoading = false);
     }
   }
 
   void _updatePosition(LatLng position) {
     setState(() {
       _currentLatLng = position;
+      _isLoading = false; // Map can now be rendered
     });
     _fetchAddress(position);
-    mapController?.animateCamera(CameraUpdate.newLatLng(position));
+    // Wait for map controller to be ready before animating
+    if (mapController != null) {
+      mapController!.animateCamera(CameraUpdate.newLatLng(position));
+    }
   }
 
   Future<void> _fetchAddress(LatLng position) async {
@@ -161,8 +178,9 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
   }
 
   void _onConfirm() {
+    if (_currentLatLng == null) return;
     Navigator.pop(context, {
-      "coordinates": _currentLatLng,
+      "coordinates": _currentLatLng!,
       "address": _address,
     });
   }
@@ -173,29 +191,53 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
       appBar: AppBar(
         title: const Text('Select Location'),
       ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            onMapCreated: (controller) => mapController = controller,
-            initialCameraPosition: CameraPosition(
-              target: _currentLatLng,
-              zoom: 15,
-            ),
-            onTap: _onMapTap,
-            myLocationEnabled: true,
-            markers: {
-              Marker(
-                markerId: const MarkerId('selected-location'),
-                position: _currentLatLng,
-              ),
-            },
-          ),
-          // Search bar
-          Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
-            child: Container(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _currentLatLng == null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Unable to fetch your location. Please enable location services and try again.'),
+                      const SizedBox(height: 12),
+                      AppButton(
+                        label: 'Retry',
+                        onPressed: _getCurrentLocation,
+                        backgroundColor: const Color(0xFFFF6705),
+                        textColor: Colors.white,
+                      ),
+                    ],
+                  ),
+                )
+              : Stack(
+                  children: [
+                    GoogleMap(
+                      onMapCreated: (controller) {
+                        mapController = controller;
+                        // Animate to current position once controller is ready
+                        if (_currentLatLng != null) {
+                          controller.animateCamera(CameraUpdate.newLatLng(_currentLatLng!));
+                        }
+                      },
+                      initialCameraPosition: CameraPosition(
+                        target: _currentLatLng!,
+                        zoom: 15,
+                      ),
+                      onTap: _onMapTap,
+                      myLocationEnabled: true,
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('selected-location'),
+                          position: _currentLatLng!,
+                        ),
+                      },
+                    ),
+                    // Search bar
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      right: 16,
+                      child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               height: 48,
               decoration: BoxDecoration(
@@ -227,15 +269,14 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-          // Bottom sheet with address and button
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
+                      ),
+                    ),
+                    // Bottom sheet with address and button
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -275,9 +316,11 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
                     onPressed: widget.isEditing ? _onConfirm : _onNext,
                     backgroundColor: const Color(0xFFFF6705),
                     textColor: Colors.white,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -290,6 +333,7 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
       _onConfirm();
       return;
     }
+    if (_currentLatLng == null) return;
     Navigator.push(
       context,
       SlidePageRoute(
@@ -306,7 +350,7 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
           productName: widget.productName,
           selectedCategory: widget.selectedCategory,
           yearOfPurchase: widget.yearOfPurchase,
-          latlng: _currentLatLng,
+          latlng: _currentLatLng!,
         ),
       ),
     );

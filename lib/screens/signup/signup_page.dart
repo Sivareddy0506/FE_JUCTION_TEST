@@ -166,11 +166,12 @@ class _SignupPageState extends State<SignupPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          alignment: WrapAlignment.center,
                           children: [
                             const Text(
-                              'Already have an account?',
+                              'Already have an account? ',
                               style: TextStyle(fontSize: 14, color: Color(0xFF212121)),
                             ),
                             TextButton(
@@ -184,7 +185,7 @@ class _SignupPageState extends State<SignupPage> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF212121),
+                                  color: Color(0xFFFF6705),
                                 ),
                               ),
                             ),

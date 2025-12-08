@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
+import GoogleMaps
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -9,6 +10,16 @@ import FirebaseMessaging
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Initialize Google Maps SDK
+    if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+       let plist = NSDictionary(contentsOfFile: path),
+       let apiKey = plist["API_KEY"] as? String {
+      GMSServices.provideAPIKey(apiKey)
+      print("✅ Google Maps SDK initialized with API key")
+    } else {
+      print("⚠️ Warning: Could not find Google Maps API key in GoogleService-Info.plist")
+    }
+    
     // Note: Firebase is initialized in Flutter (main.dart), not here
     // Calling FirebaseApp.configure() here causes duplicate initialization error
     
