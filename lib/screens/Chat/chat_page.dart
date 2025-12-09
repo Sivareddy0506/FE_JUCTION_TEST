@@ -56,7 +56,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _hasDoneInitialScroll = false;
   
   // Button disabling and error handling
-  bool _isConfirmButtonDisabled = false;
+  final bool _isConfirmButtonDisabled = false;
   Timer? _confirmButtonTimer;
   String? _errorMessage;
   DateTime? _nextQuoteAllowedAt;
@@ -972,7 +972,7 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                       Text(
                         'Locked Price: ₹${chatData.finalPrice?.toStringAsFixed(0) ?? '0'}',
                         style: const TextStyle(
-                          color: const Color(0xFFFF6705),
+                          color: Color(0xFFFF6705),
 
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -2721,7 +2721,7 @@ Widget _buildProductCard(MessageModel message) {
                   Text(
                     '${productData['price']}',
                     style: const TextStyle(
-                      color: const Color(0xFFFF6705),
+                      color: Color(0xFFFF6705),
 
                       fontWeight: FontWeight.bold,
                     ),

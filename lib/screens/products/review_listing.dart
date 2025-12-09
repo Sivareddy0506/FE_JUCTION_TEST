@@ -120,7 +120,7 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
                 ),
                 Text(
                   widget.price,
-                  style: const TextStyle(fontSize: 16, color: const Color(0xFFFF6705),
+                  style: const TextStyle(fontSize: 16, color: Color(0xFFFF6705),
  fontWeight: FontWeight.bold),
                 ),
               ],
