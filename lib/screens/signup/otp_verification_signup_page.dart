@@ -148,7 +148,9 @@ class _OTPVerificationSignupPageState extends State<OTPVerificationSignupPage> {
     if (response.statusCode == 200) {
       setState(() {
         otpError = false;
-        for (final c in controllers) c.clear();
+        for (final c in controllers) {
+          c.clear();
+        }
         FocusScope.of(context).requestFocus(focusNodes[0]);
       });
       ScaffoldMessenger.of(context)

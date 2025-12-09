@@ -136,7 +136,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     await _updatePreferences();
                     await _fetchPreferences();
                   },
-                  activeColor: Colors.white,
+                  activeThumbColor: Colors.white,
                   activeTrackColor: const Color(0xFFFF6705),
                   inactiveThumbColor: Colors.white,
                   inactiveTrackColor: const Color(0xFFC9C8D3),

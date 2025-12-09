@@ -152,7 +152,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
                   child: Switch(
                     value: value,
                     onChanged: (_) => _showSettingsDialog(permissionName),
-                    activeColor: Colors.white,
+                    activeThumbColor: Colors.white,
                     activeTrackColor: const Color(0xFFFF6705),
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFC9C8D3),
