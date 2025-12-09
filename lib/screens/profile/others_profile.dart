@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../widgets/products_grid.dart';
 import '../../widgets/bottom_navbar.dart';
@@ -12,7 +14,12 @@ import 'about.dart';
 
 class OthersProfilePage extends StatefulWidget {
   final String userId;
-  const OthersProfilePage({super.key, required this.userId});
+  final bool fromChat; // If true, show back button overlay on top left
+  const OthersProfilePage({
+    super.key, 
+    required this.userId,
+    this.fromChat = false,
+  });
 
   @override
   State<OthersProfilePage> createState() => _OthersProfilePageState();
@@ -28,6 +35,10 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
   int selectedTabIndex = 0;
   List<Product> activeListings = [];
   bool _loadingActive = true;
+  
+  // Block user state
+  bool _isBlocked = false;
+  bool _isBlocking = false;
 
   Color get _baseColor {
     final hash = name.hashCode;
@@ -60,6 +71,31 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
     });
 
     try {
+      // First check if user is blocked (bidirectional check)
+      final isBlocked = await _checkBlockStatus();
+      
+      if (isBlocked && mounted) {
+        // User is blocked, show message and navigate back
+        setState(() {
+          _isLoading = false;
+          _loadingActive = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User is blocked. Cannot view profile.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        // Navigate back after a short delay
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
+        return;
+      }
+
+      // If not blocked, proceed with loading profile data
       final results = await Future.wait([
         ActiveListingRepository.fetchActiveListings(userId: widget.userId),
         AboutRepository.fetchAboutData(userId: widget.userId),
@@ -252,11 +288,14 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
 
     final Widget content = _isLoading
         ? const Center(child: CircularProgressIndicator())
-        : SafeArea(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (bgImage != null) ...[
+        : Stack(
+            fit: StackFit.expand,
+            children: [
+              SafeArea(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (bgImage != null) ...[
                   Image.network(
                     bgImage,
                     fit: BoxFit.cover,
@@ -397,10 +436,74 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
                     ),
                   ],
                 ),
-              ],
-            ),
+                  ],
+                ),
+              ),
+              // Back button overlay when navigating from chat (outside SafeArea for top-left positioning)
+              if (widget.fromChat)
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  left: 8,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Image.asset(
+                        'assets/back.png',
+                        width: 24,
+                        height: 24,
+                        color: Colors.white,
+                        colorBlendMode: BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                ),
+              // Block user button overlay (top right)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: _isBlocked ? null : _showBlockConfirmation,
+                  child: Container(
+                    padding: const EdgeInsets.all(8.0),
+                    decoration: BoxDecoration(
+                      color: _isBlocked 
+                          ? Colors.grey.withOpacity(0.4)
+                          : Colors.black.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: _isBlocking
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Icon(
+                            _isBlocked ? Icons.block : Icons.block_outlined,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                  ),
+                ),
+              ),
+            ],
           );
 
+    // When navigating from chat, don't show bottom nav bar
+    if (widget.fromChat) {
+      return Scaffold(
+        body: content,
+      );
+    }
+
+    // Default behavior: show bottom nav bar
     return BottomNavWrapper(
       activeItem: 'profile',
       onTap: (_) {},
@@ -453,5 +556,164 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
         ),
       ),
     );
+  }
+
+  /// Check if either user has blocked the other (bidirectional)
+  /// Returns true if blocked, false otherwise
+  Future<bool> _checkBlockStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+
+      if (token == null) return false;
+
+      final response = await http.get(
+        Uri.parse('https://api.junctionverse.com/user/check-block/${widget.userId}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Check if either user blocked the other (bidirectional)
+        final isBlocked = data['isBlocked'] == true;
+        final blockedByMe = data['blockedByMe'] == true;
+        
+        if (mounted) {
+          setState(() {
+            // Store blockedByMe for button state (if we show the button)
+            _isBlocked = blockedByMe;
+          });
+        }
+        
+        return isBlocked;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking block status: $e');
+      // Return false on error to allow viewing (fail open)
+      return false;
+    }
+  }
+
+  void _showBlockConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Block User'),
+          content: Text('Are you sure you want to block $name? You will not be able to chat with them or see their listings.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _blockUser();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Block'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _blockUser() async {
+    if (_isBlocking || _isBlocked) return;
+
+    setState(() {
+      _isBlocking = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+
+      if (token == null) {
+        if (!mounted) return;
+        setState(() {
+          _isBlocking = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to block users')),
+        );
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/user/${widget.userId}/block'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final alreadyExists = data['alreadyExists'] == true;
+
+        setState(() {
+          _isBlocked = true;
+          _isBlocking = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(alreadyExists
+                ? 'User is already blocked'
+                : 'User blocked successfully. You can no longer chat with them.'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // If navigated from chat, go back to chat screen
+        if (widget.fromChat) {
+          Navigator.pop(context);
+        }
+      } else {
+        setState(() {
+          _isBlocking = false;
+        });
+
+        String errorMessage;
+        try {
+          final data = jsonDecode(response.body);
+          errorMessage = data['message']?.toString() ?? 'Failed to block user. Please try again.';
+        } catch (_) {
+          errorMessage = 'Failed to block user. Please try again.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error blocking user: $e');
+      if (!mounted) return;
+      
+      setState(() {
+        _isBlocking = false;
+      });
+
+      String errorMessage = 'An error occurred. Please try again.';
+      if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
   }
 }

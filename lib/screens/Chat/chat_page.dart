@@ -1179,7 +1179,15 @@ void _showCancelDealConfirmation(ChatModel chatData) {
         if (otherUserId == _chatService.currentUserIdSync) {
           Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
         } else {
-          Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: otherUserId)));
+          Navigator.push(
+            context,
+            SlidePageRoute(
+              page: OthersProfilePage(
+                userId: otherUserId,
+                fromChat: true, // Show back button overlay
+              ),
+            ),
+          );
         }
       },
       child: Row(
@@ -2014,8 +2022,6 @@ void _handleImageSelection(ImageSource source, ChatModel chatData) async {
       },
       onCancelled: () {
         // Handle cancellation: clean up state without showing error
-        // User stays on chat screen - no navigation needed
-        // Overlay should not be open since we only show it after image is picked
         setState(() {
           _isImageUploading = false;
           _imageUploadProgress = 0.0;

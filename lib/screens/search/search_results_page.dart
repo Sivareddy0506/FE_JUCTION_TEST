@@ -146,7 +146,15 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     if (sellerId == currentUserId) {
       Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
     } else {
-      Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: sellerId)));
+      Navigator.push(
+        context,
+        SlidePageRoute(
+          page: OthersProfilePage(
+            userId: sellerId,
+            fromChat: true, // Show back button and hide bottom nav
+          ),
+        ),
+      );
     }
   }
 

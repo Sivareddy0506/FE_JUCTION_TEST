@@ -1115,7 +1115,15 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
             if (sellerId == _chatService.currentUserIdSync) {
               Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
             } else {
-              Navigator.push(context, SlidePageRoute(page: OthersProfilePage(userId: sellerId)));
+              Navigator.push(
+                context,
+                SlidePageRoute(
+                  page: OthersProfilePage(
+                    userId: sellerId,
+                    fromChat: true, // Show back button and hide bottom nav
+                  ),
+                ),
+              );
             }
           },
           child: Row(
