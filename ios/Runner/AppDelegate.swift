@@ -3,6 +3,9 @@ import UIKit
 import FirebaseCore
 import FirebaseMessaging
 import GoogleMaps
+import AVFoundation
+import CoreLocation
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -37,6 +40,90 @@ import GoogleMaps
     application.registerForRemoteNotifications()
     
     GeneratedPluginRegistrant.register(with: self)
+    
+    let controller = window?.rootViewController as! FlutterViewController
+    let permissionChannel = FlutterMethodChannel(
+      name: "com.junction.permissions",
+      binaryMessenger: controller.binaryMessenger
+    )
+    
+    permissionChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard call.method == "checkPermission" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      
+      guard let args = call.arguments as? [String: Any],
+            let permission = args["permission"] as? String else {
+        result(FlutterError(code: "INVALID_ARGUMENT", message: "Permission name required", details: nil))
+        return
+      }
+      
+      var status: String = "denied"
+      
+      switch permission {
+      case "camera":
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        switch authStatus {
+        case .authorized:
+          status = "granted"
+        case .denied, .restricted:
+          status = "denied"
+        case .notDetermined:
+          status = "notDetermined"
+        @unknown default:
+          status = "denied"
+        }
+        
+      case "location":
+        let authStatus: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+          authStatus = CLLocationManager().authorizationStatus
+        } else {
+          authStatus = CLLocationManager.authorizationStatus()
+        }
+        switch authStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+          status = "granted"
+        case .denied, .restricted:
+          status = "denied"
+        case .notDetermined:
+          status = "notDetermined"
+        @unknown default:
+          status = "denied"
+        }
+        
+      case "notifications":
+        if #available(iOS 10.0, *) {
+          UNUserNotificationCenter.current().getNotificationSettings { settings in
+            var notificationStatus: String = "denied"
+            switch settings.authorizationStatus {
+            case .authorized, .provisional:
+              notificationStatus = "granted"
+            case .denied:
+              notificationStatus = "denied"
+            case .notDetermined:
+              notificationStatus = "notDetermined"
+            case .ephemeral:
+              notificationStatus = "granted"
+            @unknown default:
+              notificationStatus = "denied"
+            }
+            result(notificationStatus)
+          }
+          return
+        } else {
+          status = "granted"
+        }
+        
+      default:
+        result(FlutterError(code: "UNKNOWN_PERMISSION", message: "Unknown permission: \(permission)", details: nil))
+        return
+      }
+      
+      result(status)
+    }
+    
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
   
