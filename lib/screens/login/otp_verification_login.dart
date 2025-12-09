@@ -95,7 +95,6 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
       debugPrint('OTP verification response status: ${response.statusCode}');
 
       if (!mounted) return;
-      setState(() => isSubmitting = false);
 
       final responseBody = jsonDecode(response.body);
 
@@ -105,6 +104,8 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
         final userId = user?['id'] ?? '';
 
         if (user == null) {
+          if (!mounted) return;
+          setState(() => isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Unexpected response. Please try again.")),
           );
@@ -117,6 +118,8 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
         final bool eulaAccepted = user['eulaAccepted'] ?? false;
 
         if (!isOnboarded) {
+          if (!mounted) return;
+          setState(() => isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("User not onboarded. Please signup first.")),
           );
@@ -231,6 +234,9 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
             debugPrint('Firebase custom token creation failed: ${customTokenResponse.statusCode}');
             debugPrint('Error response: $errorBody');
             
+            if (!mounted) return;
+            setState(() => isSubmitting = false);
+            
             String errorMsg = 'Failed to login. Please try again.';
             try {
               final errorData = jsonDecode(errorBody);
@@ -254,13 +260,20 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
             SlidePageRoute(page: const VerificationRejectedPage()),
           );
         } else {
+          if (!mounted) return;
+          setState(() => isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Unhandled user status: $userStatus")),
           );
         }
+        // On success, don't reset isSubmitting - let navigation happen while button is in loading state
+        // This provides better UX feedback
       } else {
+        // OTP verification failed - reset loading state
+        if (!mounted) return;
         _clearOTPFields();
         setState(() {
+          isSubmitting = false;
           hasError = true;
           errorMessage = 'Incorrect OTP. Please double check';
         });

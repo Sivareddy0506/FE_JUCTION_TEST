@@ -109,7 +109,25 @@ class _NotificationPageState extends State<NotificationPage> {
         final notifications = (data['notifications'] as List)
              .map((json) => NotificationModel.fromJson(json))
              .toList();
-        final groups = groupNotificationsByDate(notifications);
+        
+        // Filter out any existing welcome notification to avoid duplicates
+        final filteredNotifications = notifications.where((n) => n.id != 'welcome-notification').toList();
+        
+        // Add welcome notification at the beginning for all users
+        final welcomeNotification = NotificationModel(
+          id: 'welcome-notification',
+          title: 'Welcome to Junction',
+          message: 'Welcome to Junction! Start exploring products, connecting with sellers, and making great deals.',
+          imageUrl: null,
+          targetType: 'ALL',
+          targetIds: [],
+          sentById: 'system',
+          createdAt: DateTime.now(),
+        );
+        
+        // Prepend welcome notification to the list
+        final allNotifications = [welcomeNotification, ...filteredNotifications];
+        final groups = groupNotificationsByDate(allNotifications);
         setState(() {
           notificationGroups = groups;
           isLoading = false;

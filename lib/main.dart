@@ -205,9 +205,16 @@ Future<void> main() async {
   _getFCMTokenWithRetry();
 
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    // Only register token if user is logged in
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+    if (authToken == null || authToken.isEmpty) {
+      debugPrint('📱 [FCM] Ignoring token refresh - user not logged in');
+      return;
+    }
+
     await _sendFCMTokenToBackend(newToken);
     
-    final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (userId != null && firebaseUser != null) {
@@ -225,6 +232,14 @@ Future<void> main() async {
   });
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    // Check if user is logged in before processing notification
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+    if (authToken == null || authToken.isEmpty) {
+      debugPrint('📱 [FCM] Ignoring notification - user not logged in');
+      return;
+    }
+
     RemoteNotification? notification = message.notification;
     if (notification != null) {
       try {
@@ -257,7 +272,15 @@ Future<void> main() async {
     }
   });
   
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+    // Check if user is logged in before processing notification
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+    if (authToken == null || authToken.isEmpty) {
+      debugPrint('📱 [FCM] Ignoring notification tap - user not logged in');
+      return;
+    }
+
     final chatId = message.data['chatId'];
     if (chatId != null) {
       navigateToChat(chatId);
@@ -266,11 +289,18 @@ Future<void> main() async {
   
   RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
-    final chatId = initialMessage.data['chatId'];
-    if (chatId != null) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        navigateToChat(chatId);
-      });
+    // Check if user is logged in before processing initial message
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+    if (authToken != null && authToken.isNotEmpty) {
+      final chatId = initialMessage.data['chatId'];
+      if (chatId != null) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          navigateToChat(chatId);
+        });
+      }
+    } else {
+      debugPrint('📱 [FCM] Ignoring initial message - user not logged in');
     }
   }
 
@@ -340,5 +370,73 @@ Future<void> _sendFCMTokenToBackend(String token) async {
     }
   } catch (e) {
     debugPrint('Error sending FCM token to backend: $e');
+  }
+}
+
+/// Delete FCM token from backend and Firestore on logout
+Future<void> _deleteFCMToken() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('authToken');
+    
+    if (authToken == null || authToken.isEmpty) {
+      debugPrint('📱 [FCM] No auth token, skipping FCM token deletion');
+      return;
+    }
+
+    // Get current FCM token
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (token == null) {
+      debugPrint('📱 [FCM] No FCM token to delete');
+      return;
+    }
+
+    // Delete from backend (we'll need to create this endpoint)
+    try {
+      final response = await http.delete(
+        Uri.parse('https://api.junctionverse.com/user/fcm-token'),
+        headers: {
+          'Authorization': 'Bearer $authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'token': token}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 404) {
+        debugPrint('📱 [FCM] ✅ FCM token deleted from backend');
+      } else {
+        debugPrint('📱 [FCM] ⚠️ Failed to delete FCM token from backend: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('📱 [FCM] ⚠️ Error deleting FCM token from backend: $e');
+      // Continue even if backend deletion fails
+    }
+
+    // Delete from Firestore
+    final userId = prefs.getString('userId');
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (userId != null && firebaseUser != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({
+          'fcmTokens': FieldValue.arrayRemove([token]),
+        });
+        debugPrint('📱 [FCM] ✅ FCM token removed from Firestore');
+      } catch (e) {
+        debugPrint('📱 [FCM] ⚠️ Error removing token from Firestore: $e');
+      }
+    }
+
+    // Delete the token from Firebase Messaging (optional, but good practice)
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+      debugPrint('📱 [FCM] ✅ FCM token deleted from Firebase');
+    } catch (e) {
+      debugPrint('📱 [FCM] ⚠️ Error deleting token from Firebase: $e');
+    }
+  } catch (e) {
+    debugPrint('📱 [FCM] ⚠️ Error in FCM token deletion: $e');
   }
 }

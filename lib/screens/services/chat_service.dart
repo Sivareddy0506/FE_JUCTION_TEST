@@ -433,6 +433,7 @@ Stream<ChatModel?> getChatStream(String chatId) {
     required Function(double) onUploadProgress,
     required Function() onUploadComplete,
     required Function(String) onError,
+    Function()? onCancelled, // Callback for when user cancels image selection
   }) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
@@ -440,36 +441,45 @@ Stream<ChatModel?> getChatStream(String chatId) {
         imageQuality: 100, // Pick at full quality, we'll compress later
       );
       
-      if (pickedFile != null) {
-        onUploadStart('Compressing image...');
-        
-        // Compress image to ensure it's under 5MB
-        File? compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
-        
-        if (compressedFile == null) {
-          onError('Failed to process image. Please try again.');
-          return;
+      // Handle cancellation: user closed camera/gallery without selecting
+      if (pickedFile == null) {
+        if (onCancelled != null) {
+          onCancelled();
+        } else {
+          // Fallback: treat cancellation as a silent error (no error message shown)
+          onError('');
         }
-        
-        onUploadStart('Uploading image...');
-        
-        // Upload image with progress tracking
-        final Map<String, dynamic> attachmentData = await _uploadImageToBackend(
-          imageFile: compressedFile,
-          onProgress: onUploadProgress,
-        );
-        
-        // Send image message
-        await sendMessage(
-          chatId: chatId,
-          receiverId: receiverId,
-          message: 'Photo',
-          messageType: 'image',
-          attachmentData: attachmentData,
-        );
-        
-        onUploadComplete();
+        return;
       }
+      
+      onUploadStart('Compressing image...');
+      
+      // Compress image to ensure it's under 5MB
+      File? compressedFile = await ImageCompression.compressImageToFit(pickedFile.path);
+      
+      if (compressedFile == null) {
+        onError('Failed to process image. Please try again.');
+        return;
+      }
+      
+      onUploadStart('Uploading image...');
+      
+      // Upload image with progress tracking
+      final Map<String, dynamic> attachmentData = await _uploadImageToBackend(
+        imageFile: compressedFile,
+        onProgress: onUploadProgress,
+      );
+      
+      // Send image message
+      await sendMessage(
+        chatId: chatId,
+        receiverId: receiverId,
+        message: 'Photo',
+        messageType: 'image',
+        attachmentData: attachmentData,
+      );
+      
+      onUploadComplete();
     } catch (e) {
       onError('Failed to send image: $e');
     }

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 import '../../widgets/custom_appbar.dart';
 import '../../widgets/app_button.dart';
@@ -80,6 +84,9 @@ class AccountSettingsPage extends StatelessWidget {
       );
 
       if (response.statusCode == 200) {
+        // Delete FCM token before clearing preferences
+        await _deleteFCMToken(token);
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
         await ProfileService.clearProfileCache(); // <-- fix: clear cached profile on logout
@@ -111,6 +118,67 @@ class AccountSettingsPage extends StatelessWidget {
   Future<String> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token') ?? '';
+  }
+
+  /// Delete FCM token from backend and Firestore on logout
+  Future<void> _deleteFCMToken(String authToken) async {
+    try {
+      // Get current FCM token
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null) {
+        debugPrint('📱 [FCM] No FCM token to delete');
+        return;
+      }
+
+      // Delete from backend (DELETE endpoint - may need to be created)
+      try {
+        final response = await http.delete(
+          Uri.parse('https://api.junctionverse.com/user/fcm-token'),
+          headers: {
+            'Authorization': 'Bearer $authToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'token': fcmToken}),
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 404) {
+          debugPrint('📱 [FCM] ✅ FCM token deleted from backend');
+        } else {
+          debugPrint('📱 [FCM] ⚠️ Failed to delete FCM token from backend: ${response.statusCode}');
+        }
+      } catch (e) {
+        debugPrint('📱 [FCM] ⚠️ Error deleting FCM token from backend: $e');
+        // Continue even if backend deletion fails
+      }
+
+      // Delete from Firestore
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (userId != null && firebaseUser != null) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .update({
+            'fcmTokens': FieldValue.arrayRemove([fcmToken]),
+          });
+          debugPrint('📱 [FCM] ✅ FCM token removed from Firestore');
+        } catch (e) {
+          debugPrint('📱 [FCM] ⚠️ Error removing token from Firestore: $e');
+        }
+      }
+
+      // Delete the token from Firebase Messaging
+      try {
+        await FirebaseMessaging.instance.deleteToken();
+        debugPrint('📱 [FCM] ✅ FCM token deleted from Firebase');
+      } catch (e) {
+        debugPrint('📱 [FCM] ⚠️ Error deleting token from Firebase: $e');
+      }
+    } catch (e) {
+      debugPrint('📱 [FCM] ⚠️ Error in FCM token deletion: $e');
+    }
   }
 
   @override

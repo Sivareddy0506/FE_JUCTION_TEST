@@ -512,7 +512,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                alreadyReported ? 'You already reported this listing.' : 'Thanks for the report. Our team will review it.'),
+                alreadyReported ? 'Your report on this listing is already submitted and under review.' : 'Thanks for the report. Our team will review it.'),
           ),
         );
         return;

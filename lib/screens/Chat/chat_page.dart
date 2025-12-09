@@ -1822,7 +1822,7 @@ void _showImagePickerBottomSheet(ChatModel chatData) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (context) => Container(
+    builder: (sheetContext) => Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1864,7 +1864,10 @@ void _showImagePickerBottomSheet(ChatModel chatData) {
                 backgroundColor: Colors.white,
                 textColor: const Color(0xFF262626),
                 borderColor: const Color(0xFF262626),
-                onPressed: () => _handleImageSelection(ImageSource.camera, chatData),
+                onPressed: () {
+                  Navigator.pop(sheetContext); // Close bottom sheet using its own context
+                  _handleImageSelection(ImageSource.camera, chatData);
+                },
                 bottomSpacing: 16,
               ),
               AppButton(
@@ -1872,7 +1875,10 @@ void _showImagePickerBottomSheet(ChatModel chatData) {
                 backgroundColor: Colors.white,
                 textColor: const Color(0xFF262626),
                 borderColor: const Color(0xFF262626),
-                onPressed: () => _handleImageSelection(ImageSource.gallery, chatData),
+                onPressed: () {
+                  Navigator.pop(sheetContext); // Close bottom sheet using its own context
+                  _handleImageSelection(ImageSource.gallery, chatData);
+                },
               ),
             ],
           ),
@@ -1930,30 +1936,35 @@ Widget _buildImageSourceOption({
 }
 
 void _handleImageSelection(ImageSource source, ChatModel chatData) async {
-  Navigator.pop(context);
+  // Bottom sheet is already closed by the button's onPressed handler
+  // No need to pop here - this prevents accidentally popping the chat screen
   
   final bool isSeller = chatData.sellerId == _chatService.currentUserIdSync;
   String receiverId = isSeller ? chatData.buyerId : chatData.sellerId;
 
-  // Set initial upload state
-  setState(() {
-    _isImageUploading = true;
-    _imageUploadProgress = 0.0;
-    _imageUploadStatus = 'Selecting image...';
-  });
+  // Don't set upload state here - wait until image is actually picked
+  // This prevents getting stuck if user cancels
 
   try {
-    _showImageUploadOverlay();
-    
     await _chatService.pickAndSendImageWithProgress(
       chatId: widget.chatId,
       receiverId: receiverId,
       source: source,
       onUploadStart: (status) {
-        setState(() {
-          _imageUploadStatus = status;
-          _imageUploadProgress = 0.0;
-        });
+        // Show overlay only when upload actually starts (after image is picked)
+        if (!_isImageUploading) {
+          setState(() {
+            _isImageUploading = true;
+            _imageUploadProgress = 0.0;
+            _imageUploadStatus = status;
+          });
+          _showImageUploadOverlay();
+        } else {
+          setState(() {
+            _imageUploadStatus = status;
+            _imageUploadProgress = 0.0;
+          });
+        }
       },
       onUploadProgress: (progress) {
         setState(() {
@@ -1991,10 +2002,26 @@ void _handleImageSelection(ImageSource source, ChatModel chatData) async {
           _imageUploadProgress = 0.0;
           _imageUploadStatus = '';
         });
-        Navigator.of(context, rootNavigator: true).pop(); // Close overlay
+        // Close overlay if it's open
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
         
-        // Show error feedback
-        ErrorHandler.showErrorSnackBar(context, error);
+        // Only show error if it's not empty (empty means cancellation)
+        if (error.isNotEmpty) {
+          ErrorHandler.showErrorSnackBar(context, error);
+        }
+      },
+      onCancelled: () {
+        // Handle cancellation: clean up state without showing error
+        // User stays on chat screen - no navigation needed
+        // Overlay should not be open since we only show it after image is picked
+        setState(() {
+          _isImageUploading = false;
+          _imageUploadProgress = 0.0;
+          _imageUploadStatus = '';
+        });
+        // No navigation needed - user cancelled, so they stay on chat screen
       },
     );
   } catch (e) {

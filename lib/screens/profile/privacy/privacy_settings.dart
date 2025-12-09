@@ -14,7 +14,6 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
 
   bool allowLocation = false;
   bool allowCamera = false;
-  bool allowMedia = false;
   bool allowMicrophone = false;
   bool allowContacts = false;
 
@@ -35,7 +34,10 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Refresh permissions when user returns from system settings
     if (state == AppLifecycleState.resumed) {
-      _checkAllPermissions();
+      // Add small delay to ensure system has updated permission states
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _checkAllPermissions();
+      });
     }
   }
 
@@ -44,18 +46,28 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
     setState(() => isLoading = true);
 
     try {
-      final locationStatus = await Permission.locationWhenInUse.status;
+      // Location: Check both whenInUse and always (Android can grant either)
+      final locationWhenInUseStatus = await Permission.locationWhenInUse.status;
+      final locationAlwaysStatus = await Permission.locationAlways.status;
+      final locationGranted = locationWhenInUseStatus.isGranted || locationAlwaysStatus.isGranted;
+      
+      // Camera: Direct check
       final cameraStatus = await Permission.camera.status;
-      final photosStatus = await Permission.photos.status;
+      final cameraGranted = cameraStatus.isGranted || cameraStatus.isLimited;
+      
+      // Microphone: Direct check
       final microphoneStatus = await Permission.microphone.status;
+      final microphoneGranted = microphoneStatus.isGranted || microphoneStatus.isLimited;
+      
+      // Contacts: Direct check
       final contactsStatus = await Permission.contacts.status;
+      final contactsGranted = contactsStatus.isGranted || contactsStatus.isLimited;
 
       setState(() {
-        allowLocation = locationStatus.isGranted;
-        allowCamera = cameraStatus.isGranted;
-        allowMedia = photosStatus.isGranted;
-        allowMicrophone = microphoneStatus.isGranted;
-        allowContacts = contactsStatus.isGranted;
+        allowLocation = locationGranted;
+        allowCamera = cameraGranted;
+        allowMicrophone = microphoneGranted;
+        allowContacts = contactsGranted;
         isLoading = false;
       });
     } catch (e) {
@@ -206,12 +218,6 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
                     subtitle: "Use your phone's camera to click and upload product images directly while posting.",
                     value: allowCamera,
                     permissionName: "Camera",
-                  ),
-                  buildToggle(
-                    title: "Media & Files Access",
-                    subtitle: "Access photos and files to upload product images from your gallery.",
-                    value: allowMedia,
-                    permissionName: "Photos/Media",
                   ),
                   buildToggle(
                     title: "Microphone Access",
