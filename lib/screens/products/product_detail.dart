@@ -24,6 +24,8 @@ class ProductDetailPage extends StatefulWidget {
   final List<Product>? products;
   final int? initialIndex;
   final VoidCallback? onFavoriteChanged;
+  final Map<String, int>? initialUniqueClicks;   // productId -> unique views
+  final Map<String, String>? initialLocations;   // productId -> geocoded location
 
   const ProductDetailPage({
     super.key,
@@ -31,6 +33,8 @@ class ProductDetailPage extends StatefulWidget {
     this.products,
     this.initialIndex,
     this.onFavoriteChanged,
+    this.initialUniqueClicks,
+    this.initialLocations,
   });
 
   @override
@@ -48,9 +52,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   String? _sellerName;
   int _displayViews = 0;
   bool _registeredView = false;
-  String? _cachedLocation;
-  bool _isLoadingLocation = false;
-  int _viewCount = 0;
+  final Map<String, String> _locationCache = {}; // Location cache per product
+  final Set<String> _loadingLocations = {}; // Track which products are loading location
+  final Map<String, int> _viewCountCache = {}; // View count cache per product
   int _currentImageIndex = 0;
   String? _currentProductStatus; // Track product status
   Timer? _statusPollingTimer; // Timer for polling product status
@@ -96,6 +100,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         relatedProducts = withCurrent;
         isLoadingRelated = false;
       });
+
+      // Load data for the initial displayed product
+      if (withCurrent.isNotEmpty && currentProductIndex >= 0 && currentProductIndex < withCurrent.length) {
+        final displayedProduct = withCurrent[currentProductIndex];
+        _loadProductLocation(displayedProduct);
+        _fetchUniqueClicks(displayedProduct);
+      }
     }
   }
 
@@ -105,6 +116,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _favoritesService = FavoritesService();
     _displayViews = widget.product.views ?? 0;
 
+    // Seed caches from initial data passed from list/search pages
+    if (widget.initialUniqueClicks != null) {
+      _viewCountCache.addAll(widget.initialUniqueClicks!);
+    }
+    if (widget.initialLocations != null) {
+      _locationCache.addAll(widget.initialLocations!);
+    }
+    
     if (widget.products != null && widget.products!.isNotEmpty) {
       relatedProducts = List<Product>.from(widget.products!);
       currentProductIndex = widget.initialIndex ?? 0;
@@ -124,10 +143,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
 
     _loadSellerName();
-    _loadProductLocation();
-    _fetchUniqueClicks();
     _fetchProductStatus(); // Fetch product status on init
     _checkAndShowSwipeHint(); // Check if swipe hint should be shown
+
+    // Load data for the initial displayed product (may be different from widget.product)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && relatedProducts.isNotEmpty) {
+        final displayedProduct = relatedProducts[currentProductIndex];
+        _loadProductLocation(displayedProduct);
+        _fetchUniqueClicks(displayedProduct);
+      } else {
+        // Fallback to widget.product if no related products yet
+        _loadProductLocation(widget.product);
+        _fetchUniqueClicks(widget.product);
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
@@ -542,33 +572,44 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
-  Future<void> _loadProductLocation() async {
-    if ((widget.product.location == null || widget.product.location!.isEmpty) &&
-        widget.product.latitude != null &&
-        widget.product.longitude != null &&
-        _cachedLocation == null &&
-        !_isLoadingLocation) {
-      setState(() => _isLoadingLocation = true);
+  Future<void> _loadProductLocation([Product? product]) async {
+    final targetProduct = product ?? widget.product;
+    final productId = targetProduct.id;
 
-      try {
-        final location = await getAddressFromLatLng(
-            widget.product.latitude!, widget.product.longitude!);
-        if (mounted) {
-          setState(() {
-            _cachedLocation = location;
-            _isLoadingLocation = false;
-          });
-        }
-      } catch (e) {
-        debugPrint('Error loading location: $e');
-        if (mounted) {
-          setState(() {
-            _cachedLocation = 'Location unavailable';
-            _isLoadingLocation = false;
-          });
-          // Don't show error snackbar for location loading failures
-          // as they're handled gracefully with fallback text
-        }
+    // Skip if already cached or already loading
+    if (_locationCache.containsKey(productId) || _loadingLocations.contains(productId)) {
+      return;
+    }
+
+    // Skip if product already has a location string
+    if (targetProduct.location != null && targetProduct.location!.isNotEmpty) {
+      return;
+    }
+
+    // Skip if no coordinates
+    if (targetProduct.latitude == null || targetProduct.longitude == null) {
+      return;
+    }
+
+    _loadingLocations.add(productId);
+    if (mounted) setState(() {});
+
+    try {
+      final location = await getAddressFromLatLng(
+          targetProduct.latitude!, targetProduct.longitude!);
+      if (mounted) {
+        setState(() {
+          _locationCache[productId] = location;
+          _loadingLocations.remove(productId);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading location for $productId: $e');
+      if (mounted) {
+        setState(() {
+          _locationCache[productId] = 'Location unavailable';
+          _loadingLocations.remove(productId);
+        });
       }
     }
   }
@@ -678,22 +719,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
-  Future<void> _fetchUniqueClicks() async {
-    // try {
-    //   final clicks = await ProductClickService.getUniqueClicks(widget.product.id);
-    //   if (mounted) {
-    //     setState(() {
-    //       _displayViews = (_registeredView ? _displayViews : clicks);
-    //     });
-    //   }
-    // } catch (e) {
-    //   debugPrint('Error fetching unique clicks: $e');
-    // }
-    final result = await ProductClickService.getUniqueClicksFor([widget.product.id]);
-    if (mounted) {
-      setState(() {
-        _viewCount = result[widget.product.id] ?? 0;
-      });
+  Future<void> _fetchUniqueClicks([Product? product]) async {
+    final targetProduct = product ?? widget.product;
+    final productId = targetProduct.id;
+
+    // Skip if already cached
+    if (_viewCountCache.containsKey(productId)) {
+      return;
+    }
+
+    try {
+      final result = await ProductClickService.getUniqueClicksFor([productId]);
+      if (mounted) {
+        setState(() {
+          _viewCountCache[productId] = result[productId] ?? 0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching clicks for $productId: $e');
     }
   }
 
@@ -819,6 +862,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               if (_showSwipeHint) {
                 _dismissSwipeHint();
               }
+
+              // Load data for the new product
+              final newProduct = relatedProducts[index];
+              _fetchUniqueClicks(newProduct);
+              _loadProductLocation(newProduct);
             },
             itemBuilder: (context, index) {
               final product = relatedProducts[index];
@@ -1201,7 +1249,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                       children: [
                         Image.asset('assets/Eye.png', width: 16, height: 16),
                         const SizedBox(width: 6),
-                        Text('Viewed by $_viewCount others', style: const TextStyle(fontSize: 13, color: Color(0xFF8A8894))),
+                        Text('Viewed by ${_viewCountCache[product.id] ?? 0} others', style: const TextStyle(fontSize: 13, color: Color(0xFF8A8894))),
                         const Spacer(),
                         Image.asset('assets/MapPin.png', width: 16, height: 16),
                         const SizedBox(width: 6),
@@ -1277,13 +1325,19 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
   }
 
   Widget _buildLocationText(Product product) {
+    // First check if product has location string
     if (product.location != null && product.location!.isNotEmpty) {
       return Text(product.location!, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
     }
-    if (_cachedLocation != null && _cachedLocation != 'Location unavailable') {
-      return Text(_cachedLocation!, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
+
+    // Then check cache for this specific product
+    final cachedLocation = _locationCache[product.id];
+    if (cachedLocation != null && cachedLocation != 'Location unavailable') {
+      return Text(cachedLocation, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
     }
-    if (_isLoadingLocation) {
+
+    // Check if loading for this specific product
+    if (_loadingLocations.contains(product.id)) {
       return const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1293,6 +1347,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
         ],
       );
     }
+
     return const Text('Location not set', style: TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 

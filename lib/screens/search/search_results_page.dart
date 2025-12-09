@@ -4,6 +4,7 @@ import '../../widgets/search_bar_widget.dart';
 import '../../services/search_service.dart';
 import '../../services/filter_state_service.dart';
 import '../services/api_service.dart';
+import '../services/location_helper.dart';
 import '../products/product_detail.dart';
 import '../../services/profile_service.dart'; 
 import '../../../widgets/custom_appbar.dart';
@@ -40,6 +41,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   String errorMessage = '';
   final Map<String, String> _sellerNames = {}; // Seller names cache
   Map<String, int> _uniqueClicks = {};   // Product clicks cache
+  final Map<String, String> _locationCache = {}; // Location cache
 
   @override
   void initState() {
@@ -76,12 +78,20 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         await ApiService.saveSearchHistory(widget.searchQuery);
       }
 
-      setState(() {
-        searchResults = searchResult.products;
-        isLoading = false;
-      });
+      // Store results first (needed for prefetch)
+      searchResults = searchResult.products;
 
-      await _fetchAllClicks();
+      // Prefetch all data BEFORE rendering
+      await Future.wait([
+        _fetchAllClicks(),
+        _prefetchAllLocations(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -98,9 +108,34 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     final List<String> productIds = searchResults.map((p) => p.id).toList();
     final results = await ProductClickService.getUniqueClicksFor(productIds);
     clicksMap.addAll(results);
-    setState(() {
-      _uniqueClicks = clicksMap;
-    });
+    _uniqueClicks = clicksMap;
+  }
+
+  Future<void> _prefetchAllLocations() async {
+    final futures = <Future>[];
+
+    for (final product in searchResults) {
+      if (product.latitude != null &&
+          product.longitude != null &&
+          !_locationCache.containsKey(product.id)) {
+        futures.add(_loadLocationForProduct(product));
+      }
+    }
+
+    // Wait for all locations to be fetched
+    await Future.wait(futures);
+  }
+
+  Future<void> _loadLocationForProduct(Product product) async {
+    try {
+      final location = await getAddressFromLatLng(
+        product.latitude!,
+        product.longitude!,
+      );
+      _locationCache[product.id] = location;
+    } catch (e) {
+      _locationCache[product.id] = 'Location unavailable';
+    }
   }
 
   Future<void> _openSellerProfile(String sellerId) async {
@@ -124,6 +159,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           product: product,
           products: searchResults,
           initialIndex: index,
+          initialUniqueClicks: _uniqueClicks,
+          initialLocations: _locationCache,
         ),
       ),
     );
@@ -347,7 +384,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                product.location ?? 'Unknown',
+                                _locationCache[product.id] ?? product.location ?? 'Unknown',
                                 style: const TextStyle(fontSize: 12),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

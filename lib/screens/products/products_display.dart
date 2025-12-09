@@ -56,38 +56,43 @@ class _ProductListingPageState extends State<ProductListingPage> {
 
     try {
       switch (widget.source) {
-      case 'fresh':
-        result = await ApiService.fetchAllProducts();
-        break;
-      case 'trending':
-        result = await ApiService.fetchMostClicked();
-        break;
-      case 'lastViewed':
-        result = await ApiService.fetchLastOpened();
-        break;
-      case 'searched':
-        result = await ApiService.fetchLastSearched();
-        break;
-      default:
-        result = [];
-    }
+        case 'fresh':
+          result = await ApiService.fetchAllProducts();
+          break;
+        case 'trending':
+          result = await ApiService.fetchMostClicked();
+          break;
+        case 'lastViewed':
+          result = await ApiService.fetchLastOpened();
+          break;
+        case 'searched':
+          result = await ApiService.fetchLastSearched();
+          break;
+        default:
+          result = [];
+      }
 
-    setState(() {
+      // Store products first (needed for prefetch)
       products = result;
-      isLoading = false;
-    });
 
-    // Prefetch product clicks
-      await _fetchAllClicks();
+      // Prefetch all data BEFORE rendering
+      await Future.wait([
+        _fetchAllClicks(),
+        _prefetchAllLocations(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          isLoading = false; // Only now allow rendering
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
-        // hasError = true;
-        // errorMessage = e.toString();
-        isLoading = false;
-      });
+          isLoading = false;
+        });
       }
-  }
+    }
   }
 
   Future<void> _fetchAllClicks() async {
@@ -101,23 +106,30 @@ class _ProductListingPageState extends State<ProductListingPage> {
     });
   }
 
-  Future<void> _loadLocation(Product product) async {
-    if (product.latitude != null &&
-        product.longitude != null &&
-        !_locationCache.containsKey(product.id)) {
-      try {
-        final location = await getAddressFromLatLng(
-          product.latitude!,
-          product.longitude!,
-        );
-        if (mounted) {
-          setState(() {
-            _locationCache[product.id] = location;
-          });
-        }
-      } catch (e) {
-        // Ignore errors
+  Future<void> _prefetchAllLocations() async {
+    final futures = <Future>[];
+
+    for (final product in products) {
+      if (product.latitude != null &&
+          product.longitude != null &&
+          !_locationCache.containsKey(product.id)) {
+        futures.add(_loadLocationForProduct(product));
       }
+    }
+
+    // Wait for all locations to be fetched
+    await Future.wait(futures);
+  }
+
+  Future<void> _loadLocationForProduct(Product product) async {
+    try {
+      final location = await getAddressFromLatLng(
+        product.latitude!,
+        product.longitude!,
+      );
+      _locationCache[product.id] = location;
+    } catch (e) {
+      _locationCache[product.id] = 'Location unavailable';
     }
   }
 
@@ -130,6 +142,8 @@ class _ProductListingPageState extends State<ProductListingPage> {
           product: product,
           products: products, // Pass in product list
           initialIndex: index, // Pass in list index
+          initialUniqueClicks: _uniqueClicks,
+          initialLocations: _locationCache,
         ),
       ),
     );
@@ -172,8 +186,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
                   itemBuilder: (context, index) {
                     final product = products[index];
 
-                    // Load location asynchronously
-                    _loadLocation(product);
+                    // Location is already prefetched
                     final locationString = _locationCache[product.id] ??
                         product.location ??
                         'Unknown';

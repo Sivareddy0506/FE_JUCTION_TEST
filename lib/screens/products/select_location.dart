@@ -238,37 +238,38 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
                       left: 16,
                       right: 16,
                       child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, size: 20, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: "Search for building, street name",
-                        hintStyle: TextStyle(color: Colors.grey),
-                      ),
-                      onChanged: _onSearchChanged,
-                      onSubmitted: _moveMapToAddress,
-                    ),
-                  ),
-                ],
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search, size: 20, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                textInputAction: TextInputAction.done,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: "Search for building, street name",
+                                  hintStyle: TextStyle(color: Colors.grey),
+                                ),
+                                onChanged: _onSearchChanged,
+                                onSubmitted: _moveMapToAddress,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     // Bottom sheet with address and button
@@ -277,55 +278,63 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
                       left: 0,
                       right: 0,
                       child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Selected Address:",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 20, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _address,
-                          style: const TextStyle(fontSize: 14),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, -2),
+                            ),
+                          ],
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Selected Address:",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 20,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _address,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            AppButton(
+                              label: widget.isEditing ? "Confirm" : "Next",
+                              onPressed:
+                                  widget.isEditing ? _onConfirm : _onNext,
+                              backgroundColor: const Color(0xFFFF6705),
+                              textColor: Colors.white,
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  AppButton(
-                    label: widget.isEditing ? "Confirm" : "Next",
-                    onPressed: widget.isEditing ? _onConfirm : _onNext,
-                    backgroundColor: const Color(0xFFFF6705),
-                    textColor: Colors.white,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+              );
   }
 
   void _onNext() {
