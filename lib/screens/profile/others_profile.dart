@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../widgets/products_grid.dart';
 import '../../widgets/bottom_navbar.dart';
+import '../../widgets/app_button.dart';
 import '../profile/empty_state.dart';
 import 'active_listing.dart';
 import 'about_repository.dart';
@@ -599,28 +600,77 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
   }
 
   void _showBlockConfirmation() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Block User'),
-          content: Text('Are you sure you want to block $name? You will not be able to chat with them or see their listings.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _blockUser();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Block User',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
               ),
-              child: const Text('Block'),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Are you sure you want to block $name? You will not be able to chat with them or view their profile.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(sheetContext),
+                      backgroundColor: Colors.white,
+                      borderColor: const Color(0xFF262626),
+                      textColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Block',
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        _blockUser();
+                      },
+                      backgroundColor: const Color(0xFF262626),
+                      textColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
