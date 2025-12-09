@@ -67,7 +67,7 @@ class PrivacyPage extends StatelessWidget {
               context: context,
               title: "App Permissions",
               description:
-                  "Manage access to location, camera, storage (Android/iOS dependent)",
+                  "Manage access to location, camera, and notifications",
               onTap: () {
                 Navigator.push(
                   context,

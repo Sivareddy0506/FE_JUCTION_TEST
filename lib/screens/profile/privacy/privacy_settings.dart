@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../widgets/custom_appbar.dart';
 
@@ -14,8 +16,9 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
 
   bool allowLocation = false;
   bool allowCamera = false;
-  bool allowMicrophone = false;
-  bool allowContacts = false;
+  bool allowNotifications = false;
+  
+  static const MethodChannel _permissionChannel = MethodChannel('com.junction.permissions');
 
   @override
   void initState() {
@@ -46,32 +49,66 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
     setState(() => isLoading = true);
 
     try {
-      // Location: Check both whenInUse and always (Android can grant either)
-      final locationWhenInUseStatus = await Permission.locationWhenInUse.status;
-      final locationAlwaysStatus = await Permission.locationAlways.status;
-      final locationGranted = locationWhenInUseStatus.isGranted || locationAlwaysStatus.isGranted;
+      bool locationGranted = false;
+      bool cameraGranted = false;
+      bool notificationsGranted = false;
       
-      // Camera: Direct check
-      final cameraStatus = await Permission.camera.status;
-      final cameraGranted = cameraStatus.isGranted || cameraStatus.isLimited;
-      
-      // Microphone: Direct check
-      final microphoneStatus = await Permission.microphone.status;
-      final microphoneGranted = microphoneStatus.isGranted || microphoneStatus.isLimited;
-      
-      // Contacts: Direct check
-      final contactsStatus = await Permission.contacts.status;
-      final contactsGranted = contactsStatus.isGranted || contactsStatus.isLimited;
+      if (Platform.isIOS) {
+        try {
+          final locationStatusStr = await _permissionChannel.invokeMethod<String>('checkPermission', {'permission': 'location'});
+          locationGranted = locationStatusStr == 'granted' || locationStatusStr == 'limited';
+          debugPrint('iOS Location (native) - status: $locationStatusStr, granted: $locationGranted');
+        } catch (e) {
+          debugPrint('Error checking iOS location permission: $e');
+          final locationStatus = await Permission.location.status;
+          final locationServiceStatus = await Permission.location.serviceStatus;
+          locationGranted = (locationStatus.isGranted || locationStatus.isLimited) && 
+                           locationServiceStatus != ServiceStatus.disabled;
+        }
+        
+        try {
+          final cameraStatusStr = await _permissionChannel.invokeMethod<String>('checkPermission', {'permission': 'camera'});
+          cameraGranted = cameraStatusStr == 'granted' || cameraStatusStr == 'limited';
+          debugPrint('iOS Camera (native) - status: $cameraStatusStr, granted: $cameraGranted');
+        } catch (e) {
+          debugPrint('Error checking iOS camera permission: $e');
+          final cameraStatus = await Permission.camera.status;
+          cameraGranted = cameraStatus.isGranted || cameraStatus.isLimited;
+        }
+        
+        try {
+          final notificationStatusStr = await _permissionChannel.invokeMethod<String>('checkPermission', {'permission': 'notifications'});
+          notificationsGranted = notificationStatusStr == 'granted' || notificationStatusStr == 'limited';
+          debugPrint('iOS Notifications (native) - status: $notificationStatusStr, granted: $notificationsGranted');
+        } catch (e) {
+          debugPrint('Error checking iOS notifications permission: $e');
+          final notificationStatus = await Permission.notification.status;
+          notificationsGranted = notificationStatus.isGranted || notificationStatus.isLimited;
+        }
+      } else {
+        final locationWhenInUseStatus = await Permission.locationWhenInUse.status;
+        final locationAlwaysStatus = await Permission.locationAlways.status;
+        locationGranted = locationWhenInUseStatus.isGranted || locationAlwaysStatus.isGranted;
+        debugPrint('Android Location status - WhenInUse: $locationWhenInUseStatus, Always: $locationAlwaysStatus, granted: $locationGranted');
+        
+        final cameraStatus = await Permission.camera.status;
+        cameraGranted = cameraStatus.isGranted || cameraStatus.isLimited;
+        debugPrint('Android Camera status: $cameraStatus, granted: $cameraGranted');
+        
+        final notificationStatus = await Permission.notification.status;
+        notificationsGranted = notificationStatus.isGranted || notificationStatus.isLimited;
+        debugPrint('Android Notifications status: $notificationStatus, granted: $notificationsGranted');
+      }
 
       setState(() {
         allowLocation = locationGranted;
         allowCamera = cameraGranted;
-        allowMicrophone = microphoneGranted;
-        allowContacts = contactsGranted;
+        allowNotifications = notificationsGranted;
         isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error checking permissions: $e');
+      debugPrint('Stack trace: $stackTrace');
       setState(() => isLoading = false);
     }
   }
@@ -220,16 +257,10 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
                     permissionName: "Camera",
                   ),
                   buildToggle(
-                    title: "Microphone Access",
-                    subtitle: "Enable voice notes or voice search",
-                    value: allowMicrophone,
-                    permissionName: "Microphone",
-                  ),
-                  buildToggle(
-                    title: "Contacts Access",
-                    subtitle: "Used only if you offer referral via contact sharing.",
-                    value: allowContacts,
-                    permissionName: "Contacts",
+                    title: "Notifications",
+                    subtitle: "Receive push notifications for messages, listings, and important updates.",
+                    value: allowNotifications,
+                    permissionName: "Notifications",
                   ),
                 ],
               ),
