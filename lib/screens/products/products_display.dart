@@ -298,23 +298,21 @@ class _ProductListingPageState extends State<ProductListingPage> {
 
                             const SizedBox(height: 12),
 
-                            // Badges: Age, Usage, Condition
+                            // Badges: Age, Condition
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Wrap(
-                                spacing: 12,
-                                children: [
-                                  if (product.yearOfPurchase != null)
-                                    _buildBadge(
-                                        'Age: > ${DateTime.now().year - product.yearOfPurchase!}Y'),
-                                  if (product.usage != null)
-                                    _buildBadge('Usage: ${product.usage}'),
-                                  if (product.condition != null)
-                                    _buildBadge(
-                                        'Condition: ${product.condition}'),
-                                ],
-                              ),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                child: Wrap(
+                                  spacing: 12,
+                                  children: [
+                                    if (product.yearOfPurchase != null)
+                                      _buildBadge(
+                                          'Age: > ${DateTime.now().year - product.yearOfPurchase!}Y'),
+                                    if (product.condition != null)
+                                      _buildBadge(
+                                          'Condition: ${product.condition}'),
+                                  ],
+                                ),
                             ),
 
                             const SizedBox(height: 12),

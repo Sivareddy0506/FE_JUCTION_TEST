@@ -350,7 +350,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                           children: [
                             if (product.yearOfPurchase != null)
                               _badge('Age: > ${DateTime.now().year - product.yearOfPurchase!}Y'),
-                            if (product.usage != null) _badge('Usage: ${product.usage}'),
                             if (product.condition != null) _badge('Condition: ${product.condition}'),
                           ],
                         ),

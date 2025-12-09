@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../widgets/custom_appbar.dart';
+import '../../../widgets/app_button.dart';
 
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});
@@ -113,26 +114,76 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> with WidgetsB
     }
   }
 
-  /// Show dialog explaining that user needs to go to system settings
+  /// Show bottom sheet explaining that user needs to go to system settings
   Future<void> _showSettingsDialog(String permissionName) async {
-    final result = await showDialog<bool>(
+    final result = await showModalBottomSheet<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Permission Settings'),
-          content: Text(
-            'To change $permissionName permission, please go to your device settings.\n\nWould you like to open settings now?',
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Open Settings'),
-            ),
-          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Permission Settings',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(sheetContext, false),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'To change $permissionName permission, please go to your device settings.\n\nWould you like to open settings now?',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                      backgroundColor: Colors.white,
+                      borderColor: const Color(0xFF262626),
+                      textColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Open Settings',
+                      onPressed: () => Navigator.pop(sheetContext, true),
+                      backgroundColor: const Color(0xFF262626),
+                      textColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );

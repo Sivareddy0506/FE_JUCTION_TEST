@@ -7,6 +7,11 @@ import '../models/product.dart';
 class SearchService {
   static const String baseUrl = 'https://api.junctionverse.com/user';
   
+  // Default location coordinates (used when user location is unavailable)
+  // Default: Central location (can be changed to your preferred default location)
+  static const double defaultLat = 12.9716; // Default latitude (e.g., Bengaluru center)
+  static const double defaultLng = 77.5946; // Default longitude (e.g., Bengaluru center)
+  
   // Cache for user location to avoid repeated requests
   static Position? _cachedLocation;
   static DateTime? _lastLocationFetch;
@@ -122,10 +127,20 @@ class SearchService {
     double? radius = 50,
   }) async {
     try {
-      // Get user location (required for search)
+      // Get user location, fallback to default if unavailable
       final location = await getUserLocation();
-      if (location == null) {
-        throw Exception('Unable to get user location. Please enable location services.');
+      final Map<String, double> searchLocation;
+      
+      if (location != null) {
+        searchLocation = location;
+        print('SearchService: Using user location: ${location['lat']}, ${location['lng']}');
+      } else {
+        // Use default coordinates when location is unavailable
+        searchLocation = {
+          'lat': defaultLat,
+          'lng': defaultLng,
+        };
+        print('SearchService: Location unavailable, using default coordinates: $defaultLat, $defaultLng');
       }
 
       // Get auth token
@@ -140,8 +155,8 @@ class SearchService {
 
       // Build query parameters
       final queryParams = <String, String>{
-        'userLat': location['lat'].toString(),
-        'userLng': location['lng'].toString(),
+        'userLat': searchLocation['lat'].toString(),
+        'userLng': searchLocation['lng'].toString(),
         'radius': radius.toString(),
         'sortBy': sortBy ?? 'Distance',
         'limit': limit.toString(),
