@@ -67,6 +67,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         query: widget.searchQuery.isNotEmpty ? widget.searchQuery : null,
         listingType: widget.appliedFilters?['listingType'],
         category: widget.appliedFilters?['category'],
+        subCategory: widget.appliedFilters?['subCategory'],
         condition: widget.appliedFilters?['condition'],
         pickupMethod: widget.appliedFilters?['pickupMethod'],
         minPrice: widget.appliedFilters?['minPrice']?.toDouble(),

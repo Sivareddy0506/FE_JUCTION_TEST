@@ -118,6 +118,7 @@ class SearchService {
     String? query,
     String? listingType,
     dynamic category, // Can be String or List<String>
+    dynamic subCategory, // Can be String or List<String>
     dynamic condition, // Can be String or List<String>
     String? pickupMethod,
     double? minPrice,
@@ -175,6 +176,14 @@ class SearchService {
           queryParams['category'] = category.join(',');
         } else if (category is String) {
           queryParams['category'] = category;
+        }
+      }
+      if (subCategory != null && subCategory != 'All') {
+        // Handle both string and list formats
+        if (subCategory is List<String>) {
+          queryParams['subCategory'] = subCategory.join(',');
+        } else if (subCategory is String) {
+          queryParams['subCategory'] = subCategory;
         }
       }
       if (condition != null && condition != 'All') {

@@ -11,8 +11,13 @@ import '../../constants/category_placeholders.dart';
 
 class DescribeProductPage extends StatefulWidget {
   final String selectedCategory;
+  final String selectedSubCategory;
 
-  const DescribeProductPage({super.key, required this.selectedCategory});
+  const DescribeProductPage({
+    super.key,
+    required this.selectedCategory,
+    required this.selectedSubCategory,
+  });
 
   @override
   State<DescribeProductPage> createState() => _DescribeProductPageState();
@@ -20,6 +25,7 @@ class DescribeProductPage extends StatefulWidget {
 
 class ProductDetails {
   final String category;
+  final String subCategory;
   final String title;
   final String price;
   final String description;
@@ -31,6 +37,7 @@ class ProductDetails {
 
   ProductDetails({
     required this.category,
+    required this.subCategory,
     required this.title,
     required this.price,
     required this.description,
@@ -275,6 +282,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
 
     final productDetails = ProductDetails(
       category: widget.selectedCategory,
+      subCategory: widget.selectedSubCategory,
       title: titleController.text.trim(),
       price: cleanedPrice,
       description: descriptionController.text.trim(),
@@ -291,6 +299,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
         SlidePageRoute(
           page: TuneAuctionWidget(
             selectedCategory: productDetails.category,
+            selectedSubCategory: productDetails.subCategory,
             title: productDetails.title,
             price: productDetails.price,
             description: productDetails.description,
@@ -308,6 +317,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
         SlidePageRoute(
           page: AddProductImagesPage(
             selectedCategory: productDetails.category,
+            selectedSubCategory: productDetails.subCategory,
             title: productDetails.title,
             price: productDetails.price,
             description: productDetails.description,
@@ -349,7 +359,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Selected Category: ${widget.selectedCategory}",
+                            "Category: ${widget.selectedCategory} | Subcategory: ${widget.selectedSubCategory}",
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF323537),
@@ -360,7 +370,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           // 1. Title
                           AppTextField(
                             label: 'Title *',
-                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'title'),
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'title'),
                             controller: titleController,
                           ),
                           const SizedBox(height: 16),
@@ -368,7 +378,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           // 2. Product Name
                           AppTextField(
                             label: 'Product Name *',
-                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'productName'),
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'productName'),
                             controller: productNameController,
                           ),
                           const SizedBox(height: 16),
@@ -376,7 +386,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           // 3. Product Description
                           AppTextField(
                             label: 'Product Description *',
-                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'description'),
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'description'),
                             controller: descriptionController,
                             maxLines: 5,
                           ),
@@ -385,7 +395,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                           // 4. Brand / Author / Artist
                           AppTextField(
                             label: 'Brand / Author / Artist *',
-                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'brandName'),
+                            placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'brandName'),
                             controller: brandController,
                           ),
                           const SizedBox(height: 16),
@@ -405,13 +415,13 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                             children: [
                               GestureDetector(
                                 onTap: _showYearPicker,
-                                child: AbsorbPointer(
-                                  child: AppTextField(
-                                    label: 'Year of Purchase *',
-                                    placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'year'),
-                                    controller: yearController,
+                                  child: AbsorbPointer(
+                                    child: AppTextField(
+                                      label: 'Year of Purchase *',
+                                      placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'year'),
+                                      controller: yearController,
+                                    ),
                                   ),
-                                ),
                               ),
                               if (yearError != null)
                                 Padding(
@@ -454,7 +464,7 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                             children: [
                               AppTextField(
                                 label: 'Price *',
-                                placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedCategory, 'price'),
+                                placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'price'),
                                 controller: priceController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 onChanged: _onPriceChanged,

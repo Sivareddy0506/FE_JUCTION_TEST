@@ -9,6 +9,7 @@ import 'app_button.dart';
 
 class TuneAuctionWidget extends StatefulWidget {
   final String selectedCategory;
+  final String selectedSubCategory;
   final String title;
   final String price;
   final String description;
@@ -21,6 +22,7 @@ class TuneAuctionWidget extends StatefulWidget {
   const TuneAuctionWidget({
     super.key,
     required this.selectedCategory,
+    required this.selectedSubCategory,
     required this.title,
     required this.price,
     required this.description,
@@ -85,6 +87,7 @@ class _TuneAuctionWidgetState extends State<TuneAuctionWidget> {
       SlidePageRoute(
         page: AddProductImagesPage(
           selectedCategory: widget.selectedCategory,
+          selectedSubCategory: widget.selectedSubCategory,
           title: widget.title,
           price: widget.price,
           description: widget.description,

@@ -9,6 +9,7 @@ import '../../../app.dart';
 
 class AddProductImagesPage extends StatefulWidget {
   final String selectedCategory;
+  final String selectedSubCategory;
   final String title;
   final String price;
   final String description;
@@ -21,6 +22,7 @@ class AddProductImagesPage extends StatefulWidget {
   const AddProductImagesPage({
     super.key,
     required this.selectedCategory,
+    required this.selectedSubCategory,
     required this.title,
     required this.price,
     required this.description,
@@ -79,6 +81,7 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
       SlidePageRoute(
         page: SelectLocationPage(
           selectedCategory: widget.selectedCategory,
+          selectedSubCategory: widget.selectedSubCategory,
           title: widget.title,
           price: widget.price,
           description: widget.description,

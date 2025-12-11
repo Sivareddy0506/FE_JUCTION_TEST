@@ -1,37 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:junction/app_state.dart';
 import '../../../widgets/custom_appbar.dart';
-import './subcategory_post.dart';
+import '../../constants/category_subcategories.dart';
+import './describe_product.dart';
 import '../../app.dart'; // For SlidePageRoute
 
-class CategoryPostPage extends StatefulWidget {
-  const CategoryPostPage({super.key});
+class SubcategoryPostPage extends StatefulWidget {
+  final String selectedCategory;
+
+  const SubcategoryPostPage({super.key, required this.selectedCategory});
 
   @override
-  State<CategoryPostPage> createState() => _CategoryPostPageState();
+  State<SubcategoryPostPage> createState() => _SubcategoryPostPageState();
 }
 
-class _CategoryPostPageState extends State<CategoryPostPage> {
-  final List<String> categories = [
-    "Electronics",
-    "Furniture",
-    "Books",
-    "Sports",
-    "Fashion",
-    "Hobbies",
-    "Vehicles",
-    "Other",
-  ];
+class _SubcategoryPostPageState extends State<SubcategoryPostPage> {
+  List<String> get subcategories => CategorySubcategories.getSubcategories(widget.selectedCategory);
 
- void _onCategorySelected(String category) {
-  Navigator.push(
-    context,
-    SlidePageRoute(
-      page: SubcategoryPostPage(selectedCategory: category),
-    ),
-  );
-}
-
+  void _onSubcategorySelected(String subcategory) {
+    Navigator.push(
+      context,
+      SlidePageRoute(
+        page: DescribeProductPage(
+          selectedCategory: widget.selectedCategory,
+          selectedSubCategory: subcategory,
+        ),
+      ),
+    );
+  }
 
   Widget _buildProgressChips(int currentStep) {
     return Row(
@@ -43,18 +39,20 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
           height: 4,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            color: isActive ? AppState.instance.isJuction?
-            const Color(0xFFC105FF):
-             const Color(0xFFFF6705): const Color(0xFFE9E9E9),
+            color: isActive
+                ? AppState.instance.isJuction
+                    ? const Color(0xFFC105FF)
+                    : const Color(0xFFFF6705)
+                : const Color(0xFFE9E9E9),
           ),
         );
       }),
     );
   }
 
-  Widget _buildCategoryItem(String title) {
+  Widget _buildSubcategoryItem(String title) {
     return GestureDetector(
-      onTap: () => _onCategorySelected(title),
+      onTap: () => _onSubcategorySelected(title),
       child: Container(
         height: 56,
         decoration: const BoxDecoration(
@@ -91,10 +89,10 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProgressChips(0),
+            _buildProgressChips(1),
             const SizedBox(height: 32),
             const Text(
-              "Select Product Category",
+              "Select Product Subcategory",
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -102,12 +100,27 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
                 color: Color(0xFF262626),
               ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              "Category: ${widget.selectedCategory}",
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF323537),
+              ),
+            ),
             const SizedBox(height: 24),
             Expanded(
-              child: ListView.builder(
-                itemCount: categories.length,
-                itemBuilder: (_, index) => _buildCategoryItem(categories[index]),
-              ),
+              child: subcategories.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No subcategories available for this category',
+                        style: TextStyle(color: Color(0xFF323537)),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: subcategories.length,
+                      itemBuilder: (_, index) => _buildSubcategoryItem(subcategories[index]),
+                    ),
             ),
           ],
         ),
@@ -115,3 +128,4 @@ class _CategoryPostPageState extends State<CategoryPostPage> {
     );
   }
 }
+

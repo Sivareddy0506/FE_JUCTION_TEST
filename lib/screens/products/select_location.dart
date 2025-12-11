@@ -9,6 +9,7 @@ import '../../widgets/app_button.dart';
 
 class SelectLocationPage extends StatefulWidget {
   final String selectedCategory;
+  final String selectedSubCategory;
   final String title;
   final String price;
   final String description;
@@ -23,6 +24,7 @@ class SelectLocationPage extends StatefulWidget {
   const SelectLocationPage({
     super.key,
     required this.selectedCategory,
+    required this.selectedSubCategory,
     required this.title,
     required this.price,
     required this.description,
@@ -358,6 +360,7 @@ class _SelectLocationPageState extends State<SelectLocationPage> {
           brandName: widget.brandName,
           productName: widget.productName,
           selectedCategory: widget.selectedCategory,
+          selectedSubCategory: widget.selectedSubCategory,
           yearOfPurchase: widget.yearOfPurchase,
           latlng: _currentLatLng!,
         ),

@@ -13,6 +13,7 @@ import 'listing_submitted.dart';
 
 class PostGuidelinesPage extends StatefulWidget {
   final String selectedCategory;
+  final String selectedSubCategory;
   final String title;
   final String description;
   final String productName;
@@ -28,6 +29,7 @@ class PostGuidelinesPage extends StatefulWidget {
   const PostGuidelinesPage({
     super.key,
     required this.selectedCategory,
+    required this.selectedSubCategory,
     required this.title,
     required this.description,
     required this.productName,
@@ -64,6 +66,7 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
     request.fields['title'] = widget.title;
     request.fields['description'] = widget.description;
     request.fields['category'] = widget.selectedCategory;
+    request.fields['subCategory'] = widget.selectedSubCategory;
     request.fields['condition'] = widget.condition;
     request.fields['brand'] = widget.brand;
     request.fields['yearOfPurchase'] = widget.yearOfPurchase;

@@ -18,6 +18,7 @@ class ReviewListingPage extends StatefulWidget {
   final String description;
   final String pickupLocation;
   final String selectedCategory;
+  final String selectedSubCategory;
   final String productName;
   final String yearOfPurchase;
   final String brandName;
@@ -34,6 +35,7 @@ class ReviewListingPage extends StatefulWidget {
     required this.description,
     required this.pickupLocation,
     required this.selectedCategory,
+    required this.selectedSubCategory,
     required this.yearOfPurchase,
     required this.brandName,
     required this.productName,
@@ -158,6 +160,7 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
                     SlidePageRoute(
                       page: PostGuidelinesPage(
                         selectedCategory: widget.selectedCategory,
+                        selectedSubCategory: widget.selectedSubCategory,
                         title: widget.title,
                         price: widget.price,
                         description: _currentDescription,
@@ -249,6 +252,7 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
       SlidePageRoute(
         page: SelectLocationPage(
           selectedCategory: widget.selectedCategory,
+          selectedSubCategory: widget.selectedSubCategory,
           title: widget.title,
           price: widget.price,
           description: _currentDescription,

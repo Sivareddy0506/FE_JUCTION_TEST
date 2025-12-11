@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/search/search_results_page.dart';
 import '../services/filter_state_service.dart';
+import '../constants/category_subcategories.dart';
 import '../app.dart'; // For SlidePageRoute
 import 'app_button.dart';
 
@@ -17,6 +18,7 @@ class _FilterModalState extends State<FilterModal> {
   // Filter state
   String selectedListingType = "All";
   List<String> selectedCategories = []; // Changed to list for multiple selection
+  List<String> selectedSubCategories = []; // Subcategory selection
   String selectedSortBy = "Distance";
   List<String> selectedConditions = []; // Changed to list for multiple selection
   String selectedPickupMethod = "All";
@@ -40,6 +42,7 @@ class _FilterModalState extends State<FilterModal> {
         setState(() {
           selectedListingType = savedState['listingType'] ?? "All";
           selectedCategories = List<String>.from(savedState['categories'] ?? []);
+          selectedSubCategories = List<String>.from(savedState['subCategories'] ?? []);
           selectedSortBy = savedState['sortBy'] ?? "Distance";
           selectedConditions = List<String>.from(savedState['conditions'] ?? []);
           selectedPickupMethod = savedState['pickupMethod'] ?? "All";
@@ -70,6 +73,7 @@ class _FilterModalState extends State<FilterModal> {
       final filterState = {
         'listingType': selectedListingType,
         'categories': selectedCategories,
+        'subCategories': selectedSubCategories,
         'sortBy': selectedSortBy,
         'conditions': selectedConditions,
         'pickupMethod': selectedPickupMethod,
@@ -148,9 +152,15 @@ class _FilterModalState extends State<FilterModal> {
                   "Vehicles",
                   "Other"
                 ], selectedCategories, (value) {
-                  setState(() => selectedCategories = value);
+                  setState(() {
+                    selectedCategories = value;
+                    // Clear subcategories that don't belong to selected categories
+                    _updateSubCategoriesForSelectedCategories();
+                  });
                   _saveFilterState(); // Save state when changed
                 }),
+                // Show subcategories only if categories are selected
+                if (selectedCategories.isNotEmpty) _buildSubCategorySection(),
                 _buildButtonGroup("Sort By", [
                   "Distance",
                   "Price Low to High",
@@ -330,10 +340,44 @@ class _FilterModalState extends State<FilterModal> {
 }
 
 
+  /// Get all subcategories for selected categories (excluding "Other" for filters)
+  List<String> _getAvailableSubCategories() {
+    final Set<String> allSubCategories = {};
+    for (final category in selectedCategories) {
+      final subCategories = CategorySubcategories.getSubcategories(category);
+      // Filter out "Other" subcategory as it's not used in filters
+      allSubCategories.addAll(subCategories.where((subCat) => subCat != 'Other'));
+    }
+    return allSubCategories.toList()..sort();
+  }
+
+  /// Update subcategories list to only include those from selected categories
+  void _updateSubCategoriesForSelectedCategories() {
+    final availableSubCategories = _getAvailableSubCategories();
+    selectedSubCategories.removeWhere(
+      (subCat) => !availableSubCategories.contains(subCat),
+    );
+  }
+
+  /// Build subcategory selection section
+  Widget _buildSubCategorySection() {
+    final availableSubCategories = _getAvailableSubCategories();
+    
+    if (availableSubCategories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return _buildMultiSelectButtonGroup("Subcategory", availableSubCategories, selectedSubCategories, (value) {
+      setState(() => selectedSubCategories = value);
+      _saveFilterState(); // Save state when changed
+    });
+  }
+
   void _clearAllFilters() {
     setState(() {
       selectedListingType = "All";
       selectedCategories = [];
+      selectedSubCategories = [];
       selectedSortBy = "Distance";
       selectedConditions = [];
       selectedPickupMethod = "All";
@@ -353,6 +397,7 @@ class _FilterModalState extends State<FilterModal> {
       final filters = {
         'listingType': selectedListingType,
         'category': selectedCategories.isNotEmpty ? selectedCategories : null,
+        'subCategory': selectedSubCategories.isNotEmpty ? selectedSubCategories : null,
         'condition': selectedConditions.isNotEmpty ? selectedConditions : null,
         'pickupMethod': selectedPickupMethod,
         'minPrice': priceRange.start,
