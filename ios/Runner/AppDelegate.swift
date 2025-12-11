@@ -14,13 +14,29 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     // Initialize Google Maps SDK
+    var apiKey: String?
+    
+    // Try to get from GoogleService-Info.plist first
     if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
        let plist = NSDictionary(contentsOfFile: path),
-       let apiKey = plist["API_KEY"] as? String {
-      GMSServices.provideAPIKey(apiKey)
+       let key = plist["API_KEY"] as? String {
+      apiKey = key
+    }
+    
+    // Fallback to Info.plist (with variable substitution)
+    if apiKey == nil || apiKey?.isEmpty == true {
+      if let infoPlist = Bundle.main.infoDictionary,
+         let key = infoPlist["GMSApiKey"] as? String,
+         !key.isEmpty && !key.contains("$(GOOGLE_MAPS_API_KEY)") {
+        apiKey = key
+      }
+    }
+    
+    if let key = apiKey, !key.isEmpty {
+      GMSServices.provideAPIKey(key)
       print("✅ Google Maps SDK initialized with API key")
     } else {
-      print("⚠️ Warning: Could not find Google Maps API key in GoogleService-Info.plist")
+      print("⚠️ Warning: Could not find Google Maps API key. Please set GOOGLE_MAPS_API_KEY in Secrets.xcconfig")
     }
     
     // Note: Firebase is initialized in Flutter (main.dart), not here

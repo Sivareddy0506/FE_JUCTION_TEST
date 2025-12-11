@@ -43,7 +43,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>JunctionVerse needs access to your photo library to upload product images for your listings, verification documents, profile pictures, and images you want to share in conversations.</string>
 	<key>GMSApiKey</key>
-	<string>AIzaSyDac5AofLm9WaxphZKhpWgmT7qqW1kF3Ek</string>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
