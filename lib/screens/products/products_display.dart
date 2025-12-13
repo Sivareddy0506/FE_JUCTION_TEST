@@ -3,7 +3,6 @@ import '../../models/product.dart';
 import '../../widgets/search_bar_widget.dart';
 import '../services/api_service.dart';
 import './product_detail.dart';
-import '../services/location_helper.dart';
 import '../../services/profile_service.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../widgets/bottom_navbar.dart';
@@ -32,7 +31,6 @@ class _ProductListingPageState extends State<ProductListingPage> {
 
   // Caches
   final Map<String, String> _sellerNames = {};
-  final Map<String, String> _locationCache = {};
   Map<String, int> _uniqueClicks = {};
 
   @override
@@ -72,18 +70,15 @@ class _ProductListingPageState extends State<ProductListingPage> {
           result = [];
       }
 
-      // Store products first (needed for prefetch)
+      // Store products first
       products = result;
 
-      // Prefetch all data BEFORE rendering
-      await Future.wait([
-        _fetchAllClicks(),
-        _prefetchAllLocations(),
-      ]);
+      // Prefetch clicks
+      await _fetchAllClicks();
 
       if (mounted) {
         setState(() {
-          isLoading = false; // Only now allow rendering
+          isLoading = false;
         });
       }
     } catch (e) {
@@ -106,44 +101,16 @@ class _ProductListingPageState extends State<ProductListingPage> {
     });
   }
 
-  Future<void> _prefetchAllLocations() async {
-    final futures = <Future>[];
-
-    for (final product in products) {
-      if (product.latitude != null &&
-          product.longitude != null &&
-          !_locationCache.containsKey(product.id)) {
-        futures.add(_loadLocationForProduct(product));
-      }
-    }
-
-    // Wait for all locations to be fetched
-    await Future.wait(futures);
-  }
-
-  Future<void> _loadLocationForProduct(Product product) async {
-    try {
-      final location = await getAddressFromLatLng(
-        product.latitude!,
-        product.longitude!,
-      );
-      _locationCache[product.id] = location;
-    } catch (e) {
-      _locationCache[product.id] = 'Location unavailable';
-    }
-  }
-
   Future<void> _handleProductClick(Product product, int index) async {
-    await ApiService.trackProductClick(product.id); // track click
+    await ApiService.trackProductClick(product.id);
     Navigator.push(
       context,
       SlidePageRoute(
         page: ProductDetailPage(
           product: product,
-          products: products, // Pass in product list
-          initialIndex: index, // Pass in list index
+          products: products,
+          initialIndex: index,
           initialUniqueClicks: _uniqueClicks,
-          initialLocations: _locationCache,
         ),
       ),
     );
@@ -193,11 +160,7 @@ class _ProductListingPageState extends State<ProductListingPage> {
                   itemCount: products.length,
                   itemBuilder: (context, index) {
                     final product = products[index];
-
-                    // Location is already prefetched
-                    final locationString = _locationCache[product.id] ??
-                        product.location ??
-                        'Unknown';
+                    final locationString = product.readableLocation ?? 'Location unavailable';
 
                     // Seller name caching
                     final sellerId = product.seller?.id ?? '';

@@ -72,6 +72,27 @@ class _AddProductInfoPageState extends State<AddProductInfoPage> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: Color(0xFF8A8894),
+                ),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    'Include key words in title to ensure listing has improved visibility',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF8A8894),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 24),
             const Text(
               "Product Description",

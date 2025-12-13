@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../screens/products/product_detail.dart';
-import '../screens/services/location_helper.dart';
 import '../services/favorites_service.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../services/cache_manager.dart';
@@ -138,45 +137,11 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard> {
   late FavoritesService _favoritesService;
-  String? _cachedLocation;
-  bool _isLoadingLocation = false;
 
   @override
   void initState() {
     super.initState();
     _favoritesService = FavoritesService();
-    _loadLocation();
-  }
-
-  Future<void> _loadLocation() async {
-    if (widget.product.latitude != null &&
-        widget.product.longitude != null &&
-        _cachedLocation == null &&
-        !_isLoadingLocation) {
-      setState(() => _isLoadingLocation = true);
-
-      try {
-        final location = await getAddressFromLatLng(
-          widget.product.latitude!,
-          widget.product.longitude!,
-        );
-
-        if (mounted) {
-          setState(() {
-            _cachedLocation = location;
-            _isLoadingLocation = false;
-          });
-        }
-      } catch (e) {
-        debugPrint('Error loading location: $e');
-        if (mounted) {
-          setState(() {
-            _cachedLocation = 'Location unavailable';
-            _isLoadingLocation = false;
-          });
-        }
-      }
-    }
   }
 
   Future<void> _toggleFavorite(String productId) async {
@@ -340,9 +305,7 @@ Widget build(BuildContext context) {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            _cachedLocation ??
-                                widget.product.location ??
-                                'Location not set',
+                            widget.product.readableLocation ?? 'Location unavailable',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

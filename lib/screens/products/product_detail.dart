@@ -10,7 +10,6 @@ import '../profile/empty_state.dart';
 import '../../services/favorites_service.dart';
 import '../services/chat_service.dart';
 import '../../services/view_tracker.dart';
-import '../services/location_helper.dart';
 import '../../services/profile_service.dart';
 import '../../app.dart'; 
 import '../../../widgets/custom_appbar.dart';
@@ -25,7 +24,6 @@ class ProductDetailPage extends StatefulWidget {
   final int? initialIndex;
   final VoidCallback? onFavoriteChanged;
   final Map<String, int>? initialUniqueClicks;   // productId -> unique views
-  final Map<String, String>? initialLocations;   // productId -> geocoded location
 
   const ProductDetailPage({
     super.key,
@@ -34,7 +32,6 @@ class ProductDetailPage extends StatefulWidget {
     this.initialIndex,
     this.onFavoriteChanged,
     this.initialUniqueClicks,
-    this.initialLocations,
   });
 
   @override
@@ -45,15 +42,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Product> relatedProducts = [];
   int currentProductIndex = 0;
   PageController? _pageController;
-  PageController? _imagePageController;
+  final Map<String, PageController> _imagePageControllers = {}; // One controller per product
   bool isLoadingRelated = true;
   final ChatService _chatService = ChatService();
   late FavoritesService _favoritesService;
   String? _sellerName;
   int _displayViews = 0;
   bool _registeredView = false;
-  final Map<String, String> _locationCache = {}; // Location cache per product
-  final Set<String> _loadingLocations = {}; // Track which products are loading location
   final Map<String, int> _viewCountCache = {}; // View count cache per product
   int _currentImageIndex = 0;
   String? _currentProductStatus; // Track product status
@@ -89,10 +84,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     
     // Dispose old controllers before creating new ones
     _pageController?.dispose();
-    _imagePageController?.dispose();
+    // Dispose all image controllers
+    for (final controller in _imagePageControllers.values) {
+      controller.dispose();
+    }
+    _imagePageControllers.clear();
     
     _pageController = PageController(initialPage: currentProductIndex);
-    _imagePageController = PageController();
     _currentImageIndex = 0;
     
     if (mounted) {
@@ -101,10 +99,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         isLoadingRelated = false;
       });
 
-      // Load data for the initial displayed product
+      // Load view count for the initial displayed product
       if (withCurrent.isNotEmpty && currentProductIndex >= 0 && currentProductIndex < withCurrent.length) {
         final displayedProduct = withCurrent[currentProductIndex];
-        _loadProductLocation(displayedProduct);
         _fetchUniqueClicks(displayedProduct);
       }
     }
@@ -120,15 +117,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     if (widget.initialUniqueClicks != null) {
       _viewCountCache.addAll(widget.initialUniqueClicks!);
     }
-    if (widget.initialLocations != null) {
-      _locationCache.addAll(widget.initialLocations!);
-    }
     
     if (widget.products != null && widget.products!.isNotEmpty) {
       relatedProducts = List<Product>.from(widget.products!);
       currentProductIndex = widget.initialIndex ?? 0;
       _pageController = PageController(initialPage: currentProductIndex);
-      _imagePageController = PageController();
       _currentImageIndex = 0;
       isLoadingRelated = false;
     } else {
@@ -146,15 +139,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _fetchProductStatus(); // Fetch product status on init
     _checkAndShowSwipeHint(); // Check if swipe hint should be shown
 
-    // Load data for the initial displayed product (may be different from widget.product)
+    // Load view counts for the initial displayed product
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && relatedProducts.isNotEmpty) {
         final displayedProduct = relatedProducts[currentProductIndex];
-        _loadProductLocation(displayedProduct);
         _fetchUniqueClicks(displayedProduct);
       } else {
-        // Fallback to widget.product if no related products yet
-        _loadProductLocation(widget.product);
         _fetchUniqueClicks(widget.product);
       }
     });
@@ -551,7 +541,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     
     // Dispose controllers
     _pageController?.dispose();
-    _imagePageController?.dispose();
+    // Dispose all image controllers
+    for (final controller in _imagePageControllers.values) {
+      controller.dispose();
+    }
+    _imagePageControllers.clear();
     _reportNotesController.dispose();
     
     super.dispose();
@@ -569,48 +563,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       setState(() {
         _sellerName = (name != null && name.isNotEmpty) ? name : 'Unknown Seller';
       });
-    }
-  }
-
-  Future<void> _loadProductLocation([Product? product]) async {
-    final targetProduct = product ?? widget.product;
-    final productId = targetProduct.id;
-
-    // Skip if already cached or already loading
-    if (_locationCache.containsKey(productId) || _loadingLocations.contains(productId)) {
-      return;
-    }
-
-    // Skip if product already has a location string
-    if (targetProduct.location != null && targetProduct.location!.isNotEmpty) {
-      return;
-    }
-
-    // Skip if no coordinates
-    if (targetProduct.latitude == null || targetProduct.longitude == null) {
-      return;
-    }
-
-    _loadingLocations.add(productId);
-    if (mounted) setState(() {});
-
-    try {
-      final location = await getAddressFromLatLng(
-          targetProduct.latitude!, targetProduct.longitude!);
-      if (mounted) {
-        setState(() {
-          _locationCache[productId] = location;
-          _loadingLocations.remove(productId);
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading location for $productId: $e');
-      if (mounted) {
-        setState(() {
-          _locationCache[productId] = 'Location unavailable';
-          _loadingLocations.remove(productId);
-        });
-      }
     }
   }
 
@@ -856,17 +808,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 currentProductIndex = index;
                 _currentImageIndex = 0;
               });
-              _imagePageController?.jumpToPage(0);
+              
+              // Reset image PageView for the new product
+              final newProduct = relatedProducts[index];
+              // Get or create controller (will be created when _buildPrimaryCard is called)
+              final imageController = _imagePageControllers[newProduct.id];
+              if (imageController != null && imageController.hasClients) {
+                imageController.jumpToPage(0);
+              }
               
               // Dismiss swipe hint on first swipe
               if (_showSwipeHint) {
                 _dismissSwipeHint();
               }
 
-              // Load data for the new product
-              final newProduct = relatedProducts[index];
+              // Load view count for the new product
               _fetchUniqueClicks(newProduct);
-              _loadProductLocation(newProduct);
             },
             itemBuilder: (context, index) {
               final product = relatedProducts[index];
@@ -1103,7 +1060,11 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
        badgeChips.add(_buildBadge('Condition: ${product.condition}'));
      }
  
-     final controller = _imagePageController ??= PageController();
+     // Get or create PageController for this specific product
+     final controller = _imagePageControllers.putIfAbsent(
+       product.id,
+       () => PageController(),
+     );
  
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1333,30 +1294,11 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
   }
 
   Widget _buildLocationText(Product product) {
-    // First check if product has location string
-    if (product.location != null && product.location!.isNotEmpty) {
-      return Text(product.location!, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
+    final location = product.readableLocation;
+    if (location != null && location.isNotEmpty && location != 'Location unavailable') {
+      return Text(location, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
     }
-
-    // Then check cache for this specific product
-    final cachedLocation = _locationCache[product.id];
-    if (cachedLocation != null && cachedLocation != 'Location unavailable') {
-      return Text(cachedLocation, style: const TextStyle(fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis);
-    }
-
-    // Check if loading for this specific product
-    if (_loadingLocations.contains(product.id)) {
-      return const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.grey))),
-          SizedBox(width: 8),
-          Text('Loading location...', style: TextStyle(fontSize: 14, color: Colors.grey)),
-        ],
-      );
-    }
-
-    return const Text('Location not set', style: TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis);
+    return const Text('Location unavailable', style: TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 
   String _timeAgo(DateTime date) {

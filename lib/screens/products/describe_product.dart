@@ -373,6 +373,27 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
                             placeholder: CategoryPlaceholders.getPlaceholder(widget.selectedSubCategory, 'title'),
                             controller: titleController,
                           ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Color(0xFF8A8894),
+                              ),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Text(
+                                  'Include key words in title to ensure listing has improved visibility',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF8A8894),
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 16),
 
                           // 2. Product Name

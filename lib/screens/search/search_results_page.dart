@@ -4,7 +4,6 @@ import '../../widgets/search_bar_widget.dart';
 import '../../services/search_service.dart';
 import '../../services/filter_state_service.dart';
 import '../services/api_service.dart';
-import '../services/location_helper.dart';
 import '../products/product_detail.dart';
 import '../../services/profile_service.dart'; 
 import '../../../widgets/custom_appbar.dart';
@@ -41,7 +40,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   String errorMessage = '';
   final Map<String, String> _sellerNames = {}; // Seller names cache
   Map<String, int> _uniqueClicks = {};   // Product clicks cache
-  final Map<String, String> _locationCache = {}; // Location cache
 
   @override
   void initState() {
@@ -79,14 +77,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         await ApiService.saveSearchHistory(widget.searchQuery);
       }
 
-      // Store results first (needed for prefetch)
       searchResults = searchResult.products;
 
-      // Prefetch all data BEFORE rendering
-      await Future.wait([
-        _fetchAllClicks(),
-        _prefetchAllLocations(),
-      ]);
+      // Prefetch clicks
+      await _fetchAllClicks();
 
       if (mounted) {
         setState(() {
@@ -110,33 +104,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     final results = await ProductClickService.getUniqueClicksFor(productIds);
     clicksMap.addAll(results);
     _uniqueClicks = clicksMap;
-  }
-
-  Future<void> _prefetchAllLocations() async {
-    final futures = <Future>[];
-
-    for (final product in searchResults) {
-      if (product.latitude != null &&
-          product.longitude != null &&
-          !_locationCache.containsKey(product.id)) {
-        futures.add(_loadLocationForProduct(product));
-      }
-    }
-
-    // Wait for all locations to be fetched
-    await Future.wait(futures);
-  }
-
-  Future<void> _loadLocationForProduct(Product product) async {
-    try {
-      final location = await getAddressFromLatLng(
-        product.latitude!,
-        product.longitude!,
-      );
-      _locationCache[product.id] = location;
-    } catch (e) {
-      _locationCache[product.id] = 'Location unavailable';
-    }
   }
 
   Future<void> _openSellerProfile(String sellerId) async {
@@ -169,7 +136,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           products: searchResults,
           initialIndex: index,
           initialUniqueClicks: _uniqueClicks,
-          initialLocations: _locationCache,
         ),
       ),
     );
@@ -392,7 +358,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _locationCache[product.id] ?? product.location ?? 'Unknown',
+                                product.readableLocation ?? 'Location unavailable',
                                 style: const TextStyle(fontSize: 12),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

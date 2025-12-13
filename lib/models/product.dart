@@ -109,6 +109,7 @@ class Product {
   final double? longitude;
   final String? description;
   final String? location;
+  final String? readableLocation; // Human-readable address from backend
   final Seller? seller;
   final String? category;
   final String? condition;
@@ -136,6 +137,7 @@ class Product {
     this.longitude,
     this.description,
     this.location,
+    this.readableLocation,
     this.seller,
     this.category,
     this.condition,
@@ -209,6 +211,7 @@ class Product {
       location: json['pickupLocation'] ??
           json['locationName'] ??
           json['location']?['name'],
+      readableLocation: json['readableLocation'],
       seller: _parseSeller(json),
       category: json['category'],
       condition: json['condition'],
