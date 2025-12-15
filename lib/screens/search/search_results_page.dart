@@ -71,6 +71,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         minPrice: widget.appliedFilters?['minPrice']?.toDouble(),
         maxPrice: widget.appliedFilters?['maxPrice']?.toDouble(),
         sortBy: widget.sortBy ?? 'Distance',
+        radius: widget.appliedFilters?['radius']?.toDouble(),
       );
 
       if (widget.searchQuery.isNotEmpty) {

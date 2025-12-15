@@ -23,6 +23,7 @@ class _FilterModalState extends State<FilterModal> {
   List<String> selectedConditions = []; // Changed to list for multiple selection
   String selectedPickupMethod = "All";
   RangeValues priceRange = const RangeValues(0, 100000);
+  double? selectedRadius = 50.0; // Default radius in km (null means unlimited)
 
   // Loading state
   bool isLoading = false;
@@ -50,6 +51,9 @@ class _FilterModalState extends State<FilterModal> {
             (savedState['minPrice'] ?? 0.0).toDouble(),
             (savedState['maxPrice'] ?? 100000.0).toDouble(),
           );
+          // Handle radius: null means unlimited, otherwise use saved value or default to 50
+          final savedRadius = savedState['radius'];
+          selectedRadius = savedRadius == null ? 50.0 : (savedRadius is double ? savedRadius : savedRadius.toDouble());
           isInitialized = true;
         });
         print('FilterWidget: Filter state loaded from cache');
@@ -79,6 +83,7 @@ class _FilterModalState extends State<FilterModal> {
         'pickupMethod': selectedPickupMethod,
         'minPrice': priceRange.start,
         'maxPrice': priceRange.end,
+        'radius': selectedRadius,
       };
       
       await FilterStateService.saveFilterState(filterState);
@@ -172,6 +177,7 @@ class _FilterModalState extends State<FilterModal> {
                   _saveFilterState(); // Save state when changed
                 }),
                 _buildRangeSlider(),
+                _buildRadiusSlider(),
                 _buildMultiSelectButtonGroup("Condition", [
                   "Like New",
                   "Gently Used",
@@ -300,6 +306,63 @@ class _FilterModalState extends State<FilterModal> {
     );
   }
 
+  Widget _buildRadiusSlider() {
+    // Define radius options: [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000, null (unlimited)]
+    // null represents unlimited/no limit
+    final List<double?> radiusOptions = [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000, null];
+    
+    // Find current index - handle null comparison properly
+    int currentIndex = 0;
+    if (selectedRadius == null) {
+      currentIndex = radiusOptions.length - 1; // Last option is unlimited
+    } else {
+      currentIndex = radiusOptions.indexWhere((r) => r == selectedRadius);
+      if (currentIndex < 0) {
+        currentIndex = 0; // Default to first if not found
+      }
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Search Radius", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
+        const SizedBox(height: 14),
+        Slider(
+          value: currentIndex.toDouble(),
+          min: 0,
+          max: (radiusOptions.length - 1).toDouble(),
+          divisions: radiusOptions.length - 1,
+          activeColor: const Color(0xFFFF6705),
+          inactiveColor: Colors.grey[300],
+          onChanged: (value) {
+            final index = value.round();
+            setState(() {
+              selectedRadius = radiusOptions[index];
+            });
+            _saveFilterState(); // Save state when changed
+          },
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              selectedRadius == null 
+                ? "No Limit" 
+                : "${selectedRadius!.round()} km",
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFFF6705),
+              ),
+            ),
+          ],
+        ),
+        const Divider(height: 30),
+      ],
+    );
+  }
+
   Widget _buildFooterButtons() {
   return SafeArea( // ✅ prevents buttons from going behind Android system buttons
     minimum: const EdgeInsets.all(16), // padding for safe distance
@@ -382,6 +445,7 @@ class _FilterModalState extends State<FilterModal> {
       selectedConditions = [];
       selectedPickupMethod = "All";
       priceRange = const RangeValues(0, 100000);
+      selectedRadius = 50.0;
     });
     // Clear the filter state cache
     FilterStateService.clearFilterState();
@@ -402,6 +466,7 @@ class _FilterModalState extends State<FilterModal> {
         'pickupMethod': selectedPickupMethod,
         'minPrice': priceRange.start,
         'maxPrice': priceRange.end,
+        'radius': selectedRadius, // null means unlimited
       };
 
       // Close filter modal

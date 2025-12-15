@@ -599,6 +599,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final token = prefs.getString('authToken');
 
     if (token == null || token.isEmpty) {
+      debugPrint('_fetchRelatedProducts: No auth token found');
       if (mounted) {
         setState(() => isLoadingRelated = false);
         _setProductList([]);
@@ -608,6 +609,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     final uri =
         Uri.parse('https://api.junctionverse.com/product/related/${widget.product.id}');
+    debugPrint('_fetchRelatedProducts: Calling API: $uri');
+    
     try {
       final response = await http.get(uri, headers: {
         'Authorization': 'Bearer $token',
@@ -616,7 +619,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
       if (!mounted) return;
       
+      debugPrint('_fetchRelatedProducts: Response status: ${response.statusCode}');
+      debugPrint('_fetchRelatedProducts: Response body: ${response.body}');
+      
       if (response.statusCode != 200) {
+        debugPrint('_fetchRelatedProducts: API returned non-200 status: ${response.statusCode}');
         if (mounted) {
           setState(() => isLoadingRelated = false);
           _setProductList([]);
@@ -625,45 +632,30 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       }
 
       final dynamic decoded = jsonDecode(response.body);
-      final List<dynamic> data = decoded['products'] ?? [];
+      debugPrint('_fetchRelatedProducts: Decoded response keys: ${decoded is Map ? (decoded as Map).keys.toList() : 'Not a map'}');
+      
+      final List<dynamic> data = decoded['relatedProducts'] ?? [];
+      debugPrint('_fetchRelatedProducts: Found ${data.length} related products in response');
 
-      final List<Product> fetched = data.map<Product>((item) {
-        final map = Map<String, dynamic>.from(item);
-        final List<ProductImage> imageList = (map['images'] as List?)
-                ?.map((imgRaw) {
-                  final img = Map<String, dynamic>.from(imgRaw);
-                  return ProductImage(
-                    fileUrl: img['fileUrl'] ?? 'assets/placeholder.png',
-                    fileType: img['fileType'],
-                    filename: img['filename'],
-                  );
-                }).toList() ??
-            [];
+      final List<Product> fetched = [];
+      for (var item in data) {
+        try {
+          final productMap = Map<String, dynamic>.from(item);
+          final product = Product.fromJson(productMap);
+          fetched.add(product);
+        } catch (e) {
+          debugPrint('_fetchRelatedProducts: Error parsing related product: $e');
+          debugPrint('_fetchRelatedProducts: Product data: $item');
+          // Continue with next product instead of failing completely
+        }
+      }
 
-        final Seller? seller = map['seller'] != null
-            ? Seller.fromJson(Map<String, dynamic>.from(map['seller']))
-            : null;
-
-        return Product(
-          id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
-          images: imageList,
-          imageUrl: imageList.isNotEmpty
-              ? imageList.first.fileUrl
-              : (map['imageUrl']?.toString() ?? 'assets/placeholder.png'),
-          title: map['title']?.toString() ?? 'No title',
-          price: map['price'] != null ? '₹${map['price']}' : null,
-          description: map['description']?.toString(),
-          location: map['pickupLocation']?.toString() ??
-              map['locationName']?.toString(),
-          seller: seller,
-          isAuction: map['isAuction'] == true,
-          views: int.tryParse((map['views'] ?? map['viewCount'] ?? '0').toString()) ?? 0,
-        );
-      }).toList();
+      debugPrint('_fetchRelatedProducts: Successfully parsed ${fetched.length} products');
 
       _setProductList(fetched);
-    } catch (e) {
-      debugPrint('Error fetching related products: $e');
+    } catch (e, stackTrace) {
+      debugPrint('_fetchRelatedProducts: Exception caught: $e');
+      debugPrint('_fetchRelatedProducts: Stack trace: $stackTrace');
       if (mounted) {
         setState(() => isLoadingRelated = false);
         _setProductList([]);
@@ -779,10 +771,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       });
     }
     
-    if (isLoadingRelated || relatedProducts.isEmpty) {
+    if (isLoadingRelated) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+    
+    // If no related products found, still show the current product
+    if (relatedProducts.isEmpty) {
+      // Ensure at least the current product is in the list
+      relatedProducts = [widget.product];
+      currentProductIndex = 0;
+      if (_pageController == null) {
+        _pageController = PageController(initialPage: 0);
+      }
     }
     final product = relatedProducts[currentProductIndex];
     final bool isSellerViewing = product.seller?.id == _chatService.currentUserIdSync;

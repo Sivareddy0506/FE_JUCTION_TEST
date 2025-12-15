@@ -158,10 +158,14 @@ class SearchService {
       final queryParams = <String, String>{
         'userLat': searchLocation['lat'].toString(),
         'userLng': searchLocation['lng'].toString(),
-        'radius': radius.toString(),
         'sortBy': sortBy ?? 'Distance',
         'limit': limit.toString(),
       };
+      
+      // Only add radius if it's provided and not null (null means unlimited)
+      if (radius != null) {
+        queryParams['radius'] = radius.toString();
+      }
 
       // Add optional parameters
       if (query != null && query.isNotEmpty) {
@@ -224,10 +228,21 @@ class SearchService {
       if (response.statusCode == 200) {
          final data = json.decode(response.body);
          
+         print('SearchService: Products count before parsing: ${(data['products'] as List).length}');
+
          // Parse products (without distance fields)
-         final List<Product> products = (data['products'] as List)
-             .map((productData) => Product.fromJson(productData))
-             .toList();
+         final List<Product> products = [];
+         for (var productData in (data['products'] as List)) {
+           try {
+             final product = Product.fromJson(productData);
+             products.add(product);
+           } catch (e) {
+              print('Error parsing product: $e');
+              print('Product data: $productData');
+              continue;
+            }
+         }
+         print('SearchService: Products count after parsing: ${products.length}');
 
          // Extract distances separately from the API response
          Map<String, double>? productDistances;
