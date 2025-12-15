@@ -111,6 +111,58 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
     }
   }
 
+  Future<void> _takePicture(String key, String label) async {
+    // Check consent first if required
+    if (_requiresConsent(key) && !(_consentGiven[key] ?? false)) {
+      // Show consent dialog first
+      final consentGiven = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(label),
+          content: CheckboxListTile(
+            value: _consentGiven[key] ?? false,
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'I agree to share these documents with JunctionVerse for verification purposes.',
+              style: TextStyle(fontSize: 14),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _consentGiven[key] = value ?? false;
+              });
+              Navigator.pop(context, value ?? false);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, _consentGiven[key] ?? false),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      
+      if (consentGiven != true) {
+        return; // User didn't provide consent or cancelled
+      }
+    }
+    
+    // Directly open camera
+    final picked = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 100, // High quality for verification documents
+    );
+    
+    if (picked != null) {
+      await _handlePickedFile(picked, key, context, setState, () {});
+    }
+  }
+
   void _showUploadSheet(String key, String label) {
     showModalBottomSheet(
       context: context,
@@ -129,7 +181,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                 Text(label, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const Divider(color: Color(0xFFE3E3E3)),
                 const Text(
-                  "Note: Please upload a clear picture of your valid student ID, ensuring the ID is fully visible and legible.",
+                  "Note: Please take a clear picture of your valid student ID, ensuring the ID is fully visible and legible.",
                   style: TextStyle(color: Colors.black54),
                 ),
                 const SizedBox(height: 24),
@@ -156,82 +208,14 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                     if (_requiresConsent(key) && !(_consentGiven[key] ?? false)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Please provide consent before uploading this document.'),
+                          content: Text('Please provide consent before taking a picture of this document.'),
                           backgroundColor: Colors.red,
                         ),
                       );
                       return;
                     }
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => Container(
-                        margin: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 4,
-                                  margin: const EdgeInsets.only(bottom: 20),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const Text(
-                                  'Add Photo',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                AppButton(
-                                  label: 'Take a Photo',
-                                  backgroundColor: Colors.white,
-                                  textColor: const Color(0xFF262626),
-                                  borderColor: const Color(0xFF262626),
-                                  onPressed: () async {
-                                    Navigator.pop(context);
-                                    final picked = await picker.pickImage(source: ImageSource.camera);
-                                    await _handlePickedFile(picked, key, context, setState, setStateBottom);
-                                  },
-                                  bottomSpacing: 16,
-                                ),
-                                AppButton(
-                                  label: 'Upload from device',
-                                  backgroundColor: Colors.white,
-                                  textColor: const Color(0xFF262626),
-                                  borderColor: const Color(0xFF262626),
-                                  onPressed: () async {
-                                    Navigator.pop(context);
-                                    final picked = await picker.pickImage(source: ImageSource.gallery);
-                                    await _handlePickedFile(picked, key, context, setState, setStateBottom);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
+                    Navigator.pop(context);
+                    await _takePicture(key, label);
                   },
                   child: uploadedFiles[key] == null
                       ? Container(
@@ -251,10 +235,10 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                                 TextSpan(
                                   children: [
                                     TextSpan(
-                                      text: 'Click here',
+                                      text: 'Tap here',
                                       style: TextStyle(color: Color(0xFFFF6705), fontWeight: FontWeight.w500),
                                     ),
-                                    TextSpan(text: ' to take the picture'),
+                                    TextSpan(text: ' to take a picture'),
                                   ],
                                 ),
                                 textAlign: TextAlign.center,
@@ -303,7 +287,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                 ),
 
                 const SizedBox(height: 8),
-                const Text('JPG, PNG, PDF files up to 5MB each', style: TextStyle(fontSize: 14)),
+                const Text('JPG, PNG files up to 5MB each (Camera only for security)', style: TextStyle(fontSize: 14)),
                 
                 // Show total size info
                 FutureBuilder<int>(
@@ -360,7 +344,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
                 const SizedBox(height: 20),
 
                 AppButton(
-                  label: isLoading ? 'Uploading...' : 'Upload',
+                  label: isLoading ? 'Uploading...' : 'Done',
                   onPressed: uploadedFiles[key] != null && (! _requiresConsent(key) || (_consentGiven[key] ?? false))
                       ? () {
                           Navigator.pop(context);

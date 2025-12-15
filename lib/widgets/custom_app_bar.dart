@@ -28,14 +28,23 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 const SizedBox(width: 10),
                 if (showBackButton)
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Image.asset('assets/back.png', width: 24),
-                    onPressed: onBackPressed ?? () {
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      }
-                    },
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      icon: Image.asset('assets/back.png', width: 24),
+                      onPressed: onBackPressed ?? () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
                   ),
               ],
             ),
