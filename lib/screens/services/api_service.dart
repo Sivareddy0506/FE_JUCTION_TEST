@@ -346,6 +346,43 @@ class ApiService {
     }
   }
 
+  /// Fetch a single product by ID
+  static Future<Product?> getProductById(String productId) async {
+    try {
+      final token = await _getToken();
+      
+      if (token == null) {
+        debugPrint('ApiService: No auth token available for getProductById');
+        return null;
+      }
+      
+      final response = await http.get(
+        Uri.parse('https://api.junctionverse.com/product/$productId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final productData = jsonDecode(response.body);
+        return Product.fromJson(productData);
+      } else if (response.statusCode == 404) {
+        debugPrint('ApiService: Product not found: $productId');
+        return null;
+      } else if (response.statusCode == 401) {
+        debugPrint('ApiService: Unauthorized - token may be expired');
+        return null;
+      } else {
+        debugPrint('ApiService: Failed to fetch product: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('ApiService: Error fetching product by ID: $e');
+      return null;
+    }
+  }
+
   // Removed fetchSellerDetails; product.seller is now populated by backend
 }
 

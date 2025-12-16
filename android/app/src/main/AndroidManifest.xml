@@ -52,6 +52,16 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
+            <!-- Deep link intent filter for product sharing -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="junction"
+                    android:host="product" />
+            </intent-filter>
+
         </activity>
         
         <!-- Firebase Cloud Messaging default notification channel -->

@@ -107,8 +107,8 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 32),
                           AppTextField(
-                            label: 'College Email',
-                            placeholder: 'Enter your college email',
+                            label: 'Registered Email ID',
+                            placeholder: 'Enter your registered email ID',
                             isMandatory: true,
                             keyboardType: TextInputType.emailAddress,
                             controller: _emailController,

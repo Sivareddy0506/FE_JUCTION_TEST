@@ -23,7 +23,7 @@ class CategoryGrid extends StatelessWidget {
       height: itemSize + 40, // image + label + padding
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.only(left: 0, right: 12),
         itemCount: categories.length,
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
@@ -54,7 +54,7 @@ class CategoryGrid extends StatelessWidget {
                   category['label']!,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: (MediaQuery.of(context).size.width * 0.035).clamp(12.0, 16.0),
+                    fontSize: (MediaQuery.of(context).size.width * 0.028).clamp(10.0, 13.0),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
