@@ -11,6 +11,10 @@ import 'firebase_options.dart';
 import 'app.dart';
 import 'navigation_service.dart';
 import 'screens/Chat/chat_page.dart';
+import 'services/deep_link_service.dart';
+import 'screens/products/product_detail.dart';
+import 'screens/services/api_service.dart';
+import 'app.dart'; // For SlidePageRoute
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -310,7 +314,79 @@ Future<void> main() async {
     print('FlutterError: ${details.exception}');
   };
 
+  // Initialize deep link service
+  final deepLinkService = DeepLinkService();
+  deepLinkService.initialize();
+  
+  // Handle product deep links
+  deepLinkService.onProductLinkReceived = (productId) async {
+    await _handleProductDeepLink(productId);
+  };
+
   runApp(const MyApp());
+}
+
+// Handle product deep links
+Future<void> _handleProductDeepLink(String productId) async {
+  try {
+    debugPrint('🔗 Handling product deep link: $productId');
+    
+    // Validate product ID format (UUID)
+    final uuidRegex = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      caseSensitive: false,
+    );
+    
+    if (!uuidRegex.hasMatch(productId)) {
+      debugPrint('🔗 Invalid product ID format: $productId');
+      _showDeepLinkError('Invalid product link');
+      return;
+    }
+
+    // Fetch product details from API
+    final product = await ApiService.getProductById(productId);
+    
+    if (product != null) {
+      // Wait a bit for app to be ready
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Navigate to product detail page
+      final navigator = NavigationService.navigatorKey.currentState;
+      if (navigator != null) {
+        navigator.push(
+          SlidePageRoute(
+            page: ProductDetailPage(product: product),
+          ),
+        );
+        debugPrint('🔗 ✅ Navigated to product: ${product.title}');
+      } else {
+        debugPrint('🔗 ⚠️ Navigator not available');
+        _showDeepLinkError('Unable to open product. Please try again.');
+      }
+    } else {
+      debugPrint('🔗 ❌ Product not found: $productId');
+      _showDeepLinkError('Product not found or no longer available. Please ensure you are signed in.');
+    }
+  } catch (e) {
+    debugPrint('🔗 ❌ Error handling product deep link: $e');
+    _showDeepLinkError('Unable to load product. Please try again.');
+  }
+}
+
+void _showDeepLinkError(String message) {
+  // Show error after a delay to ensure app is ready
+  Future.delayed(const Duration(milliseconds: 1000), () {
+    final navigator = NavigationService.navigatorKey.currentState;
+    if (navigator != null && navigator.context.mounted) {
+      ScaffoldMessenger.of(navigator.context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  });
 }
 
 // Helper function to get FCM token with retry (handles iOS APNS token delay)

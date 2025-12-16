@@ -17,6 +17,7 @@ import '../profile/user_profile.dart';
 import '../profile/others_profile.dart';
 import '../../utils/error_handler.dart';
 import '../../widgets/app_button.dart';
+import '../../services/share_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -1278,7 +1279,13 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
           Container(width: 1, height: 32, color: const Color(0xFFE7E8ED)),
           Expanded(
             child: GestureDetector(
-              onTap: () {},
+              onTap: () async {
+                await ShareService.shareProduct(
+                  productId: product.id,
+                  productTitle: product.title,
+                  productImageUrl: product.imageUrl,
+                );
+              },
               behavior: HitTestBehavior.opaque,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

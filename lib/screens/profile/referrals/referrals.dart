@@ -81,8 +81,8 @@ class _ReferralsPageState extends State<ReferralsPage> {
   void _shareReferral() {
     final message =
         "Join me on Junction! Use my referral code *$referralCode* and get started today.\n\n"
-        "📱 Android: https://play.google.com/store/apps/details?id=com.junction.app\n"
-        "🍏 iOS: https://apps.apple.com/app/idXXXXXXXX";
+        "🍏 iOS: https://apps.apple.com/in/app/junctionverse/id6755690478\n"
+        "📱 Android: https://play.google.com/store/apps/details?id=com.junction&pcampaignid=web_share";
 
     Share.share(message);
   }

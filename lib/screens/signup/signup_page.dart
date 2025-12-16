@@ -28,10 +28,9 @@ class _SignupPageState extends State<SignupPage> {
   void _checkEmail(String email) {
     final lowerEmail = email.toLowerCase();
     setState(() {
-      isValidEmail = lowerEmail.endsWith('.cc') ||
-          lowerEmail.endsWith('.edu') ||
-          lowerEmail.endsWith('@junctionverse.com') ||
-          (lowerEmail.endsWith('@yopmail.com') && kDebugMode);
+      isValidEmail = lowerEmail.endsWith('.edu.in') ||
+          lowerEmail.endsWith('.ac.in') ||
+          lowerEmail.endsWith('.edu');
     });
   }
 
