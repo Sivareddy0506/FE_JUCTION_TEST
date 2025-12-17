@@ -1356,11 +1356,8 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                 hasInitializedChats = true;
               });
               _fetchProductChats().then((fetchedChats) {
-                final chatsWithOrders = fetchedChats
-                    .where((chat) => chat['orderId'] != null && chat['orderId'].toString().isNotEmpty)
-                    .toList();
                 setModalState(() {
-                  chats = chatsWithOrders;
+                  chats = fetchedChats;
                   isLoadingChats = false;
                 });
               }).catchError((e) {
@@ -1375,14 +1372,14 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
           bool canMarkAsSold = false;
           if (isProductLocked) {
             // If product is locked, only allow Junction option
-            if (selectedOption == 'junction' && selectedChat != null && chats != null && chats!.isNotEmpty) {
+            if (selectedOption == 'junction' && selectedChat != null) {
               canMarkAsSold = true;
             }
           } else {
             // If product is not locked, allow both options
             if (selectedOption == 'outside') {
               canMarkAsSold = true;
-            } else if (selectedOption == 'junction' && selectedChat != null && chats != null && chats!.isNotEmpty) {
+            } else if (selectedOption == 'junction' && selectedChat != null) {
               canMarkAsSold = true;
             }
           }
@@ -1419,15 +1416,11 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                       hasInitializedChats = false;
                     });
                     
-                    // Fetch chats when Inside Junction is selected
+                    // Fetch all chats when Junction is selected
                     try {
                       final fetchedChats = await _fetchProductChats();
-                      final chatsWithOrders = fetchedChats
-                          .where((chat) => chat['orderId'] != null && chat['orderId'].toString().isNotEmpty)
-                          .toList();
-                      
                       setModalState(() {
-                        chats = chatsWithOrders;
+                        chats = fetchedChats;
                         isLoadingChats = false;
                         hasInitializedChats = true;
                       });
@@ -1476,7 +1469,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Text(
-                        'No locked deals found. Please lock a deal with a buyer first.',
+                        'No buyers found. Buyers who have initiated a chat will appear here.',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
@@ -1497,17 +1490,40 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                           value: selectedChat,
                           items: chats!.map((chat) {
                             final buyerName = chat['buyerName'] ?? 'Unknown Buyer';
+                            final hasOrderId = chat['orderId'] != null && chat['orderId'].toString().isNotEmpty;
                             return DropdownMenuItem<Map<String, dynamic>>(
                               value: chat as Map<String, dynamic>,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    buyerName,
-                                    style: const TextStyle(fontSize: 16),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        buyerName,
+                                        style: const TextStyle(fontSize: 16),
+                                      ),
+                                      if (hasOrderId) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green[100],
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            'Deal Locked',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.green[800],
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                                  if (chat['orderId'] != null)
+                                  if (hasOrderId)
                                     Text(
                                       'Order: ${chat['orderId']}',
                                       style: TextStyle(
@@ -1559,13 +1575,11 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                                   return;
                                 }
                                 
-                                Navigator.pop(context);
-                                
                                 if (selectedOption == 'junction' && selectedChat != null) {
-                                  final buyerId = selectedChat!['buyerId'] ?? '';
-                                  final orderId = selectedChat!['orderId'];
-                                  await _markProductAsSoldWithBuyer(buyerId, orderId);
+                                  Navigator.pop(context);
+                                  await _showPriceInputAndMarkAsSold(selectedChat!);
                                 } else if (selectedOption == 'outside') {
+                                  Navigator.pop(context);
                                   await _markProductAsSoldOutside();
                                 }
                               }
@@ -1653,6 +1667,204 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
     }
   }
 
+
+  Future<void> _showPriceInputAndMarkAsSold(Map<String, dynamic> selectedChat) async {
+    final buyerId = selectedChat['buyerId'] ?? '';
+    final buyerName = selectedChat['buyerName'] ?? 'Buyer';
+    final existingOrderId = selectedChat['orderId'];
+    
+    // If deal is already locked, use existing orderId
+    if (existingOrderId != null && existingOrderId.toString().isNotEmpty) {
+      await _markProductAsSoldWithBuyer(buyerId, existingOrderId.toString());
+      return;
+    }
+    
+    // Show price input dialog
+    final TextEditingController priceController = TextEditingController();
+    
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (priceContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(priceContext).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Enter Sale Price',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(priceContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Enter the price at which you sold the product to $buyerName',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Sale Price (₹)',
+                  hintText: 'Enter amount',
+                  border: OutlineInputBorder(),
+                  prefixText: '₹ ',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(priceContext),
+                      backgroundColor: Colors.white,
+                      textColor: const Color(0xFF262626),
+                      borderColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Continue',
+                      onPressed: () {
+                        final priceText = priceController.text.trim();
+                        if (priceText.isEmpty) {
+                          ScaffoldMessenger.of(priceContext).showSnackBar(
+                            const SnackBar(content: Text('Please enter a sale price')),
+                          );
+                          return;
+                        }
+                        final price = double.tryParse(priceText);
+                        if (price == null || price <= 0) {
+                          ScaffoldMessenger.of(priceContext).showSnackBar(
+                            const SnackBar(content: Text('Please enter a valid price')),
+                          );
+                          return;
+                        }
+                        Navigator.pop(priceContext, priceText);
+                      },
+                      backgroundColor: const Color(0xFF262626),
+                      textColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    
+    if (result == null) return;
+    
+    final salePrice = double.tryParse(result);
+    if (salePrice == null || salePrice <= 0) {
+      ErrorHandler.showErrorSnackBar(
+        context,
+        null,
+        customMessage: 'Invalid price entered',
+      );
+      return;
+    }
+    
+    // Lock deal first, then mark as sold
+    await _lockDealAndMarkAsSold(buyerId, salePrice);
+  }
+
+  Future<void> _lockDealAndMarkAsSold(String buyerId, double finalPrice) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      
+      if (token == null) {
+        ErrorHandler.showErrorSnackBar(context, Exception('Please login to perform this action'));
+        return;
+      }
+
+      // Step 1: Lock the deal
+      String orderId;
+      try {
+        orderId = await ChatService.lockDeal(
+          productId: widget.product.id,
+          buyerId: buyerId,
+          finalPrice: finalPrice,
+        );
+      } catch (e) {
+        ErrorHandler.showErrorSnackBar(
+          context,
+          e,
+          customMessage: 'Failed to lock deal. Please try again.',
+        );
+        return;
+      }
+
+      if (orderId.isEmpty) {
+        ErrorHandler.showErrorSnackBar(
+          context,
+          null,
+          customMessage: 'Failed to lock deal. Order ID not received.',
+        );
+        return;
+      }
+
+      // Step 2: Mark as sold with the orderId
+      final response = await http.post(
+        Uri.parse('https://api.junctionverse.com/product/mark-sold'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'orderId': orderId,
+          'soldInJunction': true,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ErrorHandler.showSuccessSnackBar(
+          context,
+          'Product marked as sold successfully!',
+        );
+        // Start polling for status updates
+        _startStatusPolling();
+        // Also do an immediate refresh
+        await _fetchProductStatus();
+        if (mounted) {
+          setState(() {});
+        }
+      } else {
+        ErrorHandler.showErrorSnackBar(context, null, response: response);
+      }
+    } catch (e) {
+      ErrorHandler.showErrorSnackBar(context, e);
+    }
+  }
 
   Future<void> _markProductAsSoldWithBuyer(String buyerId, String? orderId) async {
     try {

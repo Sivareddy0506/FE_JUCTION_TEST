@@ -127,6 +127,7 @@ class ActiveListingRepository {
       longitude: longitude,
       description: item['description']?.toString(),
       location: item['pickupLocation']?.toString() ?? item['locationName']?.toString(),
+      readableLocation: item['readableLocation']?.toString(),
       seller: seller,
       category: item['category']?.toString(),
       condition: item['condition']?.toString(),

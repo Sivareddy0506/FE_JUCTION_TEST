@@ -1,4 +1,5 @@
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:junction/screens/products/submit_confirm.dart';
@@ -50,6 +51,7 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
   late String _currentPickupLocation;
   late LatLng _currentLatLng;
   late String _currentDescription;
+  int _currentImageIndex = 0;
 
   @override
   void initState() {
@@ -85,20 +87,57 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
             const SizedBox(height: 16),
 
             // Image Carousel
-           /* CarouselSlider(
-              options: CarouselOptions(height: 200.0, viewportFraction: 1.0),
-              items: imageUrls.map((img) {
-                return Builder(
-                  builder: (BuildContext context) {
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(img, fit: BoxFit.cover, width: double.infinity),
-                    );
-                  },
-                );
-              }).toList(),
-            ),*/
-            const SizedBox(height: 16),
+            if (widget.imageUrls.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: PageView.builder(
+                    itemCount: widget.imageUrls.length,
+                    onPageChanged: (index) {
+                      setState(() => _currentImageIndex = index);
+                    },
+                    itemBuilder: (_, pageIndex) {
+                      final url = widget.imageUrls[pageIndex];
+                      final isNetwork = url.startsWith('http');
+                      final isAsset = url.startsWith('assets/');
+                      if (isNetwork) {
+                        return Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.asset('assets/placeholder.png', fit: BoxFit.cover),
+                        );
+                      } else if (isAsset) {
+                        return Image.asset(url, fit: BoxFit.cover);
+                      } else {
+                        return Image.file(File.fromUri(Uri.parse(url)), fit: BoxFit.cover);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              if (widget.imageUrls.length > 1)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(widget.imageUrls.length, (index) {
+                      final isActive = index == _currentImageIndex;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        height: 6,
+                        width: isActive ? 18 : 6,
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.black87 : const Color(0xFFD9D9D9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              const SizedBox(height: 16),
+            ],
 
             // Tags
             Row(
