@@ -28,8 +28,11 @@ android {
         applicationId "com.junction"
         minSdkVersion flutter.minSdkVersion
         targetSdk 36
-        versionCode 30
-        versionName "1.0.3"
+        // Version is automatically read from pubspec.yaml by Flutter
+        // Format in pubspec.yaml: version: X.Y.Z+BUILD_NUMBER
+        // X.Y.Z becomes versionName, BUILD_NUMBER becomes versionCode
+        versionCode flutter.versionCode
+        versionName flutter.versionName
         multiDexEnabled true
         
         // Google Maps API Key
@@ -38,9 +41,32 @@ android {
     signingConfigs {
         release {
             if (keystorePropertiesFile.exists()) {
+                // Debug: Print what we're reading
+                println "DEBUG: Reading key.properties from: ${keystorePropertiesFile.absolutePath}"
+                println "DEBUG: keyAlias = ${keystoreProperties['keyAlias']}"
+                println "DEBUG: storeFile path = ${keystoreProperties['storeFile']}"
+                
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
-                storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                // Resolve storeFile path relative to rootProject (android directory)
+                def storeFilePath = keystoreProperties['storeFile']
+                if (storeFilePath) {
+                    // If path starts with ../, resolve from rootProject parent
+                    def resolvedFile
+                    if (storeFilePath.startsWith('../')) {
+                        // Resolve relative to parent of android directory
+                        def parentDirPath = rootProject.projectDir.parentFile.absolutePath
+                        def fileName = storeFilePath.replace('../', '')
+                        resolvedFile = file("${parentDirPath}/${fileName}")
+                    } else {
+                        resolvedFile = file(rootProject.projectDir, storeFilePath)
+                    }
+                    println "DEBUG: Resolved keystore path: ${resolvedFile.absolutePath}"
+                    println "DEBUG: Keystore exists: ${resolvedFile.exists()}"
+                    storeFile = resolvedFile
+                } else {
+                    storeFile = null
+                }
                 storePassword keystoreProperties['storePassword']
             }
         }
