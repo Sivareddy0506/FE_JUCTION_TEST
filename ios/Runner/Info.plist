@@ -60,16 +60,5 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>junction</string>
-			</array>
-		</dict>
-	</array>
 </dict>
 </plist>

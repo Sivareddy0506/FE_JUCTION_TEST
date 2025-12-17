@@ -31,21 +31,37 @@ class DeepLinkService {
   }
 
   void _handleDeepLink(Uri uri) {
-    debugPrint('Deep link received: $uri');
+    debugPrint('🔗 Universal Link received: $uri');
     
-    // Parse junction://product/{productId}
-    if (uri.scheme == 'junction' && uri.host == 'product') {
-      final productId = uri.pathSegments.isNotEmpty 
-          ? uri.pathSegments.first 
-          : null;
+    // Parse https://share.junctionverse.com/{productId}
+    if (uri.scheme == 'https' && uri.host == 'share.junctionverse.com') {
+      // Extract productId from path (e.g., /abc-123-def -> abc-123-def)
+      final pathSegments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
       
-      if (productId != null && onProductLinkReceived != null) {
-        onProductLinkReceived!(productId);
+      if (pathSegments.isNotEmpty) {
+        final productId = pathSegments.first;
+        
+        // Validate UUID format
+        final uuidRegex = RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          caseSensitive: false,
+        );
+        
+        if (uuidRegex.hasMatch(productId)) {
+          if (onProductLinkReceived != null) {
+            debugPrint('🔗 ✅ Valid product ID extracted: $productId');
+            onProductLinkReceived!(productId);
+          } else {
+            debugPrint('🔗 ⚠️ Product link callback not set');
+          }
+        } else {
+          debugPrint('🔗 ❌ Invalid product ID format: $productId');
+        }
       } else {
-        debugPrint('Deep link: Invalid product ID or callback not set');
+        debugPrint('🔗 ❌ No product ID found in URL path');
       }
     } else {
-      debugPrint('Deep link: Unrecognized scheme or host: ${uri.scheme}://${uri.host}');
+      debugPrint('🔗 ⚠️ Unrecognized Universal Link: ${uri.scheme}://${uri.host}');
     }
   }
 

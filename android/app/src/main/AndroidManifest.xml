@@ -52,14 +52,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- Deep link intent filter for product sharing -->
-            <intent-filter>
+            <!-- App Links intent filter for Universal Links -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="junction"
-                    android:host="product" />
+                    android:scheme="https"
+                    android:host="share.junctionverse.com" />
             </intent-filter>
 
         </activity>
