@@ -117,7 +117,21 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // If not first time, navigate directly to login/home
+      // BUT: Check if deep link is being handled (app opened via deep link)
       if (mounted) {
+        // Check if deep link is currently being processed
+        final isDeepLinkHandling = prefs.getBool('isDeepLinkHandling') ?? false;
+        
+        if (isDeepLinkHandling) {
+          debugPrint('HomeScreen: Deep link is being handled, skipping pushReplacement');
+          // Clear the flag after a delay to allow deep link navigation to complete
+          Future.delayed(const Duration(seconds: 3), () {
+            prefs.setBool('isDeepLinkHandling', false);
+          });
+          return;
+        }
+        
+        // No deep link navigation occurred, proceed with normal navigation
         Navigator.pushReplacement(
           context,
           SlidePageRoute(page: shouldGoToHome ? HomePage() : LoginPage()),

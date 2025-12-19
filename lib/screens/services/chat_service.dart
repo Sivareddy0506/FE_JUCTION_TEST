@@ -27,6 +27,7 @@ class ChatModel {
   final String dealStatus;
   double? finalPrice;
   final List<String> participants;
+  final bool isArchived;
 
   ChatModel({
     required this.chatId,
@@ -45,6 +46,7 @@ class ChatModel {
     this.dealStatus = 'active',
     this.finalPrice,
     required this.participants,
+    this.isArchived = false,
   });
 
   factory ChatModel.fromFirestore(Map<String, dynamic> data) {
@@ -65,6 +67,7 @@ class ChatModel {
       dealStatus: data['dealStatus'] ?? 'active',
       finalPrice: data['finalPrice']?.toDouble(),
       participants: List<String>.from(data['participants'] ?? []),
+      isArchived: data['isArchived'] ?? false,
     );
   }
 
@@ -86,6 +89,7 @@ class ChatModel {
       'dealStatus': dealStatus,
       'finalPrice': finalPrice,
       'participants': participants,
+      'isArchived': isArchived,
     };
   }
 }
@@ -707,16 +711,21 @@ Stream<ChatModel?> getChatStream(String chatId) {
     required double price,
     required int offerNumber,
   }) async {
+    final userId = await currentUserId;
+    // Get user name for the offer message
+    final userDoc = await _firestore.collection('users').doc(userId).get();
+    final userName = userDoc.data()?['fullName'] ?? 'User';
+    
     await sendMessage(
       chatId: chatId,
       receiverId: receiverId,
-      message: 'Price quoted: ₹${price.toStringAsFixed(0)}',
+      message: '₹${price.toStringAsFixed(0)} offer $offerNumber by $userName',
       messageType: 'price_quote',
       priceData: {
         'price': price,
         'isConfirmed': false,
         'offerNumber': offerNumber,
-        'quotedBy': await currentUserId,  // Track who made the quote
+        'quotedBy': userId,  // Track who made the quote
       },
     );
   }
@@ -882,6 +891,9 @@ Future<void> markAsSold({
         .doc(systemMessageId)
         .set(systemMessage.toFirestore());
 
+    // Archive all chats for this product
+    await archiveChatsForProduct(productId);
+
   } catch (e) {
     throw Exception('Failed to mark product as sold: $e');
   }
@@ -995,12 +1007,62 @@ static Future<String> lockDeal({
       return _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
+          .where('isArchived', isEqualTo: false)
           .orderBy('lastMessageTime', descending: true)
           .snapshots()
           .map((snapshot) => snapshot.docs
               .map((doc) => ChatModel.fromFirestore(doc.data()))
               .toList());
     });
+  }
+
+  /// Get archived chats for the current user
+  Stream<List<ChatModel>> getArchivedChats() {
+    return Stream.fromFuture(_getUserId()).asyncExpand((userId) {
+      if (userId.isEmpty) {
+        return Stream.value(<ChatModel>[]);
+      }
+      
+      return _firestore
+          .collection('chats')
+          .where('participants', arrayContains: userId)
+          .where('isArchived', isEqualTo: true)
+          .orderBy('lastMessageTime', descending: true)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => ChatModel.fromFirestore(doc.data()))
+              .toList());
+    });
+  }
+
+  /// Archive all chats for a given product (called when product is marked as sold)
+  Future<void> archiveChatsForProduct(String productId) async {
+    try {
+      // Query all chats for this product
+      final chatsSnapshot = await _firestore
+          .collection('chats')
+          .where('productId', isEqualTo: productId)
+          .get();
+
+      if (chatsSnapshot.docs.isEmpty) {
+        debugPrint('No chats found for product $productId to archive');
+        return;
+      }
+
+      // Batch update all chats to set isArchived = true
+      final batch = _firestore.batch();
+      for (var doc in chatsSnapshot.docs) {
+        batch.update(doc.reference, {
+          'isArchived': true,
+        });
+      }
+
+      await batch.commit();
+      debugPrint('Archived ${chatsSnapshot.docs.length} chat(s) for product $productId');
+    } catch (e) {
+      debugPrint('Error archiving chats for product $productId: $e');
+      throw Exception('Failed to archive chats for product: $e');
+    }
   }
 
   Future<int> getNextOfferNumber(String chatId) async {

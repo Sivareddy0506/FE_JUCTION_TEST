@@ -28,9 +28,6 @@ android {
         applicationId "com.junction"
         minSdkVersion flutter.minSdkVersion
         targetSdk 36
-        // Version is automatically read from pubspec.yaml by Flutter
-        // Format in pubspec.yaml: version: X.Y.Z+BUILD_NUMBER
-        // X.Y.Z becomes versionName, BUILD_NUMBER becomes versionCode
         versionCode flutter.versionCode
         versionName flutter.versionName
         multiDexEnabled true

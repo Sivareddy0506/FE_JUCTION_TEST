@@ -69,8 +69,6 @@ class _ChatPageState extends State<ChatPage> {
   
   // Product status
   String? _productStatus;
-  Timer? _statusPollingTimer; // Timer for polling product status
-  DateTime? _pollingStartTime; // Track when polling started
   String? _lastFetchedProductId; // Track last fetched productId to prevent redundant calls
   bool _isFetchingProductStatus = false; // Prevent concurrent fetches
   
@@ -318,55 +316,6 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
   
-  void _startStatusPolling() {
-    // Cancel any existing timer
-    _statusPollingTimer?.cancel();
-    
-    // Record polling start time
-    _pollingStartTime = DateTime.now();
-    
-    // Start polling every 2 seconds
-    _statusPollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        _statusPollingTimer = null;
-        return;
-      }
-      
-      // Safety check: Stop polling after 30 seconds to prevent infinite polling
-      if (_pollingStartTime != null) {
-        final elapsed = DateTime.now().difference(_pollingStartTime!);
-        if (elapsed.inSeconds > 30) {
-          timer.cancel();
-          _statusPollingTimer = null;
-          _pollingStartTime = null;
-          debugPrint('Chat polling timeout reached (30s). Stopping status polling.');
-          return;
-        }
-      }
-      
-      final String? status = await _fetchProductStatus();
-      
-      // Stop polling if product is confirmed as sold
-      if (status == 'Sold') {
-        timer.cancel();
-        _statusPollingTimer = null;
-        _pollingStartTime = null;
-        debugPrint('Product status confirmed as Sold. Stopping polling.');
-        
-        // Force a rebuild to update UI
-        if (mounted) {
-          setState(() {});
-        }
-      }
-    });
-  }
-  
-  void _stopStatusPolling() {
-    _statusPollingTimer?.cancel();
-    _statusPollingTimer = null;
-    _pollingStartTime = null;
-  }
 
   @override
   void dispose() {
@@ -375,7 +324,6 @@ class _ChatPageState extends State<ChatPage> {
     _messageFocusNode.dispose();
     // Clean up timers
     _confirmButtonTimer?.cancel();
-    _statusPollingTimer?.cancel(); // Cancel polling timer on dispose
     _blockStatusPollingTimer?.cancel(); // Cancel block status polling timer
     // Reset flags when disposing
     _hasDoneInitialScroll = false;
@@ -2159,36 +2107,7 @@ Widget _buildPriceQuoteMessage(MessageModel message, bool isMe, ChatModel chatDa
           ),
           const SizedBox(height: 4),
         ],
-        Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
-          ),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isMe ? Colors.black : Colors.grey[300],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                message.message,
-                style: TextStyle(
-                  color: isMe ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _formatMessageTime(message.timestamp),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isMe ? Colors.white70 : Colors.black54,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
+        // Removed "Price quoted" message text container - only show offer card below
         Container(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.75,
@@ -2578,9 +2497,7 @@ void _showMarkAsSoldConfirmation(ChatModel chatData, String orderId) {
                         //   ),
                         // );
 
-                        // Start polling for status updates
-                        _startStatusPolling();
-                        // Also do an immediate refresh
+                        // Refresh product status immediately
                         await _fetchProductStatus();
                         if (mounted) {
                           setState(() {});
