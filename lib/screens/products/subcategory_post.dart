@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:junction/app_state.dart';
 import '../../../widgets/custom_appbar.dart';
+import '../../../widgets/listing_progress_indicator.dart';
 import '../../constants/category_subcategories.dart';
 import './describe_product.dart';
 import '../../app.dart'; // For SlidePageRoute
@@ -29,26 +30,6 @@ class _SubcategoryPostPageState extends State<SubcategoryPostPage> {
     );
   }
 
-  Widget _buildProgressChips(int currentStep) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(6, (index) {
-        final isActive = index <= currentStep;
-        return Container(
-          width: 59,
-          height: 4,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: isActive
-                ? AppState.instance.isJuction
-                    ? const Color(0xFFC105FF)
-                    : const Color(0xFFFF6705)
-                : const Color(0xFFE9E9E9),
-          ),
-        );
-      }),
-    );
-  }
 
   Widget _buildSubcategoryItem(String title) {
     return GestureDetector(
@@ -89,7 +70,7 @@ class _SubcategoryPostPageState extends State<SubcategoryPostPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProgressChips(1),
+            const ListingProgressIndicator(currentStep: 1),
             const SizedBox(height: 32),
             const Text(
               "Select Product Subcategory",

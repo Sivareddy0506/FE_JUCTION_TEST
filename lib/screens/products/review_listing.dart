@@ -1,12 +1,14 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:junction/screens/products/submit_confirm.dart';
-import 'package:junction/screens/products/select_location.dart';
+import 'package:junction/screens/products/location_selection_page.dart';
 
 import '../../app_state.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/listing_progress_indicator.dart';
 import '../../app.dart'; // For SlidePageRoute
 
 class ReviewListingPage extends StatefulWidget {
@@ -51,6 +53,8 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
   late String _currentPickupLocation;
   late LatLng _currentLatLng;
   late String _currentDescription;
+  late String _currentTitle;
+  late String _currentPrice;
   int _currentImageIndex = 0;
 
   @override
@@ -59,6 +63,8 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
     _currentPickupLocation = widget.pickupLocation;
     _currentLatLng = widget.latlng;
     _currentDescription = widget.description;
+    _currentTitle = widget.title;
+    _currentPrice = widget.price;
   }
 
 
@@ -69,156 +75,162 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
         title: const Text("Place a Listing"),
         centerTitle: true,
         leading: const BackButton(),
-        actions: const [Padding(padding: EdgeInsets.only(right: 16), child: Icon(Icons.close))],
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _progressIndicator(),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text("Review Listing", style: Theme.of(context).textTheme.titleMedium),
-            ),
-            const SizedBox(height: 16),
-
-            // Image Carousel
-            if (widget.imageUrls.isNotEmpty) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: PageView.builder(
-                    itemCount: widget.imageUrls.length,
-                    onPageChanged: (index) {
-                      setState(() => _currentImageIndex = index);
-                    },
-                    itemBuilder: (_, pageIndex) {
-                      final url = widget.imageUrls[pageIndex];
-                      final isNetwork = url.startsWith('http');
-                      final isAsset = url.startsWith('assets/');
-                      if (isNetwork) {
-                        return Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset('assets/placeholder.png', fit: BoxFit.cover),
-                        );
-                      } else if (isAsset) {
-                        return Image.asset(url, fit: BoxFit.cover);
-                      } else {
-                        return Image.file(File.fromUri(Uri.parse(url)), fit: BoxFit.cover);
-                      }
-                    },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+            child: const ListingProgressIndicator(currentStep: 5),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text("Review Listing", style: Theme.of(context).textTheme.titleMedium),
                   ),
-                ),
-              ),
-              if (widget.imageUrls.length > 1)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(widget.imageUrls.length, (index) {
-                      final isActive = index == _currentImageIndex;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 6,
-                        width: isActive ? 18 : 6,
-                        decoration: BoxDecoration(
-                          color: isActive ? Colors.black87 : const Color(0xFFD9D9D9),
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 16),
+
+                  // Image Carousel
+                  if (widget.imageUrls.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: PageView.builder(
+                          itemCount: widget.imageUrls.length,
+                          onPageChanged: (index) {
+                            setState(() => _currentImageIndex = index);
+                          },
+                          itemBuilder: (_, pageIndex) {
+                            final url = widget.imageUrls[pageIndex];
+                            final isNetwork = url.startsWith('http');
+                            final isAsset = url.startsWith('assets/');
+                            if (isNetwork) {
+                              return Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset('assets/placeholder.png', fit: BoxFit.cover),
+                              );
+                            } else if (isAsset) {
+                              return Image.asset(url, fit: BoxFit.cover);
+                            } else {
+                              return Image.file(File.fromUri(Uri.parse(url)), fit: BoxFit.cover);
+                            }
+                          },
                         ),
-                      );
-                    }),
-                  ),
-                ),
-              const SizedBox(height: 16),
-            ],
-
-            // Tags
-            Row(
-              children: [
-                _tag("Age: ${widget.age}"),
-                const SizedBox(width: 8),
-                _tag("Usage: ${widget.usage}"),
-                const SizedBox(width: 8),
-                _tag("Condition: ${widget.condition}"),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Title and Price
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(widget.title,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ),
-                Text(
-                  widget.price,
-                  style: const TextStyle(fontSize: 16, color: Color(0xFFFF6705),
- fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Description Field
-            _editableField(
-              context, 
-              "Description", 
-              _currentDescription,
-              onEdit: () => _editDescription(context),
-            ),
-            const SizedBox(height: 12),
-
-            // Pickup Location Field
-            _editableField(
-              context, 
-              "Pickup Location", 
-              _currentPickupLocation,
-              onEdit: () => _editLocation(context),
-            ),
-
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: AppButton(
-                bottomSpacing: 20,
-                label: 'Review Guidelines',
-                backgroundColor: const Color(0xFF262626),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    SlidePageRoute(
-                      page: PostGuidelinesPage(
-                        selectedCategory: widget.selectedCategory,
-                        selectedSubCategory: widget.selectedSubCategory,
-                        title: widget.title,
-                        price: widget.price,
-                        description: _currentDescription,
-                        productName: widget.productName,
-                        yearOfPurchase: widget.yearOfPurchase,
-                        brand: widget.brandName,
-                        usage: widget.usage,
-                        condition: widget.condition,
-                        images: widget.imageUrls,
-                        location: _currentPickupLocation,
-                        latlng: _currentLatLng,
                       ),
                     ),
-                  );
-                },
+                    if (widget.imageUrls.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(widget.imageUrls.length, (index) {
+                            final isActive = index == _currentImageIndex;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              height: 6,
+                              width: isActive ? 18 : 6,
+                              decoration: BoxDecoration(
+                                color: isActive ? Colors.black87 : const Color(0xFFD9D9D9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Tags
+                  Row(
+                    children: [
+                      _tag("Age: ${widget.age}"),
+                      const SizedBox(width: 8),
+                      _tag("Condition: ${widget.condition}"),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Title Field
+                  _editableField(
+                    context, 
+                    "Title", 
+                    _currentTitle,
+                    onEdit: () => _editTitle(context),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Price Field
+                  _editableField(
+                    context, 
+                    "Price", 
+                    _currentPrice,
+                    onEdit: () => _editPrice(context),
+                    showCurrency: true,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Description Field
+                  _editableField(
+                    context, 
+                    "Description", 
+                    _currentDescription,
+                    onEdit: () => _editDescription(context),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Pickup Location Field
+                  _editableField(
+                    context, 
+                    "Pickup Location", 
+                    _currentPickupLocation,
+                    onEdit: () => _editLocation(context),
+                  ),
+
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: AppButton(
+                      bottomSpacing: 20,
+                      label: 'Review Guidelines',
+                      backgroundColor: const Color(0xFF262626),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          SlidePageRoute(
+                            page: PostGuidelinesPage(
+                              selectedCategory: widget.selectedCategory,
+                              selectedSubCategory: widget.selectedSubCategory,
+                              title: _currentTitle,
+                              price: _currentPrice,
+                              description: _currentDescription,
+                              productName: widget.productName,
+                              yearOfPurchase: widget.yearOfPurchase,
+                              brand: widget.brandName,
+                              usage: widget.usage,
+                              condition: widget.condition,
+                              images: widget.imageUrls,
+                              location: _currentPickupLocation,
+                              latlng: _currentLatLng,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -238,42 +250,77 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
     final TextEditingController descriptionController = 
         TextEditingController(text: _currentDescription);
 
-    final result = await showDialog<String>(
+    final result = await showModalBottomSheet<String>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Edit Description'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: TextField(
-              controller: descriptionController,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                hintText: 'Enter product description',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom + 16,
           ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Edit Description',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: AppButton(
-                  label: 'Save',
-                  onPressed: () {
-                    if (descriptionController.text.trim().isNotEmpty) {
-                      Navigator.of(context).pop(descriptionController.text.trim());
-                    }
-                  },
-                  backgroundColor: const Color(0xFFFF6705),
-                  textColor: Colors.white,
+              const SizedBox(height: 20),
+              TextField(
+                controller: descriptionController,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  hintText: 'Enter product description',
+                  border: OutlineInputBorder(),
                 ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(bottomSheetContext),
+                      backgroundColor: Colors.white,
+                      textColor: const Color(0xFF262626),
+                      borderColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Save',
+                      onPressed: () {
+                        if (descriptionController.text.trim().isNotEmpty) {
+                          Navigator.pop(bottomSheetContext, descriptionController.text.trim());
+                        }
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
+          ),
         );
       },
     );
@@ -285,24 +332,186 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
     }
   }
 
+  Future<void> _editTitle(BuildContext context) async {
+    final TextEditingController titleController = 
+        TextEditingController(text: _currentTitle);
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Edit Title',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  hintText: 'Enter product title',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(bottomSheetContext),
+                      backgroundColor: Colors.white,
+                      textColor: const Color(0xFF262626),
+                      borderColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Save',
+                      onPressed: () {
+                        if (titleController.text.trim().isNotEmpty) {
+                          Navigator.pop(bottomSheetContext, titleController.text.trim());
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _currentTitle = result;
+      });
+    }
+  }
+
+  Future<void> _editPrice(BuildContext context) async {
+    final TextEditingController priceController = 
+        TextEditingController(text: _currentPrice);
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Edit Price',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                ],
+                decoration: const InputDecoration(
+                  hintText: 'Enter price',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(bottomSheetContext),
+                      backgroundColor: Colors.white,
+                      textColor: const Color(0xFF262626),
+                      borderColor: const Color(0xFF262626),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Save',
+                      onPressed: () {
+                        if (priceController.text.trim().isNotEmpty) {
+                          Navigator.pop(bottomSheetContext, priceController.text.trim());
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _currentPrice = result;
+      });
+    }
+  }
+
   Future<void> _editLocation(BuildContext context) async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       SlidePageRoute(
-        page: SelectLocationPage(
-          selectedCategory: widget.selectedCategory,
-          selectedSubCategory: widget.selectedSubCategory,
-          title: widget.title,
-          price: widget.price,
-          description: _currentDescription,
-          productName: widget.productName,
-          yearOfPurchase: widget.yearOfPurchase,
-          brandName: widget.brandName,
-          usage: widget.usage,
-          condition: widget.condition,
-          imageNames: widget.imageUrls,
-          isEditing: true, // Mark as editing mode
-        ),
+        page: const LocationSelectionPage(isForPostListing: true),
       ),
     );
 
@@ -314,7 +523,7 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
     }
   }
 
-  Widget _editableField(BuildContext context, String label, String value, {VoidCallback? onEdit}) {
+  Widget _editableField(BuildContext context, String label, String value, {VoidCallback? onEdit, bool showCurrency = false}) {
     return GestureDetector(
       onTap: onEdit,
       child: Container(
@@ -332,8 +541,14 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
                   Text(label,
                       style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 4),
-                  Text(value,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(
+                    showCurrency ? '₹ $value' : value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: showCurrency ? const Color(0xFFFF6705) : Colors.black,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -348,23 +563,4 @@ class _ReviewListingPageState extends State<ReviewListingPage> {
     );
   }
 
-  Widget _progressIndicator() {
-    return Row(
-      children: List.generate(
-        5,
-        (index) => Expanded(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            height: 4,
-            decoration: BoxDecoration(
-              color: index < 4  ? AppState.instance.isJuction?
-              const Color(0xFFC105FF):
-              const Color(0xFFFF6705): const Color(0xFFE9E9E9),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

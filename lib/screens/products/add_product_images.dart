@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
+import '../../../widgets/listing_progress_indicator.dart';
 import '../../../utils/image_compression.dart';
-import './select_location.dart';
+import './location_selection_page.dart';
 import '../../../app.dart'; 
 
 class AddProductImagesPage extends StatefulWidget {
@@ -76,21 +78,25 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
   }
 
   void _goToSelectLocationPage() {
+    // Navigate to LocationSelectionPage with all product data
+    // LocationSelectionPage will handle navigation to ReviewListingPage
     Navigator.push(
       context,
       SlidePageRoute(
-        page: SelectLocationPage(
-          selectedCategory: widget.selectedCategory,
-          selectedSubCategory: widget.selectedSubCategory,
+        page: LocationSelectionPage(
+          isForPostListing: true,
+          imageUrls: imageNames,
           title: widget.title,
           price: widget.price,
+          age: widget.yearOfPurchase,
+          usage: widget.usage,
+          condition: widget.condition,
           description: widget.description,
+          selectedCategory: widget.selectedCategory,
+          selectedSubCategory: widget.selectedSubCategory,
           productName: widget.productName,
           yearOfPurchase: widget.yearOfPurchase,
           brandName: widget.brandName,
-          usage: widget.usage,
-          condition: widget.condition,
-          imageNames: imageNames,
         ),
       ),
     );
@@ -341,110 +347,121 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const CustomAppBar(title: "Place a Listing"),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Add Product Images",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF262626)),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: const Text(
-                    "Make sure to have clean background and clear shots of the product",
-                    style: TextStyle(fontSize: 12, color: Color(0xFF323537)),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+            child: const ListingProgressIndicator(currentStep: 3),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Add Product Images",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF262626)),
                   ),
-                ),
-                Text(
-                  "${imageNames.length}/$maxImages",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _isImageLimitReached ? const Color(0xFFFF6705) : const Color(0xFF323537),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            // Show total size info
-            FutureBuilder<int>(
-              future: _getTotalSize(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData && imageNames.isNotEmpty) {
-                  final totalSize = snapshot.data!;
-                  final totalSizeMB = totalSize / (1024 * 1024);
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Total size: ${_formatFileSize(totalSize)} / ${_formatFileSize(maxTotalSize)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: totalSize > maxTotalSize ? Colors.red : const Color(0xFF323537),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            const SizedBox(height: 32),
-
-            // Uploaded Images
-            for (int i = 0; i < imageNames.length; i++) 
-              _buildImageItem(imageNames[i], imageIndex: i),
-
-            // "Take a Photo" Option should always be visible
-            _buildImageItem("Take a Photo", isAddNew: true),
-
-            // File size error message
-            if (fileSizeError != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        fileSizeError!,
-                        style: TextStyle(
-                          color: Colors.red.shade700,
-                          fontSize: 13,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: const Text(
+                          "Make sure to have clean background and clear shots of the product",
+                          style: TextStyle(fontSize: 12, color: Color(0xFF323537)),
                         ),
+                      ),
+                      Text(
+                        "${imageNames.length}/$maxImages",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _isImageLimitReached ? const Color(0xFFFF6705) : const Color(0xFF323537),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Show total size info
+                  FutureBuilder<int>(
+                    future: _getTotalSize(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && imageNames.isNotEmpty) {
+                        final totalSize = snapshot.data!;
+                        final totalSizeMB = totalSize / (1024 * 1024);
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Total size: ${_formatFileSize(totalSize)} / ${_formatFileSize(maxTotalSize)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: totalSize > maxTotalSize ? Colors.red : const Color(0xFF323537),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Uploaded Images
+                  for (int i = 0; i < imageNames.length; i++) 
+                    _buildImageItem(imageNames[i], imageIndex: i),
+
+                  // "Take a Photo" Option should always be visible
+                  _buildImageItem("Take a Photo", isAddNew: true),
+
+                  // File size error message
+                  if (fileSizeError != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              fileSizeError!,
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+
+                  const SizedBox(height: 24),
+
+                  // Check total size before allowing navigation
+                  FutureBuilder<int>(
+                    future: _getTotalSize(),
+                    builder: (context, snapshot) {
+                      final totalSize = snapshot.data ?? 0;
+                      final exceedsLimit = totalSize > maxTotalSize;
+                      return AppButton(
+                        bottomSpacing: 24,
+                        label: isSubmitting ? 'Submitting...' : 'Next',
+                        onPressed: (isSubmitting || imageNames.isEmpty || exceedsLimit) ? null : _goToSelectLocationPage,
+                      );
+                    },
+                  ),
+                ],
               ),
-            ],
-
-            const Spacer(),
-
-            // Check total size before allowing navigation
-            FutureBuilder<int>(
-              future: _getTotalSize(),
-              builder: (context, snapshot) {
-                final totalSize = snapshot.data ?? 0;
-                final exceedsLimit = totalSize > maxTotalSize;
-                return AppButton(
-                  bottomSpacing: 24,
-                  label: isSubmitting ? 'Submitting...' : 'Next',
-                  onPressed: (isSubmitting || imageNames.isEmpty || exceedsLimit) ? null : _goToSelectLocationPage,
-                );
-              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

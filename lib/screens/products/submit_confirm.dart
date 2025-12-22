@@ -139,7 +139,7 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
             const BulletPoint(text: "No Offensive Content"),
             const BulletPoint(text: "Listings must not include hate speech, discriminatory language, or explicit content"),
             const BulletPoint(text: "All Images Must be Original"),
-            const Spacer(),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Checkbox(
@@ -151,6 +151,7 @@ class _PostGuidelinesPageState extends State<PostGuidelinesPage> {
                 )
               ],
             ),
+            const SizedBox(height: 24),
             AppButton(
               label: isSubmitting ? 'Submitting...' : 'Post Listing',
               onPressed: isConfirmed && !isSubmitting ? _submitListing : null,

@@ -7,13 +7,49 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../widgets/custom_appbar.dart';
+import '../../widgets/app_button.dart';
+import '../../widgets/listing_progress_indicator.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../profile/address/address_response.dart';
 import '../../services/location_service.dart';
+import 'review_listing.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Page for selecting location from saved addresses or "Other" option
 class LocationSelectionPage extends StatefulWidget {
-  const LocationSelectionPage({super.key});
+  /// If true, returns location data for post listing flow instead of saving to LocationService
+  final bool isForPostListing;
+  
+  // Product data for post listing flow (required when isForPostListing is true)
+  final List<String>? imageUrls;
+  final String? title;
+  final String? price;
+  final String? age;
+  final String? usage;
+  final String? condition;
+  final String? description;
+  final String? selectedCategory;
+  final String? selectedSubCategory;
+  final String? productName;
+  final String? yearOfPurchase;
+  final String? brandName;
+
+  const LocationSelectionPage({
+    super.key,
+    this.isForPostListing = false,
+    this.imageUrls,
+    this.title,
+    this.price,
+    this.age,
+    this.usage,
+    this.condition,
+    this.description,
+    this.selectedCategory,
+    this.selectedSubCategory,
+    this.productName,
+    this.yearOfPurchase,
+    this.brandName,
+  });
 
   @override
   State<LocationSelectionPage> createState() => _LocationSelectionPageState();
@@ -24,6 +60,10 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
   String? _defaultAddressId;
   String? _selectedAddressId;
   bool _isLoading = true;
+  
+  // Store selected location data for post listing flow
+  LatLng? _selectedCoordinates;
+  String? _selectedAddress;
 
   @override
   void initState() {
@@ -67,64 +107,51 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
   }
 
   Future<void> _onSavedAddressSelected(Address address) async {
+    LatLng? coordinates;
+    String finalAddress = address.address;
+
     // If address has coordinates, use them directly
     if (address.lat != null && address.lng != null) {
+      coordinates = LatLng(address.lat!, address.lng!);
+      
       // Reverse geocode to get human-readable address (in case address text is outdated)
       try {
         List<Placemark> placemarks = await placemarkFromCoordinates(
           address.lat!,
           address.lng!,
         );
-        String humanReadableAddress = address.address; // Default to stored address
         if (placemarks.isNotEmpty) {
           final place = placemarks[0];
           if (place.street != null && place.street!.isNotEmpty) {
-            humanReadableAddress = "${place.name}, ${place.street}, ${place.locality}, ${place.postalCode}";
+            finalAddress = "${place.name}, ${place.street}, ${place.locality}, ${place.postalCode}";
           } else {
-            humanReadableAddress = "${place.name}, ${place.locality}, ${place.postalCode}";
+            finalAddress = "${place.name}, ${place.locality}, ${place.postalCode}";
           }
         }
-        
-        // Save to LocationService as "other" type (temporary location)
-        await LocationService.saveOtherLocation(
-          lat: address.lat!,
-          lng: address.lng!,
-          address: humanReadableAddress,
-        );
       } catch (e) {
         debugPrint('LocationSelectionPage: Error reverse geocoding: $e');
         // Use stored address if reverse geocoding fails
-        await LocationService.saveOtherLocation(
-          lat: address.lat!,
-          lng: address.lng!,
-          address: address.address,
-        );
       }
     } else {
       // Address doesn't have coordinates - geocode the address string
       try {
         List<Location> locations = await locationFromAddress(address.address);
         if (locations.isNotEmpty) {
-          final lat = locations[0].latitude;
-          final lng = locations[0].longitude;
+          coordinates = LatLng(locations[0].latitude, locations[0].longitude);
           
           // Reverse geocode to get formatted address
-          List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
-          String humanReadableAddress = address.address;
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            coordinates.latitude,
+            coordinates.longitude,
+          );
           if (placemarks.isNotEmpty) {
             final place = placemarks[0];
             if (place.street != null && place.street!.isNotEmpty) {
-              humanReadableAddress = "${place.name}, ${place.street}, ${place.locality}, ${place.postalCode}";
+              finalAddress = "${place.name}, ${place.street}, ${place.locality}, ${place.postalCode}";
             } else {
-              humanReadableAddress = "${place.name}, ${place.locality}, ${place.postalCode}";
+              finalAddress = "${place.name}, ${place.locality}, ${place.postalCode}";
             }
           }
-          
-          await LocationService.saveOtherLocation(
-            lat: lat,
-            lng: lng,
-            address: humanReadableAddress,
-          );
         } else {
           // Geocoding failed - show error
           if (mounted) {
@@ -151,14 +178,39 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
       }
     }
 
-    if (mounted) {
-      Navigator.pop(context, true); // Return true to indicate location was selected
+    if (coordinates == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to determine location coordinates'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (widget.isForPostListing) {
+      // Save the selection but don't navigate yet - wait for "Next" button
+      setState(() {
+        _selectedCoordinates = coordinates;
+        _selectedAddress = finalAddress;
+      });
+    } else {
+      // Save to LocationService as "other" type (temporary location) for home page use
+      await LocationService.saveOtherLocation(
+        lat: coordinates.latitude,
+        lng: coordinates.longitude,
+        address: finalAddress,
+      );
+      if (mounted) {
+        Navigator.pop(context, true); // Return true to indicate location was selected
+      }
     }
   }
 
   Future<void> _onOtherSelected() async {
     // Open map (reuse SelectLocationPage but without product listing context)
-    // We'll create a simplified version or reuse the existing one
     final result = await Navigator.push(
       context,
       SlidePageRoute(
@@ -170,16 +222,68 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
       final coordinates = result['coordinates'] as LatLng;
       final address = result['address'] as String;
 
-      // Save to LocationService
-      await LocationService.saveOtherLocation(
-        lat: coordinates.latitude,
-        lng: coordinates.longitude,
-        address: address,
-      );
+      if (widget.isForPostListing) {
+        // Navigate directly to ReviewListingPage for post listing flow
+        _navigateToReviewListing(coordinates, address);
+      } else {
+        // Save to LocationService for home page use
+        await LocationService.saveOtherLocation(
+          lat: coordinates.latitude,
+          lng: coordinates.longitude,
+          address: address,
+        );
 
-      if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate location was selected
+        if (mounted) {
+          Navigator.pop(context, true); // Return true to indicate location was selected
+        }
       }
+    }
+  }
+  
+  void _navigateToReviewListing(LatLng coordinates, String address) {
+    if (!widget.isForPostListing || 
+        widget.imageUrls == null ||
+        widget.title == null ||
+        widget.price == null ||
+        widget.age == null ||
+        widget.usage == null ||
+        widget.condition == null ||
+        widget.description == null ||
+        widget.selectedCategory == null ||
+        widget.selectedSubCategory == null ||
+        widget.productName == null ||
+        widget.yearOfPurchase == null ||
+        widget.brandName == null) {
+      debugPrint('LocationSelectionPage: Missing required product data for ReviewListingPage');
+      return;
+    }
+    
+    Navigator.push(
+      context,
+      SlidePageRoute(
+        page: ReviewListingPage(
+          imageUrls: widget.imageUrls!,
+          title: widget.title!,
+          price: widget.price!,
+          age: widget.age!,
+          usage: widget.usage!,
+          condition: widget.condition!,
+          description: widget.description!,
+          pickupLocation: address,
+          brandName: widget.brandName!,
+          productName: widget.productName!,
+          selectedCategory: widget.selectedCategory!,
+          selectedSubCategory: widget.selectedSubCategory!,
+          yearOfPurchase: widget.yearOfPurchase!,
+          latlng: coordinates,
+        ),
+      ),
+    );
+  }
+  
+  void _onNext() {
+    if (_selectedCoordinates != null && _selectedAddress != null) {
+      _navigateToReviewListing(_selectedCoordinates!, _selectedAddress!);
     }
   }
 
@@ -191,24 +295,44 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                if (widget.isForPostListing)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                    child: const ListingProgressIndicator(currentStep: 4),
+                  ),
                 // Saved addresses list
                 if (_savedAddresses.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Saved Addresses',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Select Location',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF262626),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Choose from your saved addresses or select a new location',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF323537),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Expanded(
                     child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.only(
+                        left: 24,
+                        right: 24,
+                        bottom: widget.isForPostListing && _selectedCoordinates != null ? 80 : 24,
+                      ),
                       itemCount: _savedAddresses.length + 1, // +1 for "Other" option
                       separatorBuilder: (context, index) => const Divider(),
                       itemBuilder: (context, index) {
@@ -219,6 +343,13 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
                             groupValue: _selectedAddressId,
                             onChanged: (value) {
                               setState(() => _selectedAddressId = value);
+                              // Clear saved address selection when "Other" is selected
+                              if (widget.isForPostListing) {
+                                setState(() {
+                                  _selectedCoordinates = null;
+                                  _selectedAddress = null;
+                                });
+                              }
                               _onOtherSelected();
                             },
                             title: const Text(
@@ -241,7 +372,13 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
                           groupValue: _selectedAddressId,
                           onChanged: (value) {
                             setState(() => _selectedAddressId = value);
-                            _onSavedAddressSelected(address);
+                            // For post listing flow, just save selection (don't navigate yet)
+                            if (widget.isForPostListing) {
+                              _onSavedAddressSelected(address);
+                            } else {
+                              // For home page flow, navigate immediately
+                              _onSavedAddressSelected(address);
+                            }
                           },
                           title: Text(
                             address.label[0].toUpperCase() + address.label.substring(1),
@@ -270,17 +407,28 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Saved Addresses',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Select Location',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF262626),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Choose from your saved addresses or select a new location',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF323537),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const Expanded(
@@ -293,12 +441,19 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: RadioListTile<String>(
                             value: 'other',
                             groupValue: _selectedAddressId,
                             onChanged: (value) {
                               setState(() => _selectedAddressId = value);
+                              // Clear saved address selection when "Other" is selected
+                              if (widget.isForPostListing) {
+                                setState(() {
+                                  _selectedCoordinates = null;
+                                  _selectedAddress = null;
+                                });
+                              }
                               _onOtherSelected();
                             },
                             title: const Text(
@@ -316,6 +471,28 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
                     ),
                   ),
                 ],
+                // Next button for post listing flow (shown when saved address is selected)
+                if (widget.isForPostListing && _selectedCoordinates != null && _selectedAddress != null)
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: SafeArea(
+                      child: AppButton(
+                        bottomSpacing: 0,
+                        label: 'Next',
+                        onPressed: _onNext,
+                      ),
+                    ),
+                  ),
               ],
             ),
     );

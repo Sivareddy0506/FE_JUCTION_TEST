@@ -4,6 +4,7 @@ import '../../../widgets/custom_appbar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/form_text.dart';
 import '../../../widgets/app_dropdown.dart';
+import '../../../widgets/listing_progress_indicator.dart';
 import '../../widgets/tune_auction.dart';
 import './add_product_images.dart';
 import '../../app.dart'; // For SlidePageRoute
@@ -340,6 +341,10 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
         builder: (context, constraints) {
           return Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                child: const ListingProgressIndicator(currentStep: 2),
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
