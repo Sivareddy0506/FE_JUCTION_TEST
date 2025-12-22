@@ -158,7 +158,7 @@ class _LogoAndIconsWidgetState extends State<LogoAndIconsWidget> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 🔧 Responsive sizes
-    final logoSize = (screenWidth * 0.07).clamp(24.0, 40.0);
+    final logoSize = (screenWidth * 0.06).clamp(22.0, 36.0); // Reduced from 0.07 to 0.06 to make logo narrower
     final iconContainerSize = (screenWidth * 0.1).clamp(36.0, 48.0);
 
     return Row(
@@ -168,7 +168,7 @@ class _LogoAndIconsWidgetState extends State<LogoAndIconsWidget> {
         // Logos
         ...logoAssets.map(
           (asset) => Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 10), // Reduced spacing from 12 to 10
             child: Image.asset(
               asset,
               width: logoSize,

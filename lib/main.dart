@@ -435,9 +435,9 @@ Future<void> _handleProductDeepLink(String productId) async {
       
       // Get prefs for clearing flag
       final clearPrefs = await SharedPreferences.getInstance();
-      
-      if (product != null) {
-        // Success - navigate to product detail page
+    
+    if (product != null) {
+      // Success - navigate to product detail page
         updatedNavigator.push(
           SlidePageRoute(
             page: ProductDetailPage(product: product),
@@ -446,10 +446,10 @@ Future<void> _handleProductDeepLink(String productId) async {
         debugPrint('🔗 ✅ Navigated to product: ${product.title}');
         // Clear deep link handling flag after successful navigation
         clearPrefs.setBool('isDeepLinkHandling', false);
-      } else {
-        // Product not found (404) or API error
-        debugPrint('🔗 ❌ Product not found or API error: $productId');
-        _showDeepLinkErrorWithNavigation('Product not found or no longer available.');
+    } else {
+      // Product not found (404) or API error
+      debugPrint('🔗 ❌ Product not found or API error: $productId');
+      _showDeepLinkErrorWithNavigation('Product not found or no longer available.');
         // Clear deep link handling flag
         clearPrefs.setBool('isDeepLinkHandling', false);
       }
@@ -477,7 +477,7 @@ Future<void> _handleProductDeepLink(String productId) async {
 void _showDeepLinkError(String message) {
   // Show error after a delay to ensure app is ready
   Future.delayed(const Duration(milliseconds: 1000), () {
-    final navigator = NavigationService.navigatorKey.currentState; 
+    final navigator = NavigationService.navigatorKey.currentState;
     if (navigator != null && navigator.context.mounted) {
       ScaffoldMessenger.of(navigator.context).showSnackBar(
         SnackBar(

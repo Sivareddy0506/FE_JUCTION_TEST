@@ -135,47 +135,46 @@ class _ChatListPageState extends State<ChatListPage> {
                   color: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: avatarColor,
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              otherUserName,
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _firestore
+                        .collection('messages')
+                        .doc(chat.chatId)
+                        .collection('messages')
+                        .where('receiverId', isEqualTo: _chatService.currentUserIdSync)
+                        .where('isRead', isEqualTo: false)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final hasUnread = snapshot.hasData && 
+                          snapshot.data!.docs.isNotEmpty;
+                      
+                      return Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor: avatarColor,
+                            child: Text(
+                              initials,
                               style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            // Check if chat has unread messages
-                            StreamBuilder<QuerySnapshot>(
-                              stream: _firestore
-                                  .collection('messages')
-                                  .doc(chat.chatId)
-                                  .collection('messages')
-                                  .where('receiverId', isEqualTo: _chatService.currentUserIdSync)
-                                  .where('isRead', isEqualTo: false)
-                                  .limit(1)
-                                  .snapshots(),
-                              builder: (context, snapshot) {
-                                final hasUnread = snapshot.hasData && 
-                                    snapshot.data!.docs.isNotEmpty;
-                                
-                                return Text(
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  otherUserName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
                                   chat.lastMessage,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -184,21 +183,35 @@ class _ChatListPageState extends State<ChatListPage> {
                                     fontSize: 14,
                                     fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
                                   ),
-                                );
-                              },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatTime(chat.lastMessageTime),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
+                          ),
+                          const SizedBox(width: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (hasUnread) ...[
+                                Image.asset(
+                                  'assets/orange_dot.png',
+                                  width: 10,
+                                  height: 10,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(
+                                _formatTime(chat.lastMessageTime),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               );
@@ -331,47 +344,46 @@ class _ArchivedChatsPageState extends State<ArchivedChatsPage> {
                   color: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: avatarColor,
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              otherUserName,
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _firestore
+                        .collection('messages')
+                        .doc(chat.chatId)
+                        .collection('messages')
+                        .where('receiverId', isEqualTo: _chatService.currentUserIdSync)
+                        .where('isRead', isEqualTo: false)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final hasUnread = snapshot.hasData && 
+                          snapshot.data!.docs.isNotEmpty;
+                      
+                      return Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor: avatarColor,
+                            child: Text(
+                              initials,
                               style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            // Check if chat has unread messages
-                            StreamBuilder<QuerySnapshot>(
-                              stream: _firestore
-                                  .collection('messages')
-                                  .doc(chat.chatId)
-                                  .collection('messages')
-                                  .where('receiverId', isEqualTo: _chatService.currentUserIdSync)
-                                  .where('isRead', isEqualTo: false)
-                                  .limit(1)
-                                  .snapshots(),
-                              builder: (context, snapshot) {
-                                final hasUnread = snapshot.hasData && 
-                                    snapshot.data!.docs.isNotEmpty;
-                                
-                                return Text(
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  otherUserName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
                                   chat.lastMessage,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -380,21 +392,35 @@ class _ArchivedChatsPageState extends State<ArchivedChatsPage> {
                                     fontSize: 14,
                                     fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
                                   ),
-                                );
-                              },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatTime(chat.lastMessageTime),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
+                          ),
+                          const SizedBox(width: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (hasUnread) ...[
+                                Image.asset(
+                                  'assets/orange_dot.png',
+                                  width: 10,
+                                  height: 10,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(
+                                _formatTime(chat.lastMessageTime),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               );
