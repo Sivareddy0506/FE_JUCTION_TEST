@@ -58,6 +58,44 @@ import UserNotifications
     GeneratedPluginRegistrant.register(with: self)
     
     let controller = window?.rootViewController as! FlutterViewController
+    
+    // Config channel for API keys
+    let configChannel = FlutterMethodChannel(
+      name: "com.junction.config",
+      binaryMessenger: controller.binaryMessenger
+    )
+    
+    configChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      if call.method == "getGoogleMapsApiKey" {
+        var apiKey: String?
+        
+        // Try to get from GoogleService-Info.plist first
+        if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+           let plist = NSDictionary(contentsOfFile: path),
+           let key = plist["API_KEY"] as? String {
+          apiKey = key
+        }
+        
+        // Fallback to Info.plist
+        if apiKey == nil || apiKey?.isEmpty == true {
+          if let infoPlist = Bundle.main.infoDictionary,
+             let key = infoPlist["GMSApiKey"] as? String,
+             !key.isEmpty && !key.contains("$(GOOGLE_MAPS_API_KEY)") {
+            apiKey = key
+          }
+        }
+        
+        if let key = apiKey, !key.isEmpty {
+          result(key)
+        } else {
+          result(FlutterError(code: "API_KEY_NOT_FOUND", message: "Google Maps API key not found", details: nil))
+        }
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    
+    // Permission channel
     let permissionChannel = FlutterMethodChannel(
       name: "com.junction.permissions",
       binaryMessenger: controller.binaryMessenger

@@ -79,15 +79,19 @@ class _HomePageState extends State<HomePage> {
     debugPrint('HomePage: Initializing favorites service');
     try {
       await FavoritesService().initialize();
-      setState(() {
-        _favoritesReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _favoritesReady = true;
+        });
+      }
       debugPrint('HomePage: Favorites service initialized successfully');
     } catch (e) {
       debugPrint('HomePage: Error initializing favorites service - $e');
-      setState(() {
-        _favoritesReady = true; // Set to true even on error to prevent infinite loading
-      });
+      if (mounted) {
+        setState(() {
+          _favoritesReady = true; // Set to true even on error to prevent infinite loading
+        });
+      }
     }
   }
 
@@ -95,15 +99,19 @@ class _HomePageState extends State<HomePage> {
     debugPrint('HomePage: Initializing products data');
     try {
       await fetchHomeData();
-      setState(() {
-        _productsReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _productsReady = true;
+        });
+      }
       debugPrint('HomePage: Products data initialized successfully');
     } catch (e) {
       debugPrint('HomePage: Error initializing products data - $e');
-      setState(() {
-        _productsReady = true; // Set to true even on error to prevent infinite loading
-      });
+      if (mounted) {
+        setState(() {
+          _productsReady = true; // Set to true even on error to prevent infinite loading
+        });
+      }
     }
   }
 
@@ -127,20 +135,22 @@ class _HomePageState extends State<HomePage> {
       debugPrint("📦 previousSearchProducts: ${searched.length}");
       debugPrint("📸 Ad URLs: $ads");
 
-      setState(() {
-        _isLoggedIn = loggedIn;
-        lastViewedProducts = lastViewed;
-        allProducts = latest;
-        trendingProducts = trending;
-        previousSearchProducts = searched;
-        if (ads.isNotEmpty) {
-          adUrl1 = ads[0];
-          adUrl2 = ads.length > 1 ? ads[1] : ads[0];
-        } else {
-          adUrl1 = '';
-          adUrl2 = '';
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = loggedIn;
+          lastViewedProducts = lastViewed;
+          allProducts = latest;
+          trendingProducts = trending;
+          previousSearchProducts = searched;
+          if (ads.isNotEmpty) {
+            adUrl1 = ads[0];
+            adUrl2 = ads.length > 1 ? ads[1] : ads[0];
+          } else {
+            adUrl1 = '';
+            adUrl2 = '';
+          }
+        });
+      }
     } catch (e, stacktrace) {
       debugPrint('HomePage: Exception in fetchHomeData - $e');
       debugPrint(stacktrace.toString());
@@ -151,9 +161,11 @@ class _HomePageState extends State<HomePage> {
   // Method to refresh favorites state across all product lists
   void _refreshFavorites() {
     debugPrint('HomePage: Refreshing favorites state');
-    setState(() {
-      // Triggers rebuild so ProductGridWidgets reload favourite state
-    });
+    if (mounted) {
+      setState(() {
+        // Triggers rebuild so ProductGridWidgets reload favourite state
+      });
+    }
   }
 
   @override

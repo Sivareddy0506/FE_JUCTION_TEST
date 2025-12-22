@@ -199,7 +199,19 @@ class _ActiveAuctionsTabState extends State<ActiveAuctionsTab> {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: ProductGridWidget(products: allItems),
+      child: Column(
+        children: [
+          ProductGridWidget(products: allItems),
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              'Deal locked products can be found in sold section',
+              style: const TextStyle(color: Colors.grey, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

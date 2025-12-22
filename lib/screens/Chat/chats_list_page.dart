@@ -34,69 +34,77 @@ class _ChatListPageState extends State<ChatListPage> {
 
           List<ChatModel> chats = snapshot.data ?? [];
 
-          if (chats.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'No chats yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
           return ListView.separated(
             itemCount: chats.length + 1, // +1 for "Archived Chats" option
-            separatorBuilder: (context, index) => const Divider(
-              height: 1,
-              thickness: 0.5,
-              color: Color(0xFFEAEAEA),
-            ),
+            separatorBuilder: (context, index) {
+              // Don't show separator before archived chats option (last separator)
+              // Separator index corresponds to separator between item[index] and item[index+1]
+              // So if chats.length = 2, separators are at indices 0 and 1
+              // We don't want separator at index 1 (between last chat and archived)
+              if (chats.isEmpty || index >= chats.length) {
+                return const SizedBox.shrink();
+              }
+              return const Divider(
+                height: 1,
+                thickness: 0.5,
+                color: Color(0xFFEAEAEA),
+              );
+            },
             itemBuilder: (context, index) {
-              // Show "Archived Chats" option at the end
+              // Show "Archived Chats" option at the end (or first if no active chats)
               if (index == chats.length) {
-                return InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      SlidePageRoute(
-                        page: const ArchivedChatsPage(),
+                return Column(
+                  children: [
+                    // Show empty state message if no active chats
+                    if (chats.isEmpty) ...[
+                      const SizedBox(height: 40),
+                      const Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No active chats',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
                       ),
-                    );
-                  },
-                  child: Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.archive,
-                          color: Colors.grey[600],
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Archived Chats',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: Colors.black87,
+                      const SizedBox(height: 32),
+                    ],
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          SlidePageRoute(
+                            page: const ArchivedChatsPage(),
                           ),
+                        );
+                      },
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.archive,
+                              color: Colors.grey[600],
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Archived Chats',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right,
+                              color: Colors.grey[400],
+                              size: 24,
+                            ),
+                          ],
                         ),
-                        const Spacer(),
-                        Icon(
-                          Icons.chevron_right,
-                          color: Colors.grey[400],
-                          size: 24,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 );
               }
               ChatModel chat = chats[index];

@@ -18,6 +18,7 @@ import '../profile/others_profile.dart';
 import '../../utils/error_handler.dart';
 import '../../widgets/app_button.dart';
 import '../../services/share_service.dart';
+import 'edit_listing.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -309,16 +310,47 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<Widget> _buildAppBarActions(Product product, bool isSellerViewing) {
     final bool isLoggedIn = _chatService.currentUserId != null;
     final bool canReport = isLoggedIn && !isSellerViewing;
+    final bool canEdit = isSellerViewing && product.status != 'Sold';
 
-    if (!canReport) return const [];
+    List<Widget> actions = [];
 
-    return [
-      IconButton(
-        icon: const Icon(Icons.flag_outlined, color: Color(0xFF262626)),
-        tooltip: 'Report listing',
-        onPressed: () => _openReportBottomSheet(product),
+    if (canEdit) {
+      actions.add(
+        IconButton(
+          icon: const Icon(Icons.edit_outlined, color: Color(0xFF262626)),
+          tooltip: 'Edit listing',
+          onPressed: () => _navigateToEditListing(product),
+        ),
+      );
+    }
+
+    if (canReport) {
+      actions.add(
+        IconButton(
+          icon: const Icon(Icons.flag_outlined, color: Color(0xFF262626)),
+          tooltip: 'Report listing',
+          onPressed: () => _openReportBottomSheet(product),
+        ),
+      );
+    }
+
+    return actions;
+  }
+
+  void _navigateToEditListing(Product product) async {
+    final result = await Navigator.push(
+      context,
+      SlidePageRoute(
+        page: EditListingPage(product: product),
       ),
-    ];
+    );
+
+    // If listing was updated, refresh the product data
+    if (result == true && mounted) {
+      // Refresh the product by re-fetching it
+      // You may want to implement a refresh mechanism here
+      Navigator.pop(context, true); // Pop back and signal refresh needed
+    }
   }
 
   void _openReportBottomSheet(Product product) {

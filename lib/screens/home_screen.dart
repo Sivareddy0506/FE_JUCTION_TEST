@@ -288,8 +288,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 14, // Description font size 14px
                   ),
                 ),
-                const SizedBox(height: 24),
-                _buildSliderDots(),
               ],
             ),
           );
@@ -360,6 +358,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildHeader(),
                     const SizedBox(height: 12),
                     _buildSliderContent(),
+                    const SizedBox(height: 24),
+                    _buildSliderDots(), // Dots positioned consistently outside PageView
                     const SizedBox(height: 24),
                     _buildBottomButton(),
                     const SizedBox(height: 24),
