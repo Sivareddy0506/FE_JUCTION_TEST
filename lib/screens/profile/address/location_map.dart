@@ -156,7 +156,8 @@ class _LocationMapPageState extends State<LocationMapPage> {
           id: widget.isItFromEdit? widget.initialAddress!.id :"",
           address: _selectedAddress,
           isEditable: widget.isItFromEdit,
-
+          latitude: _currentLatLng!.latitude,
+          longitude: _currentLatLng!.longitude,
         ),
       ),
     );

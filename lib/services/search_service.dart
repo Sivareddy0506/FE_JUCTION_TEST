@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
+import 'location_service.dart';
 
 class SearchService {
   static const String baseUrl = 'https://api.junctionverse.com/user';
@@ -17,8 +18,46 @@ class SearchService {
   static DateTime? _lastLocationFetch;
   static const Duration _locationCacheDuration = Duration(minutes: 5);
 
-  /// Get user's current location with fallback to saved location
+  /// Get user's preferred location (uses LocationService which handles priority)
   static Future<Map<String, double>?> getUserLocation() async {
+    try {
+      // Use LocationService to get preferred location (handles priority: Other -> Current GPS -> Saved Address -> Default)
+      final locationData = await LocationService.getPreferredLocation();
+      
+      if (locationData != null) {
+        // Update cache
+        _cachedLocation = Position(
+          latitude: locationData.lat,
+          longitude: locationData.lng,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          heading: 0,
+          speed: 0,
+          speedAccuracy: 0,
+          altitudeAccuracy: 0,
+          headingAccuracy: 0,
+        );
+        _lastLocationFetch = DateTime.now();
+        
+        print('SearchService: Using location from LocationService: ${locationData.lat}, ${locationData.lng} (${locationData.type})');
+        return {
+          'lat': locationData.lat,
+          'lng': locationData.lng,
+        };
+      }
+      
+      // Fallback to old method if LocationService returns null
+      return await _getUserLocationLegacy();
+    } catch (e) {
+      print('Error getting location from LocationService: $e');
+      // Fallback to legacy method
+      return await _getUserLocationLegacy();
+    }
+  }
+
+  /// Legacy method for getting user location (fallback)
+  static Future<Map<String, double>?> _getUserLocationLegacy() async {
     try {
       // Check if we have a recent cached location
       if (_cachedLocation != null && _lastLocationFetch != null) {

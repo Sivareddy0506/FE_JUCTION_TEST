@@ -4,6 +4,7 @@ import '../../widgets/logo_icons_widget.dart';
 import '../../widgets/search_bar_widget.dart';
 import '../../widgets/category_grid.dart';
 import '../../widgets/bottom_navbar.dart';
+import '../../widgets/location_display_widget.dart';
 import '../../models/product.dart';
 import './horizontal_product_list.dart';
 import './ad_banner_widget.dart';
@@ -36,6 +37,7 @@ class _HomePageState extends State<HomePage> {
   
   // Computed getter to check if all data is ready
   bool get _allDataReady => _favoritesReady && _productsReady;
+
 
   void handleTabChange(String selected) {
     debugPrint('HomePage: handleTabChange called with "$selected"');
@@ -168,63 +170,90 @@ class _HomePageState extends State<HomePage> {
     } else {
       content = SafeArea(
         minimum: const EdgeInsets.only(top: 24), // extra push-down
-        child: RefreshIndicator(
-          onRefresh: _handleForceRefresh,
-          edgeOffset: 0,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                debugLogWidget('LogoAndIconsWidget'),
-                const LogoAndIconsWidget(),
-                const SizedBox(height: 16),
-                debugLogWidget('SearchBarWidget'),
-                const SearchBarWidget(),
-                const SizedBox(height: 20),
-                debugLogWidget('CategoryGrid'),
-                const SizedBox(
-                  height: 130,
-                  child: CategoryGrid(),
-                ),
-                const SizedBox(height: 16),
-                ..._buildProductSection(
-                  title: 'Last Viewed',
-                  products: lastViewedProducts,
-                  source: 'lastViewed',
-                  requireLogin: true,
-                  emptyMessage: 'You haven\'t viewed any products yet. Start exploring to see them here.',
-                ),
-                ..._buildProductSection(
-                  title: 'Fresh Listings',
-                  products: allProducts,
-                  source: 'fresh',
-                  emptyMessage: 'No fresh listings available right now. Check back soon!',
-                ),
-                if (adUrl1.isNotEmpty) ...[
-                  debugLogWidget('AdBannerWidget: adUrl1'),
-                  AdBannerWidget(mediaUrl: adUrl1),
-                  const SizedBox(height: 24),
-                ],
-                ..._buildProductSection(
-                  title: 'Trending in your location',
-                  products: trendingProducts,
-                  source: 'trending',
-                  emptyMessage: 'No trending items nearby yet. Be the first to list!',
-                ),
-                if (previousSearchProducts.isNotEmpty) ...[
-                  debugLogWidget('HorizontalProductList: Based on your Previous Search'),
-                  HorizontalProductList(
-                    title: 'Based on your Previous Search',
-                    products: previousSearchProducts,
-                    source: 'searched',
-                    onFavoriteChanged: _refreshFavorites,
+        child: Column(
+          children: [
+            // Static header section
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  debugLogWidget('LogoAndIconsWidget'),
+                  const LogoAndIconsWidget(),
+                  const SizedBox(height: 8),
+                  debugLogWidget('LocationDisplayWidget'),
+                  const LocationDisplayWidget(),
+                  const SizedBox(height: 8),
+                  debugLogWidget('SearchBarWidget'),
+                  const SearchBarWidget(),
+                  const SizedBox(height: 10),
+                  // Separator line below search bar
+                  const Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: Color(0xFFEAEAEA),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
+            // Scrollable content section
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _handleForceRefresh,
+                edgeOffset: 0,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 10),
+                      debugLogWidget('CategoryGrid'),
+                      const SizedBox(
+                        height: 130,
+                        child: CategoryGrid(),
+                      ),
+                      const SizedBox(height: 10), // Reduced from 16 to 10
+                      ..._buildProductSection(
+                        title: 'Last Viewed',
+                        products: lastViewedProducts,
+                        source: 'lastViewed',
+                        requireLogin: true,
+                        emptyMessage: 'You haven\'t viewed any products yet. Start exploring to see them here.',
+                      ),
+                      ..._buildProductSection(
+                        title: 'Fresh Listings',
+                        products: allProducts,
+                        source: 'fresh',
+                        emptyMessage: 'No fresh listings available right now. Check back soon!',
+                      ),
+                      if (adUrl1.isNotEmpty) ...[
+                        debugLogWidget('AdBannerWidget: adUrl1'),
+                        AdBannerWidget(mediaUrl: adUrl1),
+                        const SizedBox(height: 24),
+                      ],
+                      ..._buildProductSection(
+                        title: 'Trending in your location',
+                        products: trendingProducts,
+                        source: 'trending',
+                        emptyMessage: 'No trending items nearby yet. Be the first to list!',
+                      ),
+                      if (previousSearchProducts.isNotEmpty) ...[
+                        debugLogWidget('HorizontalProductList: Based on your Previous Search'),
+                        HorizontalProductList(
+                          title: 'Based on your Previous Search',
+                          products: previousSearchProducts,
+                          source: 'searched',
+                          onFavoriteChanged: _refreshFavorites,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
