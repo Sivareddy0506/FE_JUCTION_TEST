@@ -11,6 +11,7 @@ import '../../services/favorites_service.dart';
 import '../services/chat_service.dart';
 import '../../services/view_tracker.dart';
 import '../../services/profile_service.dart';
+import '../services/api_service.dart';
 import '../../app.dart'; 
 import '../../../widgets/custom_appbar.dart';
 import '../profile/user_profile.dart';
@@ -21,7 +22,8 @@ import '../../services/share_service.dart';
 import 'edit_listing.dart';
 
 class ProductDetailPage extends StatefulWidget {
-  final Product product;
+  final Product? product; // Made optional for deep links
+  final String? productId; // For deep links - when provided, product will be fetched
   final List<Product>? products;
   final int? initialIndex;
   final VoidCallback? onFavoriteChanged;
@@ -29,18 +31,25 @@ class ProductDetailPage extends StatefulWidget {
 
   const ProductDetailPage({
     super.key,
-    required this.product,
+    this.product, // Optional now - either product or productId must be provided
+    this.productId, // For deep links
     this.products,
     this.initialIndex,
     this.onFavoriteChanged,
     this.initialUniqueClicks,
-  });
+  }) : assert(
+          product != null || productId != null,
+          'Either product or productId must be provided',
+        );
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
+  Product? _currentProduct; // Current product (from widget.product or fetched from productId)
+  bool _isLoadingProduct = false; // Loading state when fetching product by ID
+  String? _productLoadError; // Error message if product fails to load
   List<Product> relatedProducts = [];
   int currentProductIndex = 0;
   PageController? _pageController;
@@ -76,13 +85,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   // After fetching related products, use this helper:
   void _setProductList(List<Product> fetched) {
-    if (!mounted) return;
+    if (!mounted || _currentProduct == null) return;
     
     List<Product> withCurrent = List<Product>.from(fetched);
-    if (!withCurrent.any((p) => p.id == widget.product.id)) {
-      withCurrent.insert(0, widget.product);
+    if (!withCurrent.any((p) => p.id == _currentProduct!.id)) {
+      withCurrent.insert(0, _currentProduct!);
     }
-    currentProductIndex = withCurrent.indexWhere((p) => p.id == widget.product.id);
+    currentProductIndex = withCurrent.indexWhere((p) => p.id == _currentProduct!.id);
     
     // Dispose old controllers before creating new ones
     _pageController?.dispose();
@@ -113,7 +122,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   void initState() {
     super.initState();
     _favoritesService = FavoritesService();
-    _displayViews = widget.product.views ?? 0;
+    
+    // Handle two cases: product provided directly OR productId provided (deep link)
+    if (widget.product != null) {
+      // Existing usage - product provided directly
+      _currentProduct = widget.product;
+      _initializeWithProduct();
+    } else if (widget.productId != null) {
+      // Deep link - need to fetch product
+      _isLoadingProduct = true;
+      _loadProductById(widget.productId!);
+    }
+  }
+  
+  // Initialize page when product is available
+  void _initializeWithProduct() {
+    if (_currentProduct == null) return;
+    
+    _displayViews = _currentProduct!.views ?? 0;
 
     // Seed caches from initial data passed from list/search pages
     if (widget.initialUniqueClicks != null) {
@@ -131,9 +157,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       _fetchRelatedProducts();
     }
 
-    if (!ViewTracker.instance.isViewed(widget.product.id)) {
+    if (!ViewTracker.instance.isViewed(_currentProduct!.id)) {
       _displayViews += 1;
-      ViewTracker.instance.markViewed(widget.product.id);
+      ViewTracker.instance.markViewed(_currentProduct!.id);
       _registeredView = true;
     }
 
@@ -146,14 +172,72 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       if (mounted && relatedProducts.isNotEmpty) {
         final displayedProduct = relatedProducts[currentProductIndex];
         _fetchUniqueClicks(displayedProduct);
-      } else {
-        _fetchUniqueClicks(widget.product);
+      } else if (_currentProduct != null) {
+        _fetchUniqueClicks(_currentProduct!);
       }
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _favoritesService.addListener(_onFavoritesChanged);
     });
+  }
+  
+  // Load product by ID (for deep links)
+  Future<void> _loadProductById(String productId) async {
+    try {
+      // Check login status first
+      final prefs = await SharedPreferences.getInstance();
+      final authToken = prefs.getString('authToken');
+      final isLoggedIn = prefs.getBool('isLogin') == true && 
+                        authToken != null && authToken.isNotEmpty;
+      
+      if (!isLoggedIn) {
+        // Store productId for after login
+        await prefs.setString('pendingProductDeepLink', productId);
+        
+        if (mounted) {
+          setState(() {
+            _isLoadingProduct = false;
+            _productLoadError = 'Please sign in to view this product';
+          });
+          
+          // Navigate to login after a short delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/login');
+            }
+          });
+        }
+        return;
+      }
+      
+      // Fetch product
+      final product = await ApiService.getProductById(productId);
+      
+      if (mounted) {
+        if (product != null) {
+          setState(() {
+            _currentProduct = product;
+            _isLoadingProduct = false;
+            _productLoadError = null;
+          });
+          _initializeWithProduct();
+        } else {
+          setState(() {
+            _isLoadingProduct = false;
+            _productLoadError = 'Product not found or no longer available';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingProduct = false;
+          _productLoadError = 'Unable to load product. Please try again.';
+        });
+      }
+      debugPrint('Error loading product by ID: $e');
+    }
   }
   
   /// Check if user has seen swipe hint before, and show if needed
@@ -216,7 +300,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       
       // Get single product by ID
       final response = await http.get(
-        Uri.parse('https://api.junctionverse.com/product/${widget.product.id}'),
+        Uri.parse('https://api.junctionverse.com/product/${currentProduct?.id ?? ''}'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -591,7 +675,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _loadSellerName() async {
-    final name = widget.product.seller?.fullName;
+    final name = currentProduct?.seller?.fullName;
     if (mounted) {
       setState(() {
         _sellerName = (name != null && name.isNotEmpty) ? name : 'Unknown Seller';
@@ -641,7 +725,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
 
     final uri =
-        Uri.parse('https://api.junctionverse.com/product/related/${widget.product.id}');
+        Uri.parse('https://api.junctionverse.com/product/related/${currentProduct?.id ?? ''}');
     debugPrint('_fetchRelatedProducts: Calling API: $uri');
     
     try {
@@ -697,7 +781,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _fetchUniqueClicks([Product? product]) async {
-    final targetProduct = product ?? widget.product;
+    final targetProduct = product ?? currentProduct!;
     final productId = targetProduct.id;
 
     // Skip if already cached
@@ -718,16 +802,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void startChat(BuildContext context) async {
-    final Product currentProduct = relatedProducts.isNotEmpty
+    final Product productForChat = relatedProducts.isNotEmpty
         ? relatedProducts[currentProductIndex]
-        : widget.product;
+        : currentProduct!;
 
-    if (currentProduct.seller?.id == _chatService.currentUserIdSync) return;
+    if (productForChat.seller?.id == _chatService.currentUserIdSync) return;
 
     try {
-      String sellerId = currentProduct.seller?.id ?? '';
+      String sellerId = productForChat.seller?.id ?? '';
       String buyerId = await _chatService.currentUserId;
-      String productId = currentProduct.id;
+      String productId = productForChat.id;
       String chatId = '${productId}_${sellerId}_$buyerId';
       final prefs = await SharedPreferences.getInstance();
       String buyerName = prefs.getString('fullName') ?? 'You';
@@ -789,8 +873,40 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
+  // Getter for current product (handles both widget.product and _currentProduct)
+  Product? get currentProduct => _currentProduct ?? widget.product;
+  
   @override
   Widget build(BuildContext context) {
+    // Show loading state when fetching product by ID
+    if (_isLoadingProduct) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Loading...')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    
+    // Show error state if product failed to load
+    if (_productLoadError != null || currentProduct == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Error')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                _productLoadError ?? 'Product not available',
+                style: const TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     // Refresh product status when build is called (e.g., when returning to page)
     // Only fetch if status is null, not already fetching, and haven't scheduled a fetch yet
     if (_currentProductStatus == null && !_isFetchingStatus && !_hasScheduledStatusFetch) {
@@ -811,15 +927,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
     
     // If no related products found, still show the current product
-    if (relatedProducts.isEmpty) {
+    if (relatedProducts.isEmpty && currentProduct != null) {
       // Ensure at least the current product is in the list
-      relatedProducts = [widget.product];
+      relatedProducts = [currentProduct!];
       currentProductIndex = 0;
       if (_pageController == null) {
         _pageController = PageController(initialPage: 0);
       }
     }
-    final product = relatedProducts[currentProductIndex];
+    final product = relatedProducts.isNotEmpty ? relatedProducts[currentProductIndex] : currentProduct!;
     final bool isSellerViewing = product.seller?.id == _chatService.currentUserIdSync;
     // Use current status if available, otherwise fallback to product.status
     final String productStatus = _currentProductStatus ?? product.status ?? 'For Sale';
@@ -1352,7 +1468,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
 
   void _showMarkAsSoldDialog() {
     // Prevent opening dialog if product is already sold
-    final String currentStatus = _currentProductStatus ?? widget.product.status ?? 'For Sale';
+    final String currentStatus = _currentProductStatus ?? currentProduct?.status ?? 'For Sale';
     if (currentStatus == 'Sold') {
       ErrorHandler.showErrorSnackBar(
         context,
@@ -1596,7 +1712,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                         onPressed: canMarkAsSold
                             ? () async {
                                 // Double-check product status before marking as sold
-                                final String currentStatus = _currentProductStatus ?? widget.product.status ?? 'For Sale';
+                                final String currentStatus = _currentProductStatus ?? currentProduct?.status ?? 'For Sale';
                                 if (currentStatus == 'Sold') {
                                   Navigator.pop(context);
                                   ErrorHandler.showErrorSnackBar(
@@ -1678,7 +1794,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
       }
 
       final response = await http.get(
-        Uri.parse('https://api.junctionverse.com/chats/product-chats?productId=${widget.product.id}'),
+        Uri.parse('https://api.junctionverse.com/chats/product-chats?productId=${currentProduct?.id ?? ''}'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -1843,7 +1959,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
       String orderId;
       try {
         orderId = await ChatService.lockDeal(
-          productId: widget.product.id,
+          productId: currentProduct?.id ?? '',
           buyerId: buyerId,
           finalPrice: finalPrice,
         );
@@ -1957,7 +2073,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          'productId': widget.product.id,
+          'productId': currentProduct?.id ?? '',
           'soldInJunction': false,
         }),
       );

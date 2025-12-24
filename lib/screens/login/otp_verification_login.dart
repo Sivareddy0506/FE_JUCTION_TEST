@@ -16,6 +16,7 @@ import '../signup/verification_rejected.dart';
 import '../signup/eula_acceptance_page.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../services/chat_service.dart';
+import '../products/product_detail.dart';
 class OTPVerificationLoginPage extends StatefulWidget {
   final String email;
 
@@ -211,6 +212,9 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               // Don't block login if FCM token retrieval fails
             }
 
+            // Check for pending deep link
+            final pendingProductId = prefs.getString('pendingProductDeepLink');
+            
             // Check if user has accepted EULA
             if (!eulaAccepted) {
               // Show EULA screen before entering app
@@ -223,11 +227,36 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               );
             } else {
               // EULA already accepted, proceed to app
-              Navigator.pushAndRemoveUntil(
-                context,
-                SlidePageRoute(page: const UserProfilePage()),
-                (Route<dynamic> route) => false,
-              );
+              if (pendingProductId != null && pendingProductId.isNotEmpty) {
+                // Clear pending deep link
+                await prefs.remove('pendingProductDeepLink');
+                
+                // Navigate to product detail page
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  SlidePageRoute(page: const UserProfilePage()),
+                  (Route<dynamic> route) => false,
+                );
+                
+                // Navigate to product after a short delay to ensure UserProfilePage is ready
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (mounted) {
+                    Navigator.push(
+                      context,
+                      SlidePageRoute(
+                        page: ProductDetailPage(productId: pendingProductId),
+                      ),
+                    );
+                  }
+                });
+              } else {
+                // No pending deep link, proceed normally
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  SlidePageRoute(page: const UserProfilePage()),
+                  (Route<dynamic> route) => false,
+                );
+              }
             }
           } else {
             final errorBody = customTokenResponse.body;

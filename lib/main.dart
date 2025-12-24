@@ -327,150 +327,66 @@ Future<void> main() async {
 }
 
 // Handle product deep links
+// CRITICAL: Navigation must be SYNCHRONOUS for iOS Universal Links
+// iOS requires navigation to happen immediately (< 50ms) or it falls back to Safari
 Future<void> _handleProductDeepLink(String productId) async {
-  // CRITICAL: Always ensure navigation happens to "consume" the Universal Link
-  // iOS requires the app to navigate to a screen, otherwise it falls back to Safari
   try {
     debugPrint('🔗 Handling product deep link: $productId');
     
-    // Set flag to indicate deep link is being handled (prevents HomeScreen from navigating)
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDeepLinkHandling', true);
-    
-    // Wait for app to be ready
-    await Future.delayed(const Duration(milliseconds: 800));
-    
+    // CRITICAL: Get navigator IMMEDIATELY (don't wait for anything)
     final navigator = NavigationService.navigatorKey.currentState;
     if (navigator == null) {
-      debugPrint('🔗 ⚠️ Navigator not available yet, waiting...');
-      // Wait a bit more and try again
-      await Future.delayed(const Duration(milliseconds: 1000));
-      final retryNavigator = NavigationService.navigatorKey.currentState;
-      if (retryNavigator == null) {
-        debugPrint('🔗 ❌ Navigator still not available');
-        return;
-      }
+      debugPrint('🔗 ⚠️ Navigator not available - app still initializing');
+      // Store productId to handle after app initializes
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pendingProductDeepLink', productId);
+      return;
     }
     
-    // Validate product ID format (UUID)
+    // Validate productId format (synchronous, fast)
     final uuidRegex = RegExp(
       r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
       caseSensitive: false,
     );
     
     if (!uuidRegex.hasMatch(productId)) {
-      debugPrint('🔗 Invalid product ID format: $productId');
-      // Still navigate to show error - this "consumes" the Universal Link
-      _showDeepLinkErrorWithNavigation('Invalid product link');
-      return;
-    }
-
-    // Check if user is logged in BEFORE making API call
-    final authToken = prefs.getString('authToken');
-    final isLoggedIn = prefs.getBool('isLogin') == true && authToken != null && authToken.isNotEmpty;
-    
-    if (!isLoggedIn) {
-      debugPrint('🔗 ⚠️ User not logged in - storing productId for after login');
-      // Store productId to navigate after login
-      await prefs.setString('pendingProductDeepLink', productId);
-      
-      // Navigate to login screen (this consumes the Universal Link)
-      final currentNavigator = NavigationService.navigatorKey.currentState;
-      if (currentNavigator != null) {
-        // Import LoginPage - need to check the import
-        // For now, pop to root and show message
-        currentNavigator.popUntil((route) => route.isFirst);
-        
-        if (currentNavigator.context.mounted) {
-          ScaffoldMessenger.of(currentNavigator.context).showSnackBar(
-            const SnackBar(
-              content: Text('Please sign in to view this product'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 4),
-            ),
-          );
-        }
-        debugPrint('🔗 ✅ Stored productId for after login: $productId');
-      }
-      return;
-    }
-
-    // CRITICAL FOR iOS: Navigate immediately to "consume" the Universal Link
-    // iOS checks if navigation happens synchronously - if we wait for API, it falls back to Safari
-    debugPrint('🔗 User is logged in - navigating immediately, then fetching product: $productId');
-    
-    final currentNavigator = NavigationService.navigatorKey.currentState;
-    if (currentNavigator == null) {
-      debugPrint('🔗 ⚠️ Navigator lost');
-      _showDeepLinkErrorWithNavigation('Unable to open product. Please try again.');
-      return;
-    }
-
-    // Navigate immediately to a loading screen - this "consumes" the Universal Link on iOS
-    // The key is that navigation happens synchronously, before any async operations
-    currentNavigator.push(
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(title: const Text('Loading...')),
-          body: const Center(child: CircularProgressIndicator()),
+      debugPrint('🔗 ❌ Invalid product ID format: $productId');
+      // Navigate to error screen to consume the Universal Link
+      navigator.push(
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(title: const Text('Error')),
+            body: const Center(child: Text('Invalid product link')),
+          ),
         ),
-        fullscreenDialog: false, // Important: don't use fullscreen dialog
+      );
+      return;
+    }
+
+    // NAVIGATE IMMEDIATELY - this must happen synchronously
+    // Pass productId only, ProductDetailPage will fetch product data asynchronously
+    navigator.push(
+      SlidePageRoute(
+        page: ProductDetailPage(productId: productId),
       ),
     );
     
-    // Now fetch product details asynchronously (this happens AFTER navigation)
-    // This ensures iOS sees the navigation happen immediately
-    ApiService.getProductById(productId).then((product) async {
-      final updatedNavigator = NavigationService.navigatorKey.currentState;
-      if (updatedNavigator == null) {
-        debugPrint('🔗 ⚠️ Navigator lost during product fetch');
-        // Clear flag
-        final clearPrefs = await SharedPreferences.getInstance();
-        clearPrefs.setBool('isDeepLinkHandling', false);
-        return;
-      }
-      
-      // Remove the loading screen
-      updatedNavigator.pop();
-      
-      // Get prefs for clearing flag
-      final clearPrefs = await SharedPreferences.getInstance();
-    
-    if (product != null) {
-      // Success - navigate to product detail page
-        updatedNavigator.push(
-          SlidePageRoute(
-            page: ProductDetailPage(product: product),
-          ),
-        );
-        debugPrint('🔗 ✅ Navigated to product: ${product.title}');
-        // Clear deep link handling flag after successful navigation
-        clearPrefs.setBool('isDeepLinkHandling', false);
-    } else {
-      // Product not found (404) or API error
-      debugPrint('🔗 ❌ Product not found or API error: $productId');
-      _showDeepLinkErrorWithNavigation('Product not found or no longer available.');
-        // Clear deep link handling flag
-        clearPrefs.setBool('isDeepLinkHandling', false);
-      }
-    }).catchError((e) async {
-      debugPrint('🔗 ❌ Error fetching product: $e');
-      final errorNavigator = NavigationService.navigatorKey.currentState;
-      if (errorNavigator != null) {
-        errorNavigator.pop(); // Remove loading screen
-        _showDeepLinkErrorWithNavigation('Unable to load product. Please try again.');
-      }
-      // Clear deep link handling flag
-      final clearPrefs = await SharedPreferences.getInstance();
-      clearPrefs.setBool('isDeepLinkHandling', false);
-    });
+    debugPrint('🔗 ✅ Navigated immediately to product: $productId');
+    // ProductDetailPage will handle loading data asynchronously
   } catch (e) {
     debugPrint('🔗 ❌ Error handling product deep link: $e');
     // Always navigate even on error to consume the Universal Link
-    _showDeepLinkErrorWithNavigation('Unable to load product. Please try again.');
-    // Clear deep link handling flag
-    final errorPrefs = await SharedPreferences.getInstance();
-    errorPrefs.setBool('isDeepLinkHandling', false);
+    final navigator = NavigationService.navigatorKey.currentState;
+    if (navigator != null) {
+      navigator.push(
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(title: const Text('Error')),
+            body: const Center(child: Text('Unable to open product. Please try again.')),
+          ),
+        ),
+      );
+    }
   }
 }
 
