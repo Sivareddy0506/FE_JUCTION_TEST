@@ -853,11 +853,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           productId: productId,
           sellerId: sellerId,
           buyerId: buyerId,
-          sellerName: currentProduct.seller?.fullName ?? 'Seller',
+          sellerName: productForChat.seller?.fullName ?? 'Seller',
           buyerName: buyerName,
-          productTitle: currentProduct.title,
-          productImage: currentProduct.imageUrl ?? '',
-          productPrice: currentProduct.price ?? '',
+          productTitle: productForChat.title,
+          productImage: productForChat.imageUrl ?? '',
+          productPrice: productForChat.price ?? '',
         );
       }
 
