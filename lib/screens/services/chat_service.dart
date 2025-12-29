@@ -891,8 +891,8 @@ Future<void> markAsSold({
         .doc(systemMessageId)
         .set(systemMessage.toFirestore());
 
-    // Archive all chats for this product
-    await archiveChatsForProduct(productId);
+    // NOTE: Archival is now handled by backend cron job (runs daily)
+    // Chats will be archived 7 days after product is marked as sold
 
   } catch (e) {
     throw Exception('Failed to mark product as sold: $e');

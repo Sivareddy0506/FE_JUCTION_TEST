@@ -9,6 +9,7 @@ import '../services/memory_monitor_service.dart';
 import 'services/api_service.dart';
 import 'login/login_page.dart';
 import '../app.dart';
+import '../app_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -87,6 +88,13 @@ class _HomeScreenState extends State<HomeScreen> {
             if (result['token'] != null) {
               await prefs.setString('authToken', result['token']);
             }
+            // Update AppState with latest user status
+            final isVerified = result['isVerified'] as bool? ?? false;
+            final isOnboarded = result['isOnboarded'] as bool? ?? false;
+            AppState.instance.setUserStatus(
+              isVerified: isVerified,
+              isOnboarded: isOnboarded,
+            );
             shouldGoToHome = true;
           } else {
             await prefs.remove('authToken');

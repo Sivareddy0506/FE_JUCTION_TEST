@@ -12,6 +12,11 @@ import '../services/api_service.dart';
 import '../../services/favorites_service.dart';
 import './products_display.dart';
 import '../../app.dart';
+import '../../app_state.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/chat_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,7 +25,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String activeTab = 'home';
 
   List<Product> lastViewedProducts = [];
@@ -63,8 +68,115 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     debugPrint('HomePage: initState called');
+    WidgetsBinding.instance.addObserver(this);
     _initializeApp();
+    // Check user status on init
+    _checkUserStatus();
   }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Check user status when app resumes from background
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('HomePage: App resumed, checking user status');
+      _checkUserStatus();
+    }
+  }
+
+  /// Check and update user status from backend
+  Future<void> _checkUserStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isLoggedIn = prefs.getBool('isLogin') ?? false;
+      
+      if (!isLoggedIn) {
+        return;
+      }
+
+      final result = await AuthHealthService.refreshAuthToken();
+      
+      if (result['status'] == 'refreshed') {
+        final isVerified = result['isVerified'] as bool? ?? false;
+        final isOnboarded = result['isOnboarded'] as bool? ?? false;
+        final wasOnboarded = AppState.instance.isOnboarded;
+        
+        // Update AppState with latest status
+        AppState.instance.setUserStatus(
+          isVerified: isVerified,
+          isOnboarded: isOnboarded,
+        );
+        
+        // Update token if provided
+        if (result['token'] != null) {
+          await prefs.setString('authToken', result['token'] as String);
+        }
+        
+        // If user just became onboarded, setup Firebase and show success message
+        if (!wasOnboarded && isOnboarded && mounted) {
+          debugPrint('HomePage: User just became onboarded! Setting up Firebase...');
+          await _setupFirebaseForNewlyOnboardedUser();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 Your account has been approved! Full access enabled.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('HomePage: Error checking user status: $e');
+    }
+  }
+
+  /// Setup Firebase for a user who just became onboarded
+  Future<void> _setupFirebaseForNewlyOnboardedUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+      
+      if (userId == null || userId.isEmpty) {
+        debugPrint('HomePage: No userId found, skipping Firebase setup');
+        return;
+      }
+
+      // Create Firebase custom token
+      final customTokenResponse = await http.post(
+        Uri.parse('https://api.junctionverse.com/user/firebase/createcustomtoken'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': userId}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (customTokenResponse.statusCode == 200) {
+        final customToken = jsonDecode(customTokenResponse.body)['token'];
+        
+        // Setup Firebase Auth
+        try {
+          await FirebaseAuth.instance.signInWithCustomToken(customToken);
+          await prefs.setString('firebaseUserId', FirebaseAuth.instance.currentUser?.uid ?? '');
+          await prefs.setString('firebaseToken', customToken);
+          
+          // Initialize ChatService
+          await ChatService.initializeUserId();
+          
+          debugPrint('HomePage: Firebase setup completed for newly onboarded user');
+        } catch (e) {
+          debugPrint('HomePage: Error setting up Firebase: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('HomePage: Error in Firebase setup: $e');
+    }
+  }
+
 
   Future<void> _initializeApp() async {
     debugPrint('HomePage: Starting parallel initialization');

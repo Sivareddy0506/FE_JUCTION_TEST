@@ -20,6 +20,7 @@ import '../../utils/error_handler.dart';
 import '../../widgets/app_button.dart';
 import '../../services/share_service.dart';
 import 'edit_listing.dart';
+import '../../utils/feature_lock.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product? product; // Made optional for deep links
@@ -625,18 +626,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         return;
       }
 
-      final String errorMessage = () {
-        try {
-          final Map<String, dynamic> body = jsonDecode(response.body);
-          return body['message']?.toString();
-        } catch (_) {
-          return null;
-        }
-      }() ??
-          'Something went wrong. Please try again later.';
-
+      // Use ErrorHandler to properly parse error codes (NOT_ONBOARDED, NOT_VERIFIED)
       Navigator.of(sheetContext).pop();
-      ErrorHandler.showErrorSnackBar(context, errorMessage);
+      ErrorHandler.showErrorSnackBar(context, null, response: response);
     } catch (e) {
       Navigator.of(sheetContext).pop();
       ErrorHandler.showErrorSnackBar(context, e);
@@ -802,6 +794,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void startChat(BuildContext context) async {
+    // Check if feature is locked
+    if (lockIfNotOnboarded(context)) return;
+
     final Product productForChat = relatedProducts.isNotEmpty
         ? relatedProducts[currentProductIndex]
         : currentProduct!;

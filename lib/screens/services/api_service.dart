@@ -414,7 +414,14 @@ class AuthHealthService {
       final data = json.decode(res.body);
       final newToken = data['token']?.toString();
       if (newToken != null && newToken.isNotEmpty) {
-        return {'status': 'refreshed', 'token': newToken};
+        // Extract user status from response
+        final user = data['user'];
+        return {
+          'status': 'refreshed',
+          'token': newToken,
+          'isVerified': user?['isVerified'] ?? false,
+          'isOnboarded': user?['isOnboarded'] ?? false,
+        };
       }
       return {'status': 'invalid'};
     }

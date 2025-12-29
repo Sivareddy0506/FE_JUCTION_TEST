@@ -78,10 +78,14 @@ class FavoritesService extends ChangeNotifier {
         notifyListeners();
         return true;
       }
-      return false;
+      
+      // Throw exception with response so error handler can process it
+      // This allows proper handling of 403 NOT_ONBOARDED errors
+      throw Exception('HTTP ${response.statusCode}: ${response.body}');
     } catch (e) {
       debugPrint('Error adding to favorites: $e');
-      return false;
+      // Re-throw to allow caller to handle with ErrorHandler
+      rethrow;
     }
   }
 
@@ -107,11 +111,14 @@ class FavoritesService extends ChangeNotifier {
         notifyListeners();
         return true;
       }
+      
+      // Throw exception with response so error handler can process it
       debugPrint('FavoritesService: Failed to remove product $productId, status: ${response.statusCode}');
-      return false;
+      throw Exception('HTTP ${response.statusCode}: ${response.body}');
     } catch (e) {
       debugPrint('Error removing from favorites: $e');
-      return false;
+      // Re-throw to allow caller to handle with ErrorHandler
+      rethrow;
     }
   }
 

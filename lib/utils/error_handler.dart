@@ -11,6 +11,38 @@ class ErrorHandler {
       return _getHttpErrorMessage(response);
     }
 
+    // Try to parse JSON from exception message (e.g., "HTTP 403: {...}")
+    if (error != null) {
+      final errorString = error.toString();
+      // Check if exception message contains JSON (from favorites service)
+      // Pattern: "HTTP 403: {...}" - try to extract JSON after the colon
+      final httpMatch = RegExp(r'HTTP \d+:\s*(.+)', dotAll: true).firstMatch(errorString);
+      if (httpMatch != null) {
+        try {
+          final jsonStr = httpMatch.group(1)?.trim();
+          if (jsonStr != null && jsonStr.startsWith('{')) {
+            final data = json.decode(jsonStr);
+            if (data is Map<String, dynamic>) {
+              final String? errorCode = data['code'];
+              if (errorCode == 'NOT_ONBOARDED') {
+                return 'Verification pending – complete student approval to use this feature';
+              }
+              if (errorCode == 'NOT_VERIFIED') {
+                return 'Please verify your email first';
+              }
+              // Return the message from JSON if available
+              final String? errorMessage = data['message'];
+              if (errorMessage != null && errorMessage.isNotEmpty) {
+                return errorMessage;
+              }
+            }
+          }
+        } catch (_) {
+          // If JSON parsing fails, continue with normal error handling
+        }
+      }
+    }
+
     // Handle different exception types
     if (error is http.ClientException) {
       return 'Connection failed. Please check your internet connection.';
@@ -88,6 +120,15 @@ class ErrorHandler {
       
       // Try to extract user-friendly error message from response
       if (data is Map<String, dynamic>) {
+        // Check for specific error codes first (NOT_ONBOARDED, NOT_VERIFIED)
+        final String? errorCode = data['code'];
+        if (errorCode == 'NOT_ONBOARDED') {
+          return 'Verification pending – complete student approval to use this feature';
+        }
+        if (errorCode == 'NOT_VERIFIED') {
+          return 'Please verify your email first';
+        }
+        
         // Common error field names
         String? errorMessage = data['error'] ?? 
                               data['message'] ?? 

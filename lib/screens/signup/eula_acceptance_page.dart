@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/app_button.dart';
 import '../../app.dart';
-import '../profile/user_profile.dart';
+import '../products/home.dart';
 import 'referral_code_page.dart' as edu;
 import 'referral_code_page_non_edu.dart' as non_edu;
 
@@ -134,13 +134,20 @@ class _EULAAcceptancePageState extends State<EULAAcceptancePage> {
           // For login flow or completed signup, go to main app
           Navigator.pushAndRemoveUntil(
             context,
-            SlidePageRoute(page: const UserProfilePage()),
+            SlidePageRoute(page: HomePage()),
             (Route<dynamic> route) => false,
           );
         }
       } else {
         final errorData = jsonDecode(response.body);
-        final errorMessage = errorData['message'] ?? 'Failed to accept terms. Please try again.';
+        String errorMessage = errorData['message'] ?? 'Failed to accept terms. Please try again.';
+        
+        // Handle specific error codes
+        if (errorData['code'] == 'NOT_ONBOARDED') {
+          errorMessage = 'Verification pending – complete student approval to use this feature';
+        } else if (errorData['code'] == 'NOT_VERIFIED') {
+          errorMessage = 'Please verify your email first';
+        }
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),

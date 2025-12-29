@@ -17,6 +17,8 @@ import '../signup/eula_acceptance_page.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../services/chat_service.dart';
 import '../products/product_detail.dart';
+import '../../app_state.dart';
+import '../products/home.dart';
 class OTPVerificationLoginPage extends StatefulWidget {
   final String email;
 
@@ -114,18 +116,10 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
         }
 
         final bool isOnboarded = user['isOnboarded'] ?? false;
+        final bool isVerified = user['isVerified'] ?? false;
         final String userStatus = user['userStatus'] ?? '';
         final String fullName = user['fullName'] ?? 'User';
         final bool eulaAccepted = user['eulaAccepted'] ?? false;
-
-        if (!isOnboarded) {
-          if (!mounted) return;
-          setState(() => isSubmitting = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("User not onboarded. Please signup first.")),
-          );
-          return;
-        }
 
         // Save token and user info
         if (token != null) {
@@ -133,27 +127,31 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
           await prefs.setString('authToken', token);
           await prefs.setString('userId', userId);
           await prefs.setString('fullName', fullName);
+          // Save isOnboarded to AppState
+          AppState.instance.setIsOnboarded(isOnboarded);
         }
-
-        if (userStatus == 'Active') {
+        // Verified but not onboarded users get partial access
+        if (isVerified) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isLogin', true);
 
-          debugPrint('Creating Firebase custom token for userId: $userId');
-          final customTokenResponse = await http.post(
-            Uri.parse('https://api.junctionverse.com/user/firebase/createcustomtoken'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'userId': userId}),
-          ).timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw TimeoutException('Firebase token creation timed out');
-            },
-          );
+          // Only set up Firebase for onboarded users (chat requires onboarding)
+          if (isOnboarded) {
+            debugPrint('Creating Firebase custom token for userId: $userId');
+            final customTokenResponse = await http.post(
+              Uri.parse('https://api.junctionverse.com/user/firebase/createcustomtoken'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'userId': userId}),
+            ).timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                throw TimeoutException('Firebase token creation timed out');
+              },
+            );
 
-          debugPrint('Custom token response status: ${customTokenResponse.statusCode}');
-          
-          if (customTokenResponse.statusCode == 200) {
+            debugPrint('Custom token response status: ${customTokenResponse.statusCode}');
+            
+            if (customTokenResponse.statusCode == 200) {
             final customToken = jsonDecode(customTokenResponse.body)['token'];
             await FirebaseAuth.instance.signInWithCustomToken(customToken);
             await prefs.setString('firebaseUserId', FirebaseAuth.instance.currentUser?.uid ?? '');
@@ -227,18 +225,19 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               );
             } else {
               // EULA already accepted, proceed to app
+              // Always redirect to HomePage (for both onboarded and non-onboarded verified users)
               if (pendingProductId != null && pendingProductId.isNotEmpty) {
                 // Clear pending deep link
                 await prefs.remove('pendingProductDeepLink');
                 
-                // Navigate to product detail page
+                // Navigate to home page first
                 Navigator.pushAndRemoveUntil(
                   context,
-                  SlidePageRoute(page: const UserProfilePage()),
+                  SlidePageRoute(page: const HomePage()),
                   (Route<dynamic> route) => false,
                 );
                 
-                // Navigate to product after a short delay to ensure UserProfilePage is ready
+                // Navigate to product after a short delay
                 Future.delayed(const Duration(milliseconds: 500), () {
                   if (mounted) {
                     Navigator.push(
@@ -250,10 +249,10 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
                   }
                 });
               } else {
-                // No pending deep link, proceed normally
+                // No pending deep link, go to home page
                 Navigator.pushAndRemoveUntil(
                   context,
-                  SlidePageRoute(page: const UserProfilePage()),
+                  SlidePageRoute(page: const HomePage()),
                   (Route<dynamic> route) => false,
                 );
               }
@@ -278,22 +277,66 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
               SnackBar(content: Text(errorMsg)),
             );
           }
-        } else if (userStatus == 'Pending' || userStatus == 'Submitted') {
-          Navigator.pushReplacement(
-            context,
-            SlidePageRoute(page: const VerificationSubmittedPage()),
-          );
-        } else if (userStatus == 'Rejected') {
-          Navigator.pushReplacement(
-            context,
-            SlidePageRoute(page: const VerificationRejectedPage()),
-          );
+          } else {
+            // Verified but not onboarded - skip Firebase setup, go directly to home
+            final prefs = await SharedPreferences.getInstance();
+            final pendingProductId = prefs.getString('pendingProductDeepLink');
+            
+            // Check if user has accepted EULA
+            if (!eulaAccepted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                SlidePageRoute(
+                  page: const EULAAcceptancePage(isSignupFlow: false),
+                ),
+                (Route<dynamic> route) => false,
+              );
+            } else {
+              if (pendingProductId != null && pendingProductId.isNotEmpty) {
+                await prefs.remove('pendingProductDeepLink');
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  SlidePageRoute(page: const HomePage()),
+                  (Route<dynamic> route) => false,
+                );
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (mounted) {
+                    Navigator.push(
+                      context,
+                      SlidePageRoute(
+                        page: ProductDetailPage(productId: pendingProductId),
+                      ),
+                    );
+                  }
+                });
+              } else {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  SlidePageRoute(page: const HomePage()),
+                  (Route<dynamic> route) => false,
+                );
+              }
+            }
+          }
         } else {
-          if (!mounted) return;
-          setState(() => isSubmitting = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Unhandled user status: $userStatus")),
-          );
+          // User is not verified - show verification screens
+          if (userStatus == 'Pending' || userStatus == 'Submitted') {
+            Navigator.pushReplacement(
+              context,
+              SlidePageRoute(page: const VerificationSubmittedPage()),
+            );
+          } else if (userStatus == 'Rejected') {
+            Navigator.pushReplacement(
+              context,
+              SlidePageRoute(page: const VerificationRejectedPage()),
+            );
+          } else {
+            // Unknown status - default to verification submitted page
+            Navigator.pushReplacement(
+              context,
+              SlidePageRoute(page: const VerificationSubmittedPage()),
+            );
+          }
         }
         // On success, don't reset isSubmitting - let navigation happen while button is in loading state
         // This provides better UX feedback

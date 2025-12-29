@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:convert';
+import '../utils/feature_lock.dart';
 
 class LogoAndIconsWidget extends StatefulWidget {
   const LogoAndIconsWidget({super.key});
@@ -211,6 +212,7 @@ class _LogoAndIconsWidgetState extends State<LogoAndIconsWidget> {
             final hasNewChats = snapshot.data ?? false;
             return GestureDetector(
               onTap: () {
+                if (lockIfNotOnboarded(context)) return;
                 Navigator.push(
                   context,
                   SlidePageRoute(page: ChatListPage()),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:junction/app_state.dart';
 import '../screens/products/category_post.dart';
+import '../screens/products/home.dart';
 import '../services/navigation_manager.dart';
 import '../app.dart'; // For SlidePageRoute
+import '../utils/feature_lock.dart';
 
 // Wrapper widget that always shows bottom navigation
 class BottomNavWrapper extends StatelessWidget {
@@ -55,12 +57,40 @@ class BottomNavBar extends StatelessWidget {
     final iconSize = (screenWidth * 0.06).clamp(22.0, 32.0); // responsive size
     final fontSize = (screenWidth * 0.03).clamp(11.0, 14.0); // responsive font
 
+    final isOnboarded = AppState.instance.isOnboarded;
+    final isLocked = !isOnboarded && (label.toLowerCase() == 'post' || 
+                                      label.toLowerCase() == 'jauction' || 
+                                      label.toLowerCase() == 'profile');
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          // Check if feature is locked
+          if (isLocked) {
+            lockIfNotOnboarded(context);
+            return;
+          }
+
           final lowerLabel = label.toLowerCase();
 
-          if (lowerLabel == 'post') {
+          if (lowerLabel == 'home') {
+            // Navigate to home using same pattern as other tabs (no slider)
+            final targetRoute = lowerLabel;
+            if (!isActive) {
+              NavigationManager.setCurrentRoute(targetRoute);
+              final targetPage = NavigationManager.getPreservedPage(targetRoute);
+
+              Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      targetPage,
+                  transitionDuration: Duration.zero,
+                  reverseTransitionDuration: Duration.zero,
+                ),
+              );
+            }
+          } else if (lowerLabel == 'post') {
             AppState.instance.isJuction = false; // Default to regular listing
             Navigator.push(
               context,
@@ -91,20 +121,24 @@ class BottomNavBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              assetPath,
-              width: iconSize,
-              height: iconSize,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high, // 🔥 crisp icons
+            Opacity(
+              opacity: isLocked ? 0.4 : 1.0,
+              child: Image.asset(
+                assetPath,
+                width: iconSize,
+                height: iconSize,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high, // 🔥 crisp icons
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               label[0].toUpperCase() + label.substring(1).toLowerCase(),
               style: TextStyle(
                 fontSize: fontSize,
-                color:
-                    isActive ? const Color(0xFFFF6705) : const Color(0xFF8A8894),
+                color: isLocked
+                    ? const Color(0xFF8A8894).withOpacity(0.4)
+                    : (isActive ? const Color(0xFFFF6705) : const Color(0xFF8A8894)),
                 fontWeight: FontWeight.w500,
               ),
             ),
