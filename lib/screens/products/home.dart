@@ -234,11 +234,81 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final token = prefs.getString('authToken');
       final bool loggedIn = token != null && token.isNotEmpty;
 
-      final lastViewed = await ApiService.fetchLastOpenedWithCache();
-      final latest = await ApiService.fetchAllProductsWithCache();
-      final trending = await ApiService.fetchMostClickedWithCache();
-      final searched = await ApiService.fetchLastSearchedWithCache();
-      final ads = await ApiService.fetchAdUrlsWithCache();
+      // Run all API calls in parallel with individual timeouts and error handling
+      final results = await Future.wait([
+        // Each call has its own timeout and returns empty list on error
+        ApiService.fetchLastOpenedWithCache()
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint('HomePage: fetchLastOpenedWithCache timed out');
+                return <Product>[];
+              },
+            )
+            .catchError((e) {
+              debugPrint('HomePage: Error fetching lastViewed: $e');
+              return <Product>[];
+            }),
+        
+        ApiService.fetchAllProductsWithCache()
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint('HomePage: fetchAllProductsWithCache timed out');
+                return <Product>[];
+              },
+            )
+            .catchError((e) {
+              debugPrint('HomePage: Error fetching allProducts: $e');
+              return <Product>[];
+            }),
+        
+        ApiService.fetchMostClickedWithCache()
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint('HomePage: fetchMostClickedWithCache timed out');
+                return <Product>[];
+              },
+            )
+            .catchError((e) {
+              debugPrint('HomePage: Error fetching trending: $e');
+              return <Product>[];
+            }),
+        
+        ApiService.fetchLastSearchedWithCache()
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint('HomePage: fetchLastSearchedWithCache timed out');
+                return <Product>[];
+              },
+            )
+            .catchError((e) {
+              debugPrint('HomePage: Error fetching searched: $e');
+              return <Product>[];
+            }),
+        
+        ApiService.fetchAdUrlsWithCache()
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                debugPrint('HomePage: fetchAdUrlsWithCache timed out');
+                return <String>[];
+              },
+            )
+            .catchError((e) {
+              debugPrint('HomePage: Error fetching ads: $e');
+              return <String>[];
+            }),
+      ], eagerError: false); // Don't fail all if one fails
+
+      // Extract results
+      final lastViewed = results[0] as List<Product>;
+      final latest = results[1] as List<Product>;
+      final trending = results[2] as List<Product>;
+      final searched = results[3] as List<Product>;
+      final ads = results[4] as List<String>;
 
       debugPrint("HomePage: API data fetched successfully");
       debugPrint("📦 lastViewedProducts: ${lastViewed.length}");
@@ -266,7 +336,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (e, stacktrace) {
       debugPrint('HomePage: Exception in fetchHomeData - $e');
       debugPrint(stacktrace.toString());
-      rethrow; // Re-throw to be caught by _initializeProducts
+      // Don't rethrow - set empty data instead to prevent infinite loading
+      if (mounted) {
+        setState(() {
+          lastViewedProducts = [];
+          allProducts = [];
+          trendingProducts = [];
+          previousSearchProducts = [];
+          adUrl1 = '';
+          adUrl2 = '';
+        });
+      }
     }
   }
 

@@ -53,20 +53,7 @@ class _ChatListPageState extends State<ChatListPage> {
             itemBuilder: (context, index) {
               // Show "Archived Chats" option at the end (or first if no active chats)
               if (index == chats.length) {
-                return Column(
-                  children: [
-                    // Show empty state message if no active chats
-                    if (chats.isEmpty) ...[
-                      const SizedBox(height: 40),
-                      const Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No active chats',
-                        style: TextStyle(fontSize: 18, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
-                    InkWell(
+                return InkWell(
                       onTap: () {
                         Navigator.push(
                           context,
@@ -103,9 +90,7 @@ class _ChatListPageState extends State<ChatListPage> {
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                );
+                    );
               }
               ChatModel chat = chats[index];
               String otherUserName = chat.sellerId == _chatService.currentUserIdSync
