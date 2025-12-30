@@ -49,11 +49,21 @@ Future<void> _loadUserProfile() async {
       // ✅ Fetch the homeAddress from addressJson by matching the homeAddress ID
       String addressText = '';
       final homeAddressId = user['homeAddress'];
-      final addressJson = user['addressJson'];
+      dynamic addressJson = user['addressJson'];
+
+      // Parse addressJson if it's a string (JSON string from database)
+      if (addressJson is String) {
+        try {
+          addressJson = jsonDecode(addressJson);
+        } catch (e) {
+          print("Error parsing addressJson string: $e");
+          addressJson = null;
+        }
+      }
 
       if (homeAddressId != null && addressJson is List) {
         final defaultAddress = addressJson.firstWhere(
-          (addr) => addr['id'] == homeAddressId,
+          (addr) => addr['id'] == homeAddressId || addr['id']?.toString() == homeAddressId.toString(),
           orElse: () => null,
         );
         
@@ -129,11 +139,17 @@ Future<void> _loadUserProfile() async {
           if (showEdit)
             IconButton(
               icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                // Wait for result and refresh data when returning
+                final result = await Navigator.push(
                   context,
                   SlidePageRoute(page: const AddressPage()),
                 );
+                
+                // Refresh profile data when returning from address page
+                if (result != null || mounted) {
+                  _loadUserProfile();
+                }
               },
             ),
         ],

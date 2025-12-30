@@ -128,9 +128,26 @@ class _AddressPageState extends State<AddressPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const CustomAppBar(title: "Manage Address"),
-      body: Column(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          // Return true to indicate refresh is needed
+          Navigator.of(context).pop(true);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Manage Address"),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // Return true to trigger refresh in PersonalInfoPage
+              Navigator.of(context).pop(true);
+            },
+          ),
+        ),
+        body: Column(
         children: [
           Expanded(
             child: _isLoading
@@ -198,6 +215,7 @@ class _AddressPageState extends State<AddressPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -221,7 +221,8 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
   }
 
   String? _extractLocationFromAddressJson(Map<String, dynamic> user) {
-    final homeAddressId = user['homeAddress'];
+    // homeAddress field contains the default address ID (set via "Manage Address")
+    final defaultAddressId = user['homeAddress'];
     dynamic addressJson = user['addressJson'];
 
     if (addressJson == null) {
@@ -250,22 +251,22 @@ class _OthersProfilePageState extends State<OthersProfilePage> {
       return null;
     }
 
-    // Find the address matching the homeAddress ID
+    // Find the address matching the default address ID, or fallback to first address
     dynamic selectedAddress;
-    if (homeAddressId != null && homeAddressId is String) {
+    if (defaultAddressId != null && defaultAddressId is String && defaultAddressId.isNotEmpty) {
       try {
         selectedAddress = addressJson.firstWhere(
-          (addr) => addr['id'] == homeAddressId,
+          (addr) => addr['id'] == defaultAddressId || addr['id']?.toString() == defaultAddressId.toString(),
           orElse: () => addressJson.isNotEmpty ? addressJson[0] : null,
         );
-        debugPrint('OthersProfilePage: Found address with ID: $homeAddressId');
+        debugPrint('OthersProfilePage: Found default address with ID: $defaultAddressId');
       } catch (e) {
-        debugPrint('OthersProfilePage: Address ID not found, using first address: $e');
+        debugPrint('OthersProfilePage: Default address ID not found, using first address: $e');
         selectedAddress = addressJson.isNotEmpty ? addressJson[0] : null;
       }
     } else {
-      debugPrint('OthersProfilePage: No homeAddressId, using first address');
-      selectedAddress = addressJson[0];
+      debugPrint('OthersProfilePage: No default address set, using first address');
+      selectedAddress = addressJson.isNotEmpty ? addressJson[0] : null;
     }
 
     if (selectedAddress != null && selectedAddress['address'] != null) {

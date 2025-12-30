@@ -24,16 +24,18 @@ class UserProfile {
     // Parse the addressJson field
     if (json['addressJson'] != null && json['addressJson'] is List) {
       final addressList = json['addressJson'] as List;
-      final homeAddressId = json['homeAddress'];
+      // homeAddress field contains the default address ID (set via "Manage Address")
+      final defaultAddressId = json['homeAddress'];
 
-      // Find the address matching the homeAddress ID, or fallback to first address
+      // Find the address matching the default address ID, or fallback to first address
       dynamic selectedAddress;
-      if (homeAddressId != null && homeAddressId is String) {
+      if (defaultAddressId != null && defaultAddressId is String && defaultAddressId.isNotEmpty) {
         selectedAddress = addressList.firstWhere(
-          (addr) => addr['id'] == homeAddressId,
+          (addr) => addr['id'] == defaultAddressId || addr['id']?.toString() == defaultAddressId.toString(),
           orElse: () => addressList.isNotEmpty ? addressList[0] : null,
         );
       } else if (addressList.isNotEmpty) {
+        // If no default address is set, use the first address as fallback
         selectedAddress = addressList[0];
       }
 

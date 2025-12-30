@@ -152,17 +152,78 @@ Future<void> main() async {
     iOS: initializationSettingsIOS,
   );
   
+  // Static variable to store pending chat navigation synchronously
+  String? _pendingChatId;
+  
   void navigateToChat(String? chatId) {
     if (chatId == null || chatId.isEmpty) return;
     
-    final navigator = NavigationService.navigatorKey.currentState;
-    if (navigator != null) {
-      navigator.push(
-        SlidePageRoute(
-          page: ChatPage(chatId: chatId),
-        ),
-      );
+    // Check if Firebase is initialized
+    if (Firebase.apps.isEmpty) {
+      debugPrint('📱 [Chat Nav] Firebase not initialized, storing chatId for later: $chatId');
+      _pendingChatId = chatId;
+      // Also store in SharedPreferences for persistence (async, non-blocking)
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('pendingChatId', chatId);
+      });
+      return;
     }
+    
+    final navigator = NavigationService.navigatorKey.currentState;
+    if (navigator == null) {
+      debugPrint('📱 [Chat Nav] Navigator not available, storing chatId for later: $chatId');
+      _pendingChatId = chatId;
+      // Also store in SharedPreferences for persistence (async, non-blocking)
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('pendingChatId', chatId);
+      });
+      return;
+    }
+    
+    // Add a small delay to ensure app is fully ready (especially when opened from notification)
+    Future.delayed(const Duration(milliseconds: 300), () {
+      final currentNavigator = NavigationService.navigatorKey.currentState;
+      if (currentNavigator != null && Firebase.apps.isNotEmpty) {
+        debugPrint('📱 [Chat Nav] Navigating to chat: $chatId');
+        currentNavigator.push(
+          SlidePageRoute(
+            page: ChatPage(chatId: chatId),
+          ),
+        );
+      } else {
+        debugPrint('📱 [Chat Nav] Navigator or Firebase not ready after delay, storing: $chatId');
+        _pendingChatId = chatId;
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('pendingChatId', chatId);
+        });
+      }
+    });
+  }
+  
+  // Check for pending chat navigation after app initializes
+  void _checkPendingChatNavigation() {
+    // First check synchronous storage
+    if (_pendingChatId != null) {
+      final chatId = _pendingChatId;
+      _pendingChatId = null; // Clear immediately
+      debugPrint('📱 [Chat Nav] Processing pending chat from memory: $chatId');
+      Future.delayed(const Duration(milliseconds: 500), () {
+        navigateToChat(chatId!);
+      });
+      return;
+    }
+    
+    // Also check SharedPreferences (async, but app should be ready now)
+    SharedPreferences.getInstance().then((prefs) {
+      final pendingChatId = prefs.getString('pendingChatId');
+      if (pendingChatId != null && pendingChatId.isNotEmpty) {
+        debugPrint('📱 [Chat Nav] Processing pending chat from storage: $pendingChatId');
+        prefs.remove('pendingChatId'); // Clear
+        Future.delayed(const Duration(milliseconds: 500), () {
+          navigateToChat(pendingChatId);
+        });
+      }
+    });
   }
   
   await flutterLocalNotificationsPlugin.initialize(
@@ -174,7 +235,12 @@ Future<void> main() async {
           if (payload.contains('chatId')) {
             final chatIdMatch = RegExp(r'chatId[:\s]+([^\s,}]+)').firstMatch(payload);
             if (chatIdMatch != null) {
-              navigateToChat(chatIdMatch.group(1));
+              final chatId = chatIdMatch.group(1);
+              debugPrint('📱 [Notification] Chat notification clicked: $chatId');
+              // Add delay to ensure app is ready when opened from notification
+              Future.delayed(const Duration(milliseconds: 500), () {
+                navigateToChat(chatId);
+              });
             }
           }
         } catch (e) {
@@ -287,7 +353,11 @@ Future<void> main() async {
 
     final chatId = message.data['chatId'];
     if (chatId != null) {
-      navigateToChat(chatId);
+      debugPrint('📱 [FCM] Message opened app, navigating to chat: $chatId');
+      // Add delay to ensure app is ready when opened from notification
+      Future.delayed(const Duration(milliseconds: 500), () {
+        navigateToChat(chatId);
+      });
     }
   });
   
@@ -299,7 +369,9 @@ Future<void> main() async {
     if (authToken != null && authToken.isNotEmpty) {
       final chatId = initialMessage.data['chatId'];
       if (chatId != null) {
-        Future.delayed(const Duration(milliseconds: 500), () {
+        debugPrint('📱 [FCM] Initial message found, navigating to chat: $chatId');
+        // Add longer delay for initial message (app might be starting from cold)
+        Future.delayed(const Duration(milliseconds: 1000), () {
           navigateToChat(chatId);
         });
       }
@@ -325,9 +397,10 @@ Future<void> main() async {
 
   runApp(const MyApp());
   
-  // After app is built, check for pending deep links
+  // After app is built, check for pending deep links and chat navigation
   WidgetsBinding.instance.addPostFrameCallback((_) {
     _checkPendingDeepLink();
+    _checkPendingChatNavigation();
   });
 }
 
