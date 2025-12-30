@@ -318,28 +318,39 @@ Future<void> main() async {
   final deepLinkService = DeepLinkService();
   deepLinkService.initialize();
   
-  // Handle product deep links
-  deepLinkService.onProductLinkReceived = (productId) async {
-    await _handleProductDeepLink(productId);
+  // Handle product deep links - SYNCHRONOUS callback (no async)
+  deepLinkService.onProductLinkReceived = (productId) {
+    _handleProductDeepLink(productId);
   };
 
   runApp(const MyApp());
+  
+  // After app is built, check for pending deep links
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _checkPendingDeepLink();
+  });
 }
+
+// Static variable to store pending deep link synchronously (no async operations)
+String? _pendingProductDeepLink;
 
 // Handle product deep links
 // CRITICAL: Navigation must be SYNCHRONOUS for iOS Universal Links
 // iOS requires navigation to happen immediately (< 50ms) or it falls back to Safari
-Future<void> _handleProductDeepLink(String productId) async {
+void _handleProductDeepLink(String productId) {
   try {
     debugPrint('🔗 Handling product deep link: $productId');
     
-    // CRITICAL: Get navigator IMMEDIATELY (don't wait for anything)
+    // CRITICAL: Get navigator IMMEDIATELY (synchronous, no async operations)
     final navigator = NavigationService.navigatorKey.currentState;
     if (navigator == null) {
-      debugPrint('🔗 ⚠️ Navigator not available - app still initializing');
-      // Store productId to handle after app initializes
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('pendingProductDeepLink', productId);
+      debugPrint('🔗 ⚠️ Navigator not available - storing for later');
+      // Store productId synchronously (no async SharedPreferences)
+      _pendingProductDeepLink = productId;
+      // Also store in SharedPreferences for persistence across app restarts (async, non-blocking)
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('pendingProductDeepLink', productId);
+      });
       return;
     }
     
@@ -388,6 +399,28 @@ Future<void> _handleProductDeepLink(String productId) async {
       );
     }
   }
+}
+
+// Check for pending deep link after app initializes
+void _checkPendingDeepLink() {
+  // First check synchronous storage
+  if (_pendingProductDeepLink != null) {
+    final productId = _pendingProductDeepLink;
+    _pendingProductDeepLink = null; // Clear immediately
+    debugPrint('🔗 Processing pending deep link from memory: $productId');
+    _handleProductDeepLink(productId!);
+    return;
+  }
+  
+  // Also check SharedPreferences (async, but navigator should be ready now)
+  SharedPreferences.getInstance().then((prefs) {
+    final pendingProductId = prefs.getString('pendingProductDeepLink');
+    if (pendingProductId != null && pendingProductId.isNotEmpty) {
+      debugPrint('🔗 Processing pending deep link from storage: $pendingProductId');
+      prefs.remove('pendingProductDeepLink'); // Clear
+      _handleProductDeepLink(pendingProductId);
+    }
+  });
 }
 
 void _showDeepLinkError(String message) {

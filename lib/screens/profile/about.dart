@@ -185,75 +185,80 @@ class _AboutTabState extends State<AboutTab> {
           const SizedBox(height: 30),
           _buildSectionHeader("Reviews"),
           const SizedBox(height: 20),
-          if (reviews.isEmpty)
-            const Text("No reviews yet", style: TextStyle(color: Colors.grey)),
-          ...reviews.map((review) {
-            final reviewer = review["ratedBy"] ?? {};
-            final avatarUrl = reviewer["avatarUrl"];
-            final name = reviewer["fullName"] ?? "Anonymous";
-            final comment = review["comments"] ?? "No comments";
+          // Filter reviews to only show those with actual comments (not empty, not "N/A")
+          ...reviews
+              .where((review) {
+                final comment = review["comments"]?.toString().trim() ?? "";
+                return comment.isNotEmpty && comment != "N/A";
+              })
+              .map((review) {
+                final reviewer = review["ratedBy"] ?? {};
+                final avatarUrl = reviewer["avatarUrl"];
+                final name = reviewer["fullName"] ?? "Anonymous";
+                final comment = review["comments"]?.toString().trim() ?? "";
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 30),
-              width: double.infinity,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFAFAFA),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade400),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        comment,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF333333),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 30),
+                  width: double.infinity,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAFAFA),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade400),
                         ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: -10,
-                    left: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAFAFA),
-                        border: Border.all(color: Colors.grey.shade400),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircleAvatar(
-                            radius: 8,
-                            backgroundImage: avatarUrl != null
-                                ? NetworkImage(avatarUrl)
-                                : const AssetImage('assets/default_avatar.png')
-                                    as ImageProvider,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            name,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            comment,
                             style: const TextStyle(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 10,
+                              fontSize: 13,
+                              color: Color(0xFF333333),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        top: -10,
+                        left: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFAFAFA),
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 8,
+                                backgroundImage: avatarUrl != null
+                                    ? NetworkImage(avatarUrl)
+                                    : const AssetImage('assets/default_avatar.png')
+                                        as ImageProvider,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }).toList(),
+                );
+              })
+              .toList(),
         ],
       ),
     );

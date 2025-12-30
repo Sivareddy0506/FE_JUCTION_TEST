@@ -76,8 +76,9 @@ Future<void> submitRating() async {
     final prefs = await SharedPreferences.getInstance();
     final authToken = prefs.getString('authToken');
 
-    String comments = vibeController.text;
-    if (comments.isEmpty) comments = "N/A";
+    String comments = vibeController.text.trim();
+    // Send empty string instead of "N/A" - database allows empty strings
+    // Frontend will handle display logic to hide empty comments
 
     final response = await http.post(
       Uri.parse('https://api.junctionverse.com/ratings/'),
