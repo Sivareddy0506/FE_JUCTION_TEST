@@ -8,6 +8,7 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/custom_appbar.dart';
 import 'add_more_details.dart'; // import the new page
 import '../../../app.dart'; // For SlidePageRoute
+import '../../../services/places_autocomplete_service.dart';
 
 class LocationMapPage extends StatefulWidget {
   final Address? initialAddress;
@@ -24,9 +25,13 @@ class _LocationMapPageState extends State<LocationMapPage> {
   LatLng? _currentLatLng;
   String _selectedAddress = 'Fetching address...';
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounce;
+  Timer? _autocompleteDebounce;
   bool _userSearched = false;
   bool _isLoading = true;
+  List<PlacePrediction> _autocompletePredictions = [];
+  bool _showAutocompleteDropdown = false;
   @override
   void initState() {
     super.initState();
@@ -49,6 +54,8 @@ class _LocationMapPageState extends State<LocationMapPage> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _autocompleteDebounce?.cancel();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -117,18 +124,67 @@ class _LocationMapPageState extends State<LocationMapPage> {
   }
 
   void _onSearchChanged(String value) {
+    // Cancel previous debounce timers
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-
-    _debounce = Timer(const Duration(milliseconds: 800), () {
-      if (value.isNotEmpty) {
-        _moveMapToAddress(value);
-      }
-    });
+    if (_autocompleteDebounce?.isActive ?? false) _autocompleteDebounce!.cancel();
 
     setState(() {
       _selectedAddress = value;
       _userSearched = true;
+      if (value.isEmpty) {
+        _autocompletePredictions = [];
+        _showAutocompleteDropdown = false;
+      }
     });
+
+    // Fetch autocomplete predictions as user types
+    if (value.isNotEmpty) {
+      _autocompleteDebounce = Timer(const Duration(milliseconds: 300), () {
+        _fetchAutocompletePredictions(value);
+      });
+    }
+
+    // Fallback to geocoding if user submits or after delay (for backward compatibility)
+    _debounce = Timer(const Duration(milliseconds: 1500), () {
+      if (value.isNotEmpty && _autocompletePredictions.isEmpty) {
+        _moveMapToAddress(value);
+      }
+    });
+  }
+
+  Future<void> _fetchAutocompletePredictions(String input) async {
+    final predictions = await PlacesAutocompleteService.getPredictions(input);
+    if (mounted) {
+      setState(() {
+        _autocompletePredictions = predictions;
+        _showAutocompleteDropdown = predictions.isNotEmpty && input.isNotEmpty;
+      });
+    }
+  }
+
+  Future<void> _onPredictionSelected(PlacePrediction prediction) async {
+    setState(() {
+      _searchController.text = prediction.description;
+      _showAutocompleteDropdown = false;
+      _autocompletePredictions = [];
+    });
+    _searchFocusNode.unfocus();
+
+    // Get place details including coordinates
+    final placeDetails = await PlacesAutocompleteService.getPlaceDetails(prediction.placeId);
+    if (placeDetails != null && mounted) {
+      setState(() {
+        _currentLatLng = placeDetails.location;
+        _selectedAddress = placeDetails.formattedAddress.isNotEmpty
+            ? placeDetails.formattedAddress
+            : prediction.description;
+        _userSearched = true;
+      });
+      _mapController?.animateCamera(CameraUpdate.newLatLng(placeDetails.location));
+    } else {
+      // Fallback to geocoding if Places API fails
+      _moveMapToAddress(prediction.description);
+    }
   }
 
   Future<void> _moveMapToAddress(String address) async {
@@ -195,6 +251,10 @@ class _LocationMapPageState extends State<LocationMapPage> {
                   onCameraMove: _onMapMoved,
                   onCameraIdle: _onMapIdle,
                   onTap: (_) {
+                    setState(() {
+                      _showAutocompleteDropdown = false;
+                    });
+                    _searchFocusNode.unfocus();
                     if (!_userSearched) {
                       _getAddressFromLatLng(_currentLatLng!);
                     }
@@ -214,34 +274,109 @@ class _LocationMapPageState extends State<LocationMapPage> {
                   top: 20,
                   left: 16,
                   right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Image(
-                          image: AssetImage('assets/MagnifyingGlass.png'),
-                          width: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Search for building, street name",
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
-                            onChanged: _onSearchChanged,
-                            onSubmitted: _moveMapToAddress,
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search, size: 20, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                textInputAction: TextInputAction.done,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: "Search for building, street name",
+                                  hintStyle: TextStyle(color: Colors.grey),
+                                ),
+                                onChanged: _onSearchChanged,
+                                onSubmitted: (value) {
+                                  if (_autocompletePredictions.isNotEmpty) {
+                                    _onPredictionSelected(_autocompletePredictions.first);
+                                  } else {
+                                    _moveMapToAddress(value);
+                                  }
+                                },
+                                onTap: () {
+                                  if (_autocompletePredictions.isNotEmpty) {
+                                    setState(() {
+                                      _showAutocompleteDropdown = true;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Autocomplete dropdown
+                      if (_showAutocompleteDropdown && _autocompletePredictions.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            itemCount: _autocompletePredictions.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final prediction = _autocompletePredictions[index];
+                              return InkWell(
+                                onTap: () => _onPredictionSelected(prediction),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on_outlined,
+                                        size: 20,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          prediction.description,
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
                 Positioned(

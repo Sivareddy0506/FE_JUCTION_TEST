@@ -129,12 +129,13 @@ class _AddressPageState extends State<AddressPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: false,  // Block automatic pop to control result value
       onPopInvoked: (didPop) {
-        if (didPop) {
-          // Return true to indicate refresh is needed
+        if (!didPop) {
+          // Pop was blocked, manually pop and return true to trigger refresh
           Navigator.of(context).pop(true);
         }
+        // If didPop is true (shouldn't happen with canPop: false), do nothing
       },
       child: Scaffold(
         appBar: AppBar(

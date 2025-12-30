@@ -90,7 +90,7 @@ class _ChatListPageState extends State<ChatListPage> {
                           ],
                         ),
                       ),
-                    );
+                );
               }
               ChatModel chat = chats[index];
               String otherUserName = chat.sellerId == _chatService.currentUserIdSync
