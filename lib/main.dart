@@ -223,12 +223,15 @@ Future<void> main() async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (userId != null && firebaseUser != null) {
       try {
+        // Replace all old FCM tokens with new refreshed token
+        // This ensures only 1 active token per device, preventing duplicate notifications
         await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
             .set({
-          'fcmTokens': FieldValue.arrayUnion([newToken]),
+          'fcmTokens': [newToken], // Replace entire array with single current token
         }, SetOptions(merge: true));
+        debugPrint('📱 [FCM] ✅ FCM token replaced in Firestore on refresh (removed old tokens)');
       } catch (e) {
         debugPrint('Error saving token to Firestore: $e');
       }
@@ -509,12 +512,15 @@ Future<void> _sendFCMTokenToBackend(String token) async {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (userId != null && firebaseUser != null) {
         try {
+          // Replace all old FCM tokens with current token
+          // This ensures only 1 active token per device, preventing duplicate notifications
           await FirebaseFirestore.instance
               .collection('users')
               .doc(userId)
               .set({
-            'fcmTokens': FieldValue.arrayUnion([token]),
+            'fcmTokens': [token], // Replace entire array with single current token
           }, SetOptions(merge: true));
+          debugPrint('📱 [FCM] ✅ FCM token replaced in Firestore (removed old tokens)');
         } catch (e) {
           debugPrint('Error saving token to Firestore: $e');
         }

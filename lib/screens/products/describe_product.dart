@@ -93,9 +93,9 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
       .replaceAll('rs', '')
       .trim();
 
-  // Check if starts with invalid characters
-  if (cleanedValue.startsWith('.') || cleanedValue.startsWith(',')) {
-    return 'Price cannot start with a decimal point';
+  // Check if contains any non-numeric characters (letters, symbols, decimals, etc.)
+  if (RegExp(r'[^0-9]').hasMatch(cleanedValue)) {
+    return 'Please enter numbers only';
   }
 
   // Check if starts with 0 followed by digits (like 0123)
@@ -103,8 +103,8 @@ class _DescribeProductPageState extends State<DescribeProductPage> {
     return 'Invalid price format';
   }
 
-  // Check if it's a valid number
-  final price = double.tryParse(cleanedValue);
+  // Check if it's a valid number (integer only)
+  final price = int.tryParse(cleanedValue);
   if (price == null) {
     return 'Please enter a valid price';
   }

@@ -193,22 +193,17 @@ class _WalletPageState extends State<WalletPage> with SingleTickerProviderStateM
     return 'Amount can only contain digits';
   }
 
-  // Check for consecutive commas or invalid comma usage
-  if (value.contains(',,') || value.startsWith(',') || value.endsWith(',')) {
-    return 'Invalid amount format';
-  }
+  // Remove spaces for validation
+  final cleanedValue = value.replaceAll(' ', '').trim();
 
-  // Remove spaces and commas for parsing
-  final cleanedValue = value.replaceAll(',', '').replaceAll(' ', '').trim();
-
-  // After cleaning, check if it's empty (means only commas/spaces were entered)
+  // After cleaning, check if it's empty
   if (cleanedValue.isEmpty) {
-    return 'Please enter a valid amount';
+    return null;
   }
 
-  // Check if it contains only digits after cleaning
-  if (!RegExp(r'^\d+$').hasMatch(cleanedValue)) {
-    return 'Amount can only contain digits';
+  // Check if contains any non-numeric characters (letters, symbols, decimals, commas)
+  if (RegExp(r'[^0-9]').hasMatch(cleanedValue)) {
+    return 'Please enter numbers only';
   }
 
   // Parse the amount

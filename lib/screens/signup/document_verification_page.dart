@@ -18,7 +18,8 @@ import '../../app.dart'; // For SlidePageRoute
 
 class DocumentVerificationPage extends StatefulWidget {
   final String email;
-  const DocumentVerificationPage({super.key, required this.email});
+  final String referralCode;
+  const DocumentVerificationPage({super.key, required this.email, this.referralCode = ''});
 
   @override
   State<DocumentVerificationPage> createState() => _DocumentVerificationPageState();
@@ -448,9 +449,23 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
    String? errorMessage;
 
    try {
+     // Get auth token for JWT authentication (requireVerified middleware)
+     final prefs = await SharedPreferences.getInstance();
+     final authToken = prefs.getString('authToken');
+     
      final uri = Uri.parse("https://api.junctionverse.com/user/upload-verification-docs");
      final request = http.MultipartRequest('POST', uri);
      request.fields['email'] = widget.email;
+     
+     // Add referral code if provided
+     if (widget.referralCode.isNotEmpty) {
+       request.fields['userReferralCode'] = widget.referralCode;
+     }
+     
+     // Add JWT token for authentication (requireVerified middleware)
+     if (authToken != null && authToken.isNotEmpty) {
+       request.headers['Authorization'] = 'Bearer $authToken';
+     }
 
      // Read files asynchronously and add to request
      int totalRequestSize = request.fields['email']!.length; // Start with email field size
@@ -512,51 +527,17 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
      setState(() => isLoading = false);
 
      if (response.statusCode == 200) {
-       // Register FCM token after document verification is submitted
-       try {
-         final prefs = await SharedPreferences.getInstance();
-         final authToken = prefs.getString('authToken');
-         
-         if (authToken != null) {
-           debugPrint('📱 [FCM] Registering FCM token after document verification...');
-           final fcmToken = await FirebaseMessaging.instance.getToken();
-           if (fcmToken != null) {
-             debugPrint('📱 [FCM] FCM token retrieved: ${fcmToken.substring(0, 20)}...');
-             
-             // Register with backend
-             try {
-               final fcmResponse = await http.post(
-                 Uri.parse('https://api.junctionverse.com/user/fcm-token'),
-                 headers: {
-                   'Authorization': 'Bearer $authToken',
-                   'Content-Type': 'application/json',
-                 },
-                 body: jsonEncode({'token': fcmToken}),
-               ).timeout(const Duration(seconds: 10));
-               
-               debugPrint('📱 [FCM] Backend registration status: ${fcmResponse.statusCode}');
-               // Note: Firestore save will happen after user logs in and Firebase Auth is signed in
-             } catch (e) {
-               debugPrint('📱 [FCM] ⚠️ Failed to register FCM token with backend: $e');
-               // Don't block document submission if FCM registration fails
-             }
-           }
-         }
-       } catch (e) {
-         debugPrint('📱 [FCM] ⚠️ Error getting FCM token after document verification: $e');
-         // Don't block document submission if FCM token retrieval fails
-       }
+       // FCM token registration removed from document verification flow
+       // Token will be registered after user logs in (see otp_verification_login.dart)
+       // This prevents duplicate tokens and ensures proper cleanup
        
-       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Verification submitted.')),
-         );
-         // Navigate to verification_submitted.dart
-         Navigator.pushReplacement(
-           context,
-           SlidePageRoute(page: const VerificationSubmittedPage()),
-         );
-       }
+      if (context.mounted) {
+        // Navigate to verification_submitted.dart
+        Navigator.pushReplacement(
+          context,
+          SlidePageRoute(page: const VerificationSubmittedPage()),
+        );
+      }
      } else {
        errorMessage = 'Upload failed';
        String responseBody = response.body;

@@ -12,15 +12,11 @@ build/
 pubspec.lock
 
 # Platform-specific generated plugin registrants
-linux/flutter/generated_plugin_registrant.cc
-linux/flutter/generated_plugin_registrant.h
-linux/flutter/generated_plugins.cmake
+linux/
 
-macos/Flutter/GeneratedPluginRegistrant.swift
+macos/
 
-windows/flutter/generated_plugin_registrant.cc
-windows/flutter/generated_plugin_registrant.h
-windows/flutter/generated_plugins.cmake
+windows/
 
 # Tooling local settings
 devtools_options.yaml

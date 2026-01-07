@@ -80,32 +80,70 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (isLoggedIn == true) {
         try {
+          final token = prefs.getString('authToken');
+          if (token == null || token.isEmpty) {
+            await prefs.setBool('isLogin', false);
+            shouldGoToHome = false;
+          } else {
           final result = await AuthHealthService.refreshAuthToken().timeout(
             const Duration(seconds: 10),
             onTimeout: () => {'status': 'timeout'},
           );
-          if (result['status'] == 'refreshed') {
-            if (result['token'] != null) {
-              await prefs.setString('authToken', result['token']);
+          final status = result['status']?.toString() ?? 'network_error';
+
+          if (status == 'refreshed') {
+            final newToken = result['token']?.toString();
+            if (newToken != null && newToken.isNotEmpty) {
+              await prefs.setString('authToken', newToken);
             }
-            // Update AppState with latest user status
+            // Update AppState with latest user status (only available on refresh response)
             final isVerified = result['isVerified'] as bool? ?? false;
             final isOnboarded = result['isOnboarded'] as bool? ?? false;
+            // Persist to SharedPreferences for cold start restoration
+            await prefs.setBool('isVerified', isVerified);
+            await prefs.setBool('isOnboarded', isOnboarded);
             AppState.instance.setUserStatus(
               isVerified: isVerified,
               isOnboarded: isOnboarded,
             );
             shouldGoToHome = true;
-          } else {
+          } else if (status == 'still_valid') {
+            // Token is still valid locally; don't force refresh on every cold start.
+            // Restore user status from SharedPreferences (saved during login)
+            final isVerified = prefs.getBool('isVerified') ?? false;
+            final isOnboarded = prefs.getBool('isOnboarded') ?? false;
+            AppState.instance.setUserStatus(
+              isVerified: isVerified,
+              isOnboarded: isOnboarded,
+            );
+            shouldGoToHome = true;
+          } else if (status == 'timeout' || status == 'network_error') {
+            // Critical behavior: do NOT log out due to network/server issues.
+            // Restore user status from SharedPreferences
+            final isVerified = prefs.getBool('isVerified') ?? false;
+            final isOnboarded = prefs.getBool('isOnboarded') ?? false;
+            AppState.instance.setUserStatus(
+              isVerified: isVerified,
+              isOnboarded: isOnboarded,
+            );
+            debugPrint('⚠️ Auth refresh skipped due to $status. Keeping session.');
+            shouldGoToHome = true;
+          } else if (status == 'expired' || status == 'invalid') {
             await prefs.remove('authToken');
             await prefs.setBool('isLogin', false);
             shouldGoToHome = false;
+          } else {
+            // Fail-open: unknown status shouldn't hard-log users out.
+            debugPrint('⚠️ Unknown auth refresh status: $status. Keeping session.');
+            shouldGoToHome = true;
+          }
           }
         } catch (e) {
           debugPrint('Token refresh error: $e');
-          await prefs.remove('authToken');
-          await prefs.setBool('isLogin', false);
-          shouldGoToHome = false;
+          // Fail-open on unexpected errors to avoid random logouts on cold start.
+          // If token is actually invalid, downstream API calls will return 401 and UI can prompt re-login.
+          final token = prefs.getString('authToken');
+          shouldGoToHome = token != null && token.isNotEmpty;
         }
       }
 

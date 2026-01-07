@@ -227,24 +227,28 @@ Widget build(BuildContext context) {
                   ),
                 ),
 
-                // ❤️ Favourite Icon — now bottom-right
+                // ❤️ Favourite Icon — now bottom-right with expanded touch area
                 Positioned(
-                  bottom: 10,
-                  right: 10,
+                  bottom: 4,  // Adjusted to center the 32px visual within 44px touch area
+                  right: 4,   // Adjusted to center the 32px visual within 44px touch area
                   child: GestureDetector(
                     onTap: () => _toggleFavorite(widget.product.id),
                     child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: const Color(0x33000000), // 0.2 opacity black
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          isFav ? Icons.favorite : Icons.favorite_border,
-                          color: isFav ? const Color(0xFFFF6705) : Colors.white,
-                          size: 16,
+                      // 44×44 px touch area (recommended minimum)
+                      padding: const EdgeInsets.all(6),  // 6px padding = (44-32)/2
+                      child: Container(
+                        width: 32,  // Visual size remains 32×32
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0x33000000), // 0.2 opacity black
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            isFav ? Icons.favorite : Icons.favorite_border,
+                            color: isFav ? const Color(0xFFFF6705) : Colors.white,
+                            size: 16,
+                          ),
                         ),
                       ),
                     ),

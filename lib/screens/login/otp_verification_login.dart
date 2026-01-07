@@ -127,6 +127,9 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
           await prefs.setString('authToken', token);
           await prefs.setString('userId', userId);
           await prefs.setString('fullName', fullName);
+          // Save user status to SharedPreferences for cold start restoration
+          await prefs.setBool('isVerified', isVerified);
+          await prefs.setBool('isOnboarded', isOnboarded);
           // Save isOnboarded to AppState
           AppState.instance.setIsOnboarded(isOnboarded);
         }
@@ -184,7 +187,8 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
                   // Don't block login if FCM registration fails
                 }
                 
-                // Also save to Firestore for Cloud Function
+                // Replace all old FCM tokens with current token in Firestore
+                // This ensures only 1 active token per device, preventing duplicate notifications
                 try {
                   final firebaseUser = FirebaseAuth.instance.currentUser;
                   if (firebaseUser != null) {
@@ -192,9 +196,9 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
                         .collection('users')
                         .doc(userId)
                         .set({
-                      'fcmTokens': FieldValue.arrayUnion([fcmToken]),
+                      'fcmTokens': [fcmToken], // Replace entire array with single current token
                     }, SetOptions(merge: true));
-                    debugPrint('📱 [FCM] ✅ FCM token saved to Firestore after login');
+                    debugPrint('📱 [FCM] ✅ FCM token replaced in Firestore after login (removed old tokens)');
                   } else {
                     debugPrint('📱 [FCM] ⚠️ Firebase Auth not signed in, skipping Firestore save');
                   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -389,58 +390,117 @@ class ApiService {
 /// Lightweight auth helpers used at app launch
 class AuthHealthService {
   /// Attempts to refresh the access token using backend validate-and-refresh API.
-  /// Returns a map with keys: status ('refreshed' | 'expired' | 'invalid' | 'error'),
-  /// and 'token' when refreshed.
-  static Future<Map<String, dynamic>> refreshAuthToken() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('authToken');
-    if (token == null || token.isEmpty) {
-      return {'status': 'invalid'};
-    }
-
-    final uri = Uri.parse('https://api.junctionverse.com/auth/token/refresh');
-    final res = await http.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    ).timeout(const Duration(seconds: 30)); // Add timeout
-
-    debugPrint('🔐 refreshAuthToken: ${res.statusCode}');
-
-    if (res.statusCode == 200) {
-      final data = json.decode(res.body);
-      final newToken = data['token']?.toString();
-      if (newToken != null && newToken.isNotEmpty) {
-        // Extract user status from response
-        final user = data['user'];
-        return {
-          'status': 'refreshed',
-          'token': newToken,
-          'isVerified': user?['isVerified'] ?? false,
-          'isOnboarded': user?['isOnboarded'] ?? false,
-        };
-      }
-      return {'status': 'invalid'};
-    }
-
-    // Remove 404 special case - treat as error
-    if (res.statusCode == 401) {
-      try {
-        final data = json.decode(res.body);
-        final status = data['status']?.toString() ?? 'invalid';
-        return {'status': status};
-      } catch (_) {
+  /// Returns a map with keys:
+  /// - status: 'refreshed' | 'still_valid' | 'expired' | 'invalid' | 'timeout' | 'network_error'
+  /// - token: when refreshed
+  /// - isVerified / isOnboarded: when refreshed (from backend)
+  static Future<Map<String, dynamic>> refreshAuthToken({
+    Duration refreshIfExpiringWithin = const Duration(hours: 6),
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      if (token == null || token.isEmpty) {
         return {'status': 'invalid'};
       }
-    }
 
-    return {'status': 'invalid'}; // All other cases = invalid
-  } catch (e) {
-    debugPrint('🔐 refreshAuthToken error: $e');
-    return {'status': 'invalid'}; // Simplify error handling
+      // Local expiry check first to avoid logging users out due to network issues.
+      final expiry = _JwtTokenUtils.tryGetExpiry(token);
+      if (expiry != null) {
+        if (_JwtTokenUtils.isExpired(expiry)) {
+          return {'status': 'expired'};
+        }
+        if (!_JwtTokenUtils.isNearExpiry(expiry, within: refreshIfExpiringWithin)) {
+          return {'status': 'still_valid'};
+        }
+      }
+
+      final uri = Uri.parse('https://api.junctionverse.com/auth/token/refresh');
+      final res = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('🔐 refreshAuthToken: ${res.statusCode}');
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final newToken = data['token']?.toString();
+        if (newToken != null && newToken.isNotEmpty) {
+          final user = data['user'];
+          return {
+            'status': 'refreshed',
+            'token': newToken,
+            'isVerified': user?['isVerified'] ?? false,
+            'isOnboarded': user?['isOnboarded'] ?? false,
+          };
+        }
+        return {'status': 'invalid'};
+      }
+
+      if (res.statusCode == 401) {
+        // Token is rejected by backend.
+        // Treat as expired/invalid (don't guess which unless backend provides a status).
+        try {
+          final data = json.decode(res.body);
+          final status = data['status']?.toString();
+          if (status == 'expired') return {'status': 'expired'};
+        } catch (_) {}
+        return {'status': 'invalid'};
+      }
+
+      // 5xx / 429 / 408 etc: don't log out; treat as network/server error.
+      return {'status': 'network_error'};
+    } on TimeoutException catch (_) {
+      return {'status': 'timeout'};
+    } catch (e) {
+      debugPrint('🔐 refreshAuthToken error: $e');
+      return {'status': 'network_error'};
+    }
   }
 }
+
+/// Minimal JWT helper for local expiry checks (no extra deps).
+class _JwtTokenUtils {
+  static DateTime? tryGetExpiry(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      final payloadPart = parts[1];
+      final payloadJson = _decodeBase64UrlToString(payloadPart);
+      final payload = json.decode(payloadJson);
+      final exp = payload is Map ? payload['exp'] : null;
+      if (exp is int) {
+        return DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
+      }
+      if (exp is String) {
+        final parsed = int.tryParse(exp);
+        if (parsed != null) {
+          return DateTime.fromMillisecondsSinceEpoch(parsed * 1000, isUtc: true);
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool isExpired(DateTime expiryUtc, {Duration clockSkew = const Duration(seconds: 30)}) {
+    final nowUtc = DateTime.now().toUtc();
+    return nowUtc.isAfter(expiryUtc.subtract(clockSkew));
+  }
+
+  static bool isNearExpiry(DateTime expiryUtc, {required Duration within}) {
+    final nowUtc = DateTime.now().toUtc();
+    return expiryUtc.isBefore(nowUtc.add(within));
+  }
+
+  static String _decodeBase64UrlToString(String input) {
+    final normalized = base64Url.normalize(input);
+    final bytes = base64Url.decode(normalized);
+    return utf8.decode(bytes);
+  }
 }

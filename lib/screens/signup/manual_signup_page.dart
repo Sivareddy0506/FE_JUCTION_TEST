@@ -7,6 +7,7 @@ import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/privacy_policy_link.dart';
+import '../../widgets/university_autocomplete.dart';
 import './otp_verification_non_edu.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../../utils/error_handler.dart';
@@ -42,6 +43,7 @@ class _ManualSignupPageState extends State<ManualSignupPage> {
   String? enrollmentYear;
   String? graduationMonth;
   String? graduationYear;
+  String? selectedUniversityId; // Store selected university ID
 
   bool loading = false;
 
@@ -193,6 +195,7 @@ class _ManualSignupPageState extends State<ManualSignupPage> {
       "phoneNumber": phoneNumberController.text,
       "homeAddress": homeAddressController.text,
       "university": collegeNameController.text,
+      if (selectedUniversityId != null) "universityId": selectedUniversityId,
       "enrollmentYear": int.parse(enrollmentYear!),
       "enrollmentMonth": enrollmentMonth,
       "graduationYear": int.parse(graduationYear!),
@@ -264,7 +267,20 @@ Container(
 const SizedBox(height: 16),
                     const Text('University Details', style: TextStyle(fontSize: 14, color: Color(0xFF212121))),
                 const SizedBox(height: 16),
-                    _buildTextField('College Name *', collegeNameController, _onUniversityChanged, universityError, maxUniversityNameLength),
+                    UniversityAutocomplete(
+                      label: 'College Name',
+                      placeholder: 'Enter or select your college',
+                      controller: collegeNameController,
+                      onChanged: _onUniversityChanged,
+                      onUniversitySelected: (universityId, universityName) {
+                        setState(() {
+                          selectedUniversityId = universityId; // Will be null if user manually edited
+                          universityError = null;
+                        });
+                      },
+                      errorText: universityError,
+                      maxLength: maxUniversityNameLength,
+                    ),
                     const SizedBox(height: 16),
                    _buildDualDropdown(
   label: 'Enrollment',

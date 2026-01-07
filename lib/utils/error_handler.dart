@@ -2,6 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+/// Cooldown trackers to prevent snackbar spam
+DateTime? _lastErrorSnackbarShown;
+DateTime? _lastSuccessSnackbarShown;
+const _snackbarCooldown = Duration(milliseconds: 500); // 500ms cooldown
+
 /// Centralized error handling utility for user-friendly error messages
 class ErrorHandler {
   /// Get a user-friendly error message from an exception or HTTP response
@@ -219,7 +224,17 @@ class ErrorHandler {
   }) {
     if (!context.mounted) return;
 
+    // Cooldown check: prevent spam
+    final now = DateTime.now();
+    if (_lastErrorSnackbarShown != null && 
+        now.difference(_lastErrorSnackbarShown!) < _snackbarCooldown) {
+      return; // Skip showing snackbar if within cooldown
+    }
+
     final message = customMessage ?? getErrorMessage(error, response: response);
+
+    // Clear any existing snackbars before showing new one to prevent stacking
+    ScaffoldMessenger.of(context).clearSnackBars();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -236,6 +251,8 @@ class ErrorHandler {
         duration: duration,
       ),
     );
+    
+    _lastErrorSnackbarShown = now;
   }
 
   /// Show success snackbar
@@ -245,6 +262,16 @@ class ErrorHandler {
     Duration duration = const Duration(seconds: 3),
   }) {
     if (!context.mounted) return;
+
+    // Cooldown check: prevent spam
+    final now = DateTime.now();
+    if (_lastSuccessSnackbarShown != null && 
+        now.difference(_lastSuccessSnackbarShown!) < _snackbarCooldown) {
+      return; // Skip showing snackbar if within cooldown
+    }
+
+    // Clear any existing snackbars before showing new one to prevent stacking
+    ScaffoldMessenger.of(context).clearSnackBars();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -261,6 +288,8 @@ class ErrorHandler {
         duration: duration,
       ),
     );
+    
+    _lastSuccessSnackbarShown = now;
   }
 }
 

@@ -8,6 +8,7 @@ import 'dart:async';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
+import '../../widgets/university_autocomplete.dart';
 import 'terms_and_conditions.dart';
 import '../../widgets/headding_description.dart';
 import '../../app.dart';
@@ -55,6 +56,7 @@ class _EduDetailsPageState extends State<EduDetailsPage> {
   String? enrollmentYear;
   String? graduationMonth;
   String? graduationYear;
+  String? selectedUniversityId; // Store selected university ID
 
   bool loading = false;
 
@@ -292,6 +294,7 @@ void _onHomeAddressChanged(String value) {
       "phoneNumber": phoneNumberController.text,
       "homeAddress": homeAddressController.text,
       "university": collegeNameController.text,
+      if (selectedUniversityId != null) "universityId": selectedUniversityId,
       "enrollmentYear": int.parse(enrollmentYear!),
       "enrollmentMonth": enrollmentMonth,
       "graduationYear": int.parse(graduationYear!),
@@ -324,40 +327,9 @@ void _onHomeAddressChanged(String value) {
           debugPrint('📱 [Signup] ⚠️ Failed to save userId: $e');
         }
         
-        // Register FCM token after onboarding completes
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          final authToken = prefs.getString('authToken');
-          
-          if (authToken != null) {
-            debugPrint('📱 [FCM] Registering FCM token after onboarding...');
-            final fcmToken = await FirebaseMessaging.instance.getToken();
-            if (fcmToken != null) {
-              debugPrint('📱 [FCM] FCM token retrieved: ${fcmToken.substring(0, 20)}...');
-              
-              // Register with backend
-              try {
-                final fcmResponse = await http.post(
-                  Uri.parse('https://api.junctionverse.com/user/fcm-token'),
-                  headers: {
-                    'Authorization': 'Bearer $authToken',
-                    'Content-Type': 'application/json',
-                  },
-                  body: jsonEncode({'token': fcmToken}),
-                ).timeout(const Duration(seconds: 10));
-                
-                debugPrint('📱 [FCM] Backend registration status: ${fcmResponse.statusCode}');
-                // Note: Firestore save will happen after user logs in and Firebase Auth is signed in
-              } catch (e) {
-                debugPrint('📱 [FCM] ⚠️ Failed to register FCM token with backend: $e');
-                // Don't block onboarding if FCM registration fails
-              }
-            }
-          }
-        } catch (e) {
-          debugPrint('📱 [FCM] ⚠️ Error getting FCM token after onboarding: $e');
-          // Don't block onboarding if FCM token retrieval fails
-        }
+        // FCM token registration removed from onboarding flow
+        // Token will be registered after user logs in (see otp_verification_login.dart)
+        // This prevents duplicate tokens and ensures proper cleanup
         
         Navigator.pushReplacement(
           context,
@@ -522,43 +494,20 @@ const SizedBox(height: 16),
                   // University Details label
                   const Text('University Details', style: TextStyle(fontSize: 14, color: Color(0xFF212121))),
                   const SizedBox(height: 16),
-                  // University Name field with validation
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppTextField(
-                        label: 'University Name *',
-                        placeholder: 'Eg: XYZ University',
-                        controller: collegeNameController,
-                        onChanged: _onUniversityChanged,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, left: 12, right: 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (universityError != null)
-                              Expanded(
-                                child: Text(
-                                  universityError!,
-                                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                                ),
-                              )
-                            else
-                              const SizedBox.shrink(),
-                            Text(
-                              '${collegeNameController.text.length}/$maxUniversityNameLength',
-                              style: TextStyle(
-                                color: collegeNameController.text.length > maxUniversityNameLength
-                                    ? Colors.red
-                                    : Colors.grey[600],
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  // University Name field with autocomplete
+                  UniversityAutocomplete(
+                    label: 'University Name',
+                    placeholder: 'Enter or select your university',
+                    controller: collegeNameController,
+                    onChanged: _onUniversityChanged,
+                    onUniversitySelected: (universityId, universityName) {
+                      setState(() {
+                        selectedUniversityId = universityId; // Will be null if user manually edited
+                        universityError = null;
+                      });
+                    },
+                    errorText: universityError,
+                    maxLength: maxUniversityNameLength,
                   ),
                   const SizedBox(height: 16),
                   // Divider before enrollment/graduation

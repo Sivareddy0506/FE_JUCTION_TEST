@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/form_text.dart';
@@ -23,27 +25,80 @@ class ReferralCodePage extends StatefulWidget {
 class _ReferralCodePageState extends State<ReferralCodePage> {
   final TextEditingController codeController = TextEditingController();
   bool isLoading = false;
+  String? errorMessage;
 
   Future<void> _submitCode() async {
     final code = codeController.text.trim();
-    setState(() => isLoading = true);
-    //TODO: Implement referral code verification API call here
-    try {
-      if (!mounted) return;
+    
+    if (code.isEmpty) {
+      // If empty, proceed with empty referral code (skip scenario)
       Navigator.push(
         context,
         SlidePageRoute(
           page: EduDetailsPage(
             email: widget.email,
             otp: widget.otp,
-            referralCode: code,
+            referralCode: '',
           ),
         ),
       );
-    } catch (_) {
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      // Validate referral code
+      final uri = Uri.parse('https://api.junctionverse.com/user/validate-referral-code');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'referralCode': code}),
+      );
+
+      if (!mounted) return;
+
+      final responseBody = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseBody['valid'] == true) {
+        // Valid referral code - proceed
+        Navigator.push(
+          context,
+          SlidePageRoute(
+            page: EduDetailsPage(
+              email: widget.email,
+              otp: widget.otp,
+              referralCode: code,
+            ),
+          ),
+        );
+      } else {
+        // Invalid referral code
+        setState(() {
+          errorMessage = responseBody['error'] ?? 'Invalid referral code';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage ?? 'Invalid referral code'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
+        setState(() {
+          errorMessage = 'Failed to validate referral code. Please try again.';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit referral code')),
+          SnackBar(
+            content: Text(errorMessage ?? 'Failed to submit referral code'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -91,6 +146,14 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
               placeholder: 'Enter referral code',
               controller: codeController,
             ),
+            if (errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 12),
+                child: Text(
+                  errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
             const Spacer(),
             AppButton(
               bottomSpacing: 10,

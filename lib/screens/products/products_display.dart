@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../profile/user_profile.dart';
 import '../profile/others_profile.dart';
 import '../../app.dart'; // For SlidePageRoute
+import '../../utils/feature_lock.dart';
 
 class ProductListingPage extends StatefulWidget {
   final String title;
@@ -124,6 +125,9 @@ class _ProductListingPageState extends State<ProductListingPage> {
     if (sellerId == currentUserId) {
       Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
     } else {
+      // Restrict access to other users' profiles for non-onboarded users
+      if (lockIfNotOnboarded(context)) return;
+      
       Navigator.push(
         context,
         SlidePageRoute(

@@ -286,74 +286,119 @@ class _EditListingPageState extends State<EditListingPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (bottomSheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            String? priceError;
+            
+            // Validation function for numeric-only input
+            String? _validateNumericPrice(String value) {
+              if (value.isEmpty) return null;
+              final cleanedValue = value.replaceAll(' ', '');
+              if (cleanedValue.isEmpty) return null;
+              
+              // Check if contains any non-numeric characters
+              if (RegExp(r'[^0-9]').hasMatch(cleanedValue)) {
+                return 'Please enter numbers only';
+              }
+              
+              final price = int.tryParse(cleanedValue);
+              if (price == null || price <= 0) {
+                return 'Please enter a valid price';
+              }
+              
+              return null;
+            }
+            
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Edit Price',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Edit Price',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(bottomSheetContext),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                    ],
+                    decoration: const InputDecoration(
+                      hintText: 'Enter price',
+                      prefixText: '₹ ',
+                      border: OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                    onChanged: (value) {
+                      setModalState(() {
+                        priceError = _validateNumericPrice(value);
+                      });
+                    },
+                  ),
+                  if (priceError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 12),
+                      child: Text(
+                        priceError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppButton(
+                          label: 'Cancel',
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          backgroundColor: Colors.white,
+                          textColor: const Color(0xFF262626),
+                          borderColor: const Color(0xFF262626),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppButton(
+                          label: 'Save',
+                          onPressed: priceError != null || priceController.text.trim().isEmpty
+                              ? null
+                              : () {
+                                  final validationError = _validateNumericPrice(priceController.text.trim());
+                                  if (validationError != null) {
+                                    setModalState(() {
+                                      priceError = validationError;
+                                    });
+                                    return;
+                                  }
+                                  Navigator.pop(bottomSheetContext, priceController.text.trim());
+                                },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: priceController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
-                ],
-                decoration: const InputDecoration(
-                  hintText: 'Enter price',
-                  prefixText: '₹ ',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      label: 'Cancel',
-                      onPressed: () => Navigator.pop(bottomSheetContext),
-                      backgroundColor: Colors.white,
-                      textColor: const Color(0xFF262626),
-                      borderColor: const Color(0xFF262626),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppButton(
-                      label: 'Save',
-                      onPressed: () {
-                        if (priceController.text.trim().isNotEmpty) {
-                          Navigator.pop(bottomSheetContext, priceController.text.trim());
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

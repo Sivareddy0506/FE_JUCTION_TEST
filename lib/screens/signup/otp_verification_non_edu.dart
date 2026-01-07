@@ -78,35 +78,9 @@ class _OTPVerificationNonEduPageState extends State<OtpVerificationNonEduPage> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('authToken', token);
           
-          // Register FCM token after OTP verification
-          try {
-            debugPrint('📱 [FCM] Registering FCM token after non-edu OTP verification...');
-            final fcmToken = await FirebaseMessaging.instance.getToken();
-            if (fcmToken != null) {
-              debugPrint('📱 [FCM] FCM token retrieved: ${fcmToken.substring(0, 20)}...');
-              
-              // Register with backend
-              try {
-                final fcmResponse = await http.post(
-                  Uri.parse('https://api.junctionverse.com/user/fcm-token'),
-                  headers: {
-                    'Authorization': 'Bearer $token',
-                    'Content-Type': 'application/json',
-                  },
-                  body: jsonEncode({'token': fcmToken}),
-                ).timeout(const Duration(seconds: 10));
-                
-                debugPrint('📱 [FCM] Backend registration status: ${fcmResponse.statusCode}');
-                // Note: Firestore save will happen after user logs in and Firebase Auth is signed in
-              } catch (e) {
-                debugPrint('📱 [FCM] ⚠️ Failed to register FCM token with backend: $e');
-                // Don't block OTP verification if FCM registration fails
-              }
-            }
-          } catch (e) {
-            debugPrint('📱 [FCM] ⚠️ Error getting FCM token after non-edu OTP verification: $e');
-            // Don't block OTP verification if FCM token retrieval fails
-          }
+          // FCM token registration removed from non-edu OTP verification flow
+          // Token will be registered after user logs in (see otp_verification_login.dart)
+          // This prevents duplicate tokens and ensures proper cleanup
         }
 
         if (!mounted) return;

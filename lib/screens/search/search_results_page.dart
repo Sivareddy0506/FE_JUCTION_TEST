@@ -14,6 +14,7 @@ import '../profile/others_profile.dart';
 import '../profile/empty_state.dart';
 import '../../app.dart'; // For SlidePageRoute
 import '../../widgets/app_button.dart';
+import '../../utils/feature_lock.dart';
 
 class SearchResultsPage extends StatefulWidget {
   final String searchQuery;
@@ -115,6 +116,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     if (sellerId == currentUserId) {
       Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
     } else {
+      // Restrict access to other users' profiles for non-onboarded users
+      if (lockIfNotOnboarded(context)) return;
+      
       Navigator.push(
         context,
         SlidePageRoute(

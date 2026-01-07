@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:junction/screens/Chat/chat_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1222,6 +1223,9 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
             if (sellerId == _chatService.currentUserIdSync) {
               Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
             } else {
+              // Restrict access to other users' profiles for non-onboarded users
+              if (lockIfNotOnboarded(context)) return;
+              
               Navigator.push(
                 context,
                 SlidePageRoute(
@@ -1868,16 +1872,62 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                 ),
               ),
               const SizedBox(height: 20),
-              TextField(
-                controller: priceController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Sale Price (₹)',
-                  hintText: 'Enter amount',
-                  border: OutlineInputBorder(),
-                  prefixText: '₹ ',
-                ),
-                autofocus: true,
+              StatefulBuilder(
+                builder: (context, setModalState) {
+                  String? priceError;
+                  
+                  // Validation function for numeric-only input
+                  String? _validateNumericPrice(String value) {
+                    if (value.isEmpty) return null;
+                    final cleanedValue = value.replaceAll(' ', '');
+                    if (cleanedValue.isEmpty) return null;
+                    
+                    // Check if contains any non-numeric characters
+                    if (RegExp(r'[^0-9]').hasMatch(cleanedValue)) {
+                      return 'Please enter numbers only';
+                    }
+                    
+                    final price = int.tryParse(cleanedValue);
+                    if (price == null || price <= 0) {
+                      return 'Please enter a valid price';
+                    }
+                    
+                    return null;
+                  }
+                  
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: priceController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Sale Price (₹)',
+                          hintText: 'Enter amount',
+                          border: OutlineInputBorder(),
+                          prefixText: '₹ ',
+                        ),
+                        autofocus: true,
+                        onChanged: (value) {
+                          setModalState(() {
+                            priceError = _validateNumericPrice(value);
+                          });
+                        },
+                      ),
+                      if (priceError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 12),
+                          child: Text(
+                            priceError!,
+                            style: const TextStyle(color: Colors.red, fontSize: 12),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 24),
               Row(
@@ -1893,27 +1943,41 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: AppButton(
-                      label: 'Continue',
-                      onPressed: () {
-                        final priceText = priceController.text.trim();
-                        if (priceText.isEmpty) {
-                          ScaffoldMessenger.of(priceContext).showSnackBar(
-                            const SnackBar(content: Text('Please enter a sale price')),
-                          );
-                          return;
+                    child: StatefulBuilder(
+                      builder: (context, setButtonState) {
+                        String? validateBeforeSubmit() {
+                          final priceText = priceController.text.trim();
+                          if (priceText.isEmpty) {
+                            return 'Please enter a sale price';
+                          }
+                          final cleanedValue = priceText.replaceAll(' ', '');
+                          if (RegExp(r'[^0-9]').hasMatch(cleanedValue)) {
+                            return 'Please enter numbers only';
+                          }
+                          final price = int.tryParse(cleanedValue);
+                          if (price == null || price <= 0) {
+                            return 'Please enter a valid price';
+                          }
+                          return null;
                         }
-                        final price = double.tryParse(priceText);
-                        if (price == null || price <= 0) {
-                          ScaffoldMessenger.of(priceContext).showSnackBar(
-                            const SnackBar(content: Text('Please enter a valid price')),
-                          );
-                          return;
-                        }
-                        Navigator.pop(priceContext, priceText);
+                        
+                        return AppButton(
+                          label: 'Continue',
+                          onPressed: () {
+                            final validationError = validateBeforeSubmit();
+                            if (validationError != null) {
+                              setButtonState(() {});
+                              ScaffoldMessenger.of(priceContext).showSnackBar(
+                                SnackBar(content: Text(validationError)),
+                              );
+                              return;
+                            }
+                            Navigator.pop(priceContext, priceController.text.trim());
+                          },
+                          backgroundColor: const Color(0xFF262626),
+                          textColor: Colors.white,
+                        );
                       },
-                      backgroundColor: const Color(0xFF262626),
-                      textColor: Colors.white,
                     ),
                   ),
                 ],

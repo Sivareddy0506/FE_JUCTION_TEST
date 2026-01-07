@@ -17,6 +17,7 @@ import '../../app.dart';
 import '../profile/user_profile.dart';
 import '../profile/others_profile.dart';
 import '../../utils/error_handler.dart';
+import '../../utils/feature_lock.dart';
 
 class ChatPage extends StatefulWidget {
   final String chatId;
@@ -66,6 +67,9 @@ class _ChatPageState extends State<ChatPage> {
   
   // Track current scroll position to prevent jumps
   double _currentScrollPosition = 0.0;
+  
+  // Track scroll offset for keyboard dismissal
+  double _lastScrollOffset = 0.0;
   
   // Product status
   String? _productStatus;
@@ -1127,6 +1131,9 @@ void _showCancelDealConfirmation(ChatModel chatData) {
         if (otherUserId == _chatService.currentUserIdSync) {
           Navigator.push(context, SlidePageRoute(page: const UserProfilePage()));
         } else {
+          // Restrict access to other users' profiles for non-onboarded users
+          if (lockIfNotOnboarded(context)) return;
+          
           Navigator.push(
             context,
             SlidePageRoute(
@@ -1330,15 +1337,34 @@ void _showCancelDealConfirmation(ChatModel chatData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(bottom: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    MessageModel message = messages[index];
-                    // Use cached chat data
-                    return _buildMessage(message, _cachedChatData!);
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (ScrollNotification notification) {
+                    if (notification is ScrollUpdateNotification) {
+                      final currentOffset = notification.metrics.pixels;
+                      final scrollDelta = currentOffset - _lastScrollOffset;
+                      
+                      // If user scrolled up by more than 50px, dismiss keyboard
+                      if (scrollDelta < -50 && _messageFocusNode.hasFocus) {
+                        FocusScope.of(context).unfocus();
+                      }
+                      
+                      _lastScrollOffset = currentOffset;
+                    } else if (notification is ScrollStartNotification) {
+                      // Reset tracking when scroll starts
+                      _lastScrollOffset = notification.metrics.pixels;
+                    }
+                    return false; // Allow scroll event to propagate
                   },
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.only(bottom: 8),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      MessageModel message = messages[index];
+                      // Use cached chat data
+                      return _buildMessage(message, _cachedChatData!);
+                    },
+                  ),
                 );
               },
             ),
@@ -1487,7 +1513,30 @@ void _showQuotePriceBottomSheet(ChatModel chatData) {
   bool hasStartedCountdown = false;
   bool isSending = false;
   String? localError;
+  String? priceError;
   bool modalMounted = true;
+  
+  // Validation function for numeric-only input
+  String? _validateNumericPrice(String value) {
+    if (value.isEmpty) return null;
+    
+    // Remove spaces and check if contains non-numeric characters
+    final cleanedValue = value.replaceAll(' ', '');
+    if (cleanedValue.isEmpty) return null;
+    
+    // Check if contains any non-numeric characters (letters, symbols, decimals, commas)
+    if (RegExp(r'[^0-9]').hasMatch(cleanedValue)) {
+      return 'Please enter numbers only';
+    }
+    
+    // Check if it's a valid number
+    final price = int.tryParse(cleanedValue);
+    if (price == null || price <= 0) {
+      return 'Please enter a valid price';
+    }
+    
+    return null;
+  }
   final messenger = ScaffoldMessenger.of(context);
   debugPrint('[QuoteSheet] Initial cooldown remaining: $remainingSeconds seconds');
 
@@ -1577,7 +1626,20 @@ void _showQuotePriceBottomSheet(ChatModel chatData) {
                     keyboardType: TextInputType.number,
                     controller: priceController,
                     prefixText: '₹ ',
+                    onChanged: (value) {
+                      setModalState(() {
+                        priceError = _validateNumericPrice(value);
+                      });
+                    },
                   ),
+                  if (priceError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 12),
+                      child: Text(
+                        priceError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   if (isInCooldown) ...[
                     Container(
@@ -1653,18 +1715,33 @@ void _showQuotePriceBottomSheet(ChatModel chatData) {
                       Expanded(
                         child: AppButton(
                           label: isSending ? 'Sending...' : 'Send Quote',
-                          onPressed: (isSending || isInCooldown)
+                          onPressed: (isSending || isInCooldown || priceError != null)
                               ? null
                               : () async {
                                   final rawText = priceController.text.trim();
                                   if (rawText.isEmpty) {
-                                    setModalState(() => localError = 'Please enter a price');
+                                    setModalState(() {
+                                      localError = 'Please enter a price';
+                                      priceError = 'Please enter a price';
+                                    });
                                     return;
                                   }
 
-                                  final parsedPrice = double.tryParse(rawText.replaceAll(',', ''));
+                                  // Re-validate before submitting
+                                  final validationError = _validateNumericPrice(rawText);
+                                  if (validationError != null) {
+                                    setModalState(() {
+                                      priceError = validationError;
+                                    });
+                                    return;
+                                  }
+
+                                  final parsedPrice = double.tryParse(rawText.replaceAll(' ', ''));
                                   if (parsedPrice == null || parsedPrice <= 0) {
-                                    setModalState(() => localError = 'Please enter a valid price');
+                                    setModalState(() {
+                                      localError = 'Please enter a valid price';
+                                      priceError = 'Please enter a valid price';
+                                    });
                                     return;
                                   }
 

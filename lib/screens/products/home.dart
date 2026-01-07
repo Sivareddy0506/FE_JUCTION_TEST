@@ -107,6 +107,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final isOnboarded = result['isOnboarded'] as bool? ?? false;
         final wasOnboarded = AppState.instance.isOnboarded;
         
+        // Persist to SharedPreferences for cold start restoration
+        await prefs.setBool('isVerified', isVerified);
+        await prefs.setBool('isOnboarded', isOnboarded);
+        
         // Update AppState with latest status
         AppState.instance.setUserStatus(
           isVerified: isVerified,

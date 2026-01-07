@@ -58,9 +58,10 @@ class BottomNavBar extends StatelessWidget {
     final fontSize = (screenWidth * 0.03).clamp(11.0, 14.0); // responsive font
 
     final isOnboarded = AppState.instance.isOnboarded;
+    // Lock marketplace features (Post, Jauction) for non-onboarded users
+    // Profile remains accessible so users can logout and view their status
     final isLocked = !isOnboarded && (label.toLowerCase() == 'post' || 
-                                      label.toLowerCase() == 'jauction' || 
-                                      label.toLowerCase() == 'profile');
+                                      label.toLowerCase() == 'jauction');
 
     return Expanded(
       child: GestureDetector(
@@ -76,8 +77,13 @@ class BottomNavBar extends StatelessWidget {
           if (lowerLabel == 'home') {
             // Navigate to home using same pattern as other tabs (no slider)
             final targetRoute = lowerLabel;
-            if (!isActive) {
-              NavigationManager.setCurrentRoute(targetRoute);
+            NavigationManager.setCurrentRoute(targetRoute);
+
+            if (isActive) {
+              // If user is already on the Home tab but has navigated deeper (search/category/product/etc),
+              // tapping Home should bring them back to the root Home screen.
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            } else {
               final targetPage = NavigationManager.getPreservedPage(targetRoute);
 
               Navigator.pushReplacement(
