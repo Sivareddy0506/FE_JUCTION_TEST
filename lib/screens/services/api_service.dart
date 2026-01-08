@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
+import '../../models/promotional_banner.dart';
 import '../../services/cache_manager.dart';
 import '../../services/app_cache_service.dart';
 import '../../services/search_service.dart';
@@ -284,6 +285,71 @@ class ApiService {
   static Future<void> clearAdCache() async {
     await _cacheManager.invalidateCache(CacheConfig.adsKey);
     debugPrint('ApiService: Cleared ad cache');
+  }
+
+  /// Fetch active promotional banner for a specific position
+  static Future<PromotionalBanner?> fetchPromotionalBanner(String position) async {
+    try {
+      final uri = Uri.parse('https://api.junctionverse.com/api/promotional-banner/active/$position');
+      final res = await http.get(uri);
+
+      debugPrint('🔍 fetchPromotionalBanner ($position): ${res.statusCode}');
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data != null && data is Map && data.isNotEmpty) {
+          final banner = PromotionalBanner.fromJson(Map<String, dynamic>.from(data));
+          debugPrint('✅ Promotional banner fetched: ${banner.title}');
+          return banner;
+        }
+        // If data is null, no active banner for this position
+        debugPrint('ℹ️ No active banner for position: $position');
+        return null;
+      } else {
+        debugPrint('❌ Failed to fetch promotional banner: ${res.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching promotional banner: $e');
+      return null;
+    }
+  }
+
+  /// Fetch promotional banner with caching
+  static Future<PromotionalBanner?> fetchPromotionalBannerWithCache(String position) async {
+    try {
+      // Check cache first
+      final cacheKey = '${CacheConfig.promotionalBannerKeyPrefix}$position';
+      final cachedBanner = await _cacheManager.getCachedData<PromotionalBanner>(cacheKey);
+      if (cachedBanner != null) {
+        debugPrint('ApiService: Returning cached promotional banner for $position');
+        return cachedBanner;
+      }
+
+      // Fetch from API if not cached
+      final banner = await fetchPromotionalBanner(position);
+      if (banner != null) {
+        // Cache the banner
+        await _cacheManager.setCachedData(
+          cacheKey,
+          banner,
+          expiry: CacheConfig.promotionalBannerExpiry,
+        );
+        debugPrint('ApiService: Cached promotional banner for $position');
+      }
+
+      return banner;
+    } catch (e) {
+      debugPrint('❌ Error in fetchPromotionalBannerWithCache: $e');
+      return null;
+    }
+  }
+
+  /// Clear promotional banner cache for a specific position
+  static Future<void> clearPromotionalBannerCache(String position) async {
+    final cacheKey = '${CacheConfig.promotionalBannerKeyPrefix}$position';
+    await _cacheManager.invalidateCache(cacheKey);
+    debugPrint('ApiService: Cleared promotional banner cache for $position');
   }
 
   static Future<void> clearAllCaches() async {

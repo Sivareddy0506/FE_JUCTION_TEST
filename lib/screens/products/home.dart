@@ -8,11 +8,13 @@ import '../../widgets/location_display_widget.dart';
 import '../../models/product.dart';
 import './horizontal_product_list.dart';
 import './ad_banner_widget.dart';
+import './promotional_banner_widget.dart';
 import '../services/api_service.dart';
 import '../../services/favorites_service.dart';
 import './products_display.dart';
 import '../../app.dart';
 import '../../app_state.dart';
+import '../../models/promotional_banner.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,6 +36,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<Product> trendingProducts = [];
   String adUrl1 = '';
   String adUrl2 = '';
+  PromotionalBanner? categoryBanner; // Banner for category_below position
   bool _isLoggedIn = false;
   
   // Separate flags for different data sources
@@ -305,6 +308,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               debugPrint('HomePage: Error fetching ads: $e');
               return <String>[];
             }),
+        
+        ApiService.fetchPromotionalBannerWithCache('category_below')
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                debugPrint('HomePage: fetchPromotionalBannerWithCache timed out');
+                return null;
+              },
+            )
+            .catchError((e) {
+              debugPrint('HomePage: Error fetching promotional banner: $e');
+              return null;
+            }),
       ], eagerError: false); // Don't fail all if one fails
 
       // Extract results
@@ -313,6 +329,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final trending = results[2] as List<Product>;
       final searched = results[3] as List<Product>;
       final ads = results[4] as List<String>;
+      final banner = results[5] as PromotionalBanner?;
 
       debugPrint("HomePage: API data fetched successfully");
       debugPrint("📦 lastViewedProducts: ${lastViewed.length}");
@@ -320,6 +337,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       debugPrint("📦 trendingProducts: ${trending.length}");
       debugPrint("📦 previousSearchProducts: ${searched.length}");
       debugPrint("📸 Ad URLs: $ads");
+      debugPrint("🎯 Promotional Banner: ${banner != null ? banner.title : 'None'}");
 
       if (mounted) {
         setState(() {
@@ -328,6 +346,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           allProducts = latest;
           trendingProducts = trending;
           previousSearchProducts = searched;
+          categoryBanner = banner;
           if (ads.isNotEmpty) {
             adUrl1 = ads[0];
             adUrl2 = ads.length > 1 ? ads[1] : ads[0];
@@ -349,6 +368,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           previousSearchProducts = [];
           adUrl1 = '';
           adUrl2 = '';
+          categoryBanner = null;
         });
       }
     }
@@ -422,7 +442,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         height: 130,
                         child: CategoryGrid(),
                       ),
-                      const SizedBox(height: 10), // Reduced from 16 to 10
+                      const SizedBox(height: 6), // Reduced spacing below categories
+                      // Promotional Banner (if available)
+                      if (categoryBanner != null) ...[
+                        debugLogWidget('PromotionalBannerWidget: category_below'),
+                        PromotionalBannerWidget(banner: categoryBanner!),
+                        const SizedBox(height: 10),
+                      ],
                       ..._buildProductSection(
                         title: 'Last Viewed',
                         products: lastViewedProducts,

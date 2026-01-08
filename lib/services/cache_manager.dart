@@ -410,6 +410,7 @@ class CacheConfig {
   static const Duration productsExpiry = Duration(minutes: 30);
   static const Duration profileExpiry = Duration(hours: 1);
   static const Duration adsExpiry = Duration(hours: 2);
+  static const Duration promotionalBannerExpiry = Duration(hours: 1);
   static const Duration favoritesExpiry = Duration.zero; // Real-time, no expiry
   
   // Cache keys
@@ -424,6 +425,7 @@ class CacheConfig {
   static const String todayAuctionsKey = 'today_auctions';
   static const String previousSearchAuctionsKey = 'previous_search_auctions';
   static const String trendingAuctionsKey = 'trending_auctions';
+  static const String promotionalBannerKeyPrefix = 'promotional_banner_';
   
   // All cache keys for easy access
   static const List<String> cacheKeys = [
