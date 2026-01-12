@@ -331,10 +331,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final ads = results[4] as List<String>;
       final banner = results[5] as PromotionalBanner?;
 
+      // Get userId for filtering own listings from home page sections
+      final userId = prefs.getString('userId');
+
+      // Filter out user's own listings from home page sections
+      // Note: previousSearchProducts is not filtered as it's not displayed in home sections
+      final filteredLastViewed = _filterOwnListings(lastViewed, userId);
+      final filteredLatest = _filterOwnListings(latest, userId);
+      final filteredTrending = _filterOwnListings(trending, userId);
+
       debugPrint("HomePage: API data fetched successfully");
-      debugPrint("📦 lastViewedProducts: ${lastViewed.length}");
-      debugPrint("📦 allProducts: ${latest.length}");
-      debugPrint("📦 trendingProducts: ${trending.length}");
+      debugPrint("📦 lastViewedProducts: ${lastViewed.length} -> ${filteredLastViewed.length} (after filtering own listings)");
+      debugPrint("📦 allProducts: ${latest.length} -> ${filteredLatest.length} (after filtering own listings)");
+      debugPrint("📦 trendingProducts: ${trending.length} -> ${filteredTrending.length} (after filtering own listings)");
       debugPrint("📦 previousSearchProducts: ${searched.length}");
       debugPrint("📸 Ad URLs: $ads");
       debugPrint("🎯 Promotional Banner: ${banner != null ? banner.title : 'None'}");
@@ -342,9 +351,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _isLoggedIn = loggedIn;
-          lastViewedProducts = lastViewed;
-          allProducts = latest;
-          trendingProducts = trending;
+          lastViewedProducts = filteredLastViewed;
+          allProducts = filteredLatest;
+          trendingProducts = filteredTrending;
           previousSearchProducts = searched;
           categoryBanner = banner;
           if (ads.isNotEmpty) {
@@ -372,6 +381,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  // Helper method to filter out user's own listings
+  // Returns products that are NOT owned by the current user
+  List<Product> _filterOwnListings(List<Product> products, String? userId) {
+    if (userId == null || userId.isEmpty) {
+      // If not logged in, return all products (no filtering)
+      return products;
+    }
+    return products.where((product) {
+      final sellerId = product.seller?.id ?? '';
+      return sellerId != userId; // Keep only products NOT owned by user
+    }).toList();
   }
 
   // Method to refresh favorites state across all product lists

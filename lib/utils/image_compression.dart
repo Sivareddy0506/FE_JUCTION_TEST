@@ -43,11 +43,15 @@ class ImageCompression {
       final targetPath = '$tempPath/${nameWithoutExt}_compressed_${DateTime.now().millisecondsSinceEpoch}$ext';
 
       // Initial compression with high quality
+      // autoCorrectionAngle: true - Automatically corrects rotation based on EXIF orientation
+      // keepExif: false - Removes EXIF data after applying corrections to prevent double rotation
       XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
         file.absolute.path,
         targetPath,
         quality: quality,
         format: _getCompressFormat(ext),
+        autoCorrectionAngle: true,
+        keepExif: false,
       );
 
       if (compressedFile == null) {
@@ -71,12 +75,16 @@ class ImageCompression {
         await currentFile.delete();
         
         // Recompress with lower quality
+        // autoCorrectionAngle: true - Automatically corrects rotation based on EXIF orientation
+        // keepExif: false - Removes EXIF data after applying corrections to prevent double rotation
         final newTargetPath = '$tempPath/${nameWithoutExt}_compressed_${DateTime.now().millisecondsSinceEpoch}$ext';
         compressedFile = await FlutterImageCompress.compressAndGetFile(
           file.absolute.path,
           newTargetPath,
           quality: currentQuality,
           format: _getCompressFormat(ext),
+          autoCorrectionAngle: true,
+          keepExif: false,
         );
 
         if (compressedFile == null) {

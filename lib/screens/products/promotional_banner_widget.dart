@@ -88,7 +88,14 @@ class PromotionalBannerWidget extends StatelessWidget {
         ? _parseColor(banner.buttonColor)
         : const Color(0xFFFF6705); // Punchy orange
 
-    return Container(
+    // Determine opacity: use banner.imageOpacity if provided, otherwise use default logic
+    // Default: 0.0 if imageUrl exists, 0.3 otherwise (for overlay effect)
+    final double imageOpacity = banner.imageOpacity ?? (banner.imageUrl != null && banner.imageUrl!.isNotEmpty
+        ? 0.0 // Default to 0 opacity when background image is available
+        : 0.3); // Fallback for overlay effect when no image
+
+    // Use fixed dimensions if provided, otherwise use dynamic sizing (current behavior)
+    Widget bannerContent = Container(
       margin: EdgeInsets.zero, // No vertical margin - spacing handled by parent SizedBox
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -98,7 +105,7 @@ class PromotionalBannerWidget extends StatelessWidget {
             ? DecorationImage(
                 image: NetworkImage(banner.imageUrl!),
                 fit: BoxFit.cover,
-                opacity: 0.3, // Overlay effect for text readability
+                opacity: imageOpacity, // Use configurable opacity (default 0)
               )
             : null,
       ),
@@ -156,6 +163,24 @@ class PromotionalBannerWidget extends StatelessWidget {
         ],
       ),
     );
+
+    // Apply width constraint if specified
+    if (banner.width != null && banner.width! > 0) {
+      bannerContent = SizedBox(
+        width: banner.width,
+        child: bannerContent,
+      );
+    }
+
+    // Apply height constraint if specified
+    if (banner.height != null && banner.height! > 0) {
+      bannerContent = SizedBox(
+        height: banner.height,
+        child: bannerContent,
+      );
+    }
+
+    return bannerContent;
   }
 }
 

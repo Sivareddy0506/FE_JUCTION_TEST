@@ -411,8 +411,8 @@ class _AddProductImagesPageState extends State<AddProductImagesPage> {
                   for (int i = 0; i < imageNames.length; i++) 
                     _buildImageItem(imageNames[i], imageIndex: i),
 
-                  // "Take a Photo" Option should always be visible
-                  _buildImageItem("Take a Photo", isAddNew: true),
+                  // "Add images" Option should always be visible
+                  _buildImageItem("Add images", isAddNew: true),
 
                   // File size error message
                   if (fileSizeError != null) ...[

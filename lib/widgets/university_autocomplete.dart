@@ -127,10 +127,16 @@ class _UniversityAutocompleteState extends State<UniversityAutocomplete> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final universities = List<Map<String, dynamic>>.from(data['universities'] ?? []);
+        
+        // Filter out universities with empty, null, or whitespace-only names
+        final validUniversities = universities.where((uni) {
+          final name = uni['name'] as String?;
+          return name != null && name.trim().isNotEmpty;
+        }).toList();
 
         setState(() {
-          _suggestions = universities;
-          _showSuggestions = universities.isNotEmpty;
+          _suggestions = validUniversities;
+          _showSuggestions = validUniversities.isNotEmpty;
           _isLoading = false;
         });
 
@@ -218,9 +224,17 @@ class _UniversityAutocompleteState extends State<UniversityAutocomplete> {
                       ? const SizedBox.shrink()
                       : ListView.builder(
                           shrinkWrap: true,
+                          padding: EdgeInsets.zero, // Remove default padding to prevent whitespace
                           itemCount: _suggestions.length,
                           itemBuilder: (context, index) {
                             final university = _suggestions[index];
+                            final universityName = university['name'] as String? ?? '';
+                            
+                            // Skip rendering if name is empty (shouldn't happen after filtering, but safety check)
+                            if (universityName.trim().isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            
                             return InkWell(
                               onTap: () => _selectUniversity(university),
                               child: Padding(
@@ -229,7 +243,7 @@ class _UniversityAutocompleteState extends State<UniversityAutocomplete> {
                                   vertical: 12,
                                 ),
                                 child: Text(
-                                  university['name'] as String,
+                                  universityName,
                                   style: const TextStyle(
                                     fontSize: 16,
                                     color: Color(0xFF212121),

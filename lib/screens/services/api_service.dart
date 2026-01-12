@@ -527,6 +527,56 @@ class AuthHealthService {
       return {'status': 'network_error'};
     }
   }
+
+  /// Always fetches user verification status from backend, even if token is still_valid.
+  /// This ensures we get the latest status from database, avoiding stale SharedPreferences.
+  /// Returns a map with keys:
+  /// - status: 'success' | 'error' | 'timeout' | 'network_error'
+  /// - isVerified / isOnboarded: when status is 'success'
+  static Future<Map<String, dynamic>> checkUserStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('authToken');
+      if (token == null || token.isEmpty) {
+        return {'status': 'error'};
+      }
+
+      final uri = Uri.parse('https://api.junctionverse.com/auth/token/refresh');
+      final res = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final user = data['user'];
+        if (user != null) {
+          return {
+            'status': 'success',
+            'isVerified': user['isVerified'] ?? false,
+            'isOnboarded': user['isOnboarded'] ?? false,
+            // Optionally return new token if provided (but don't require it)
+            'token': data['token']?.toString(),
+          };
+        }
+        return {'status': 'error'};
+      }
+
+      if (res.statusCode == 401) {
+        return {'status': 'error'};
+      }
+
+      return {'status': 'network_error'};
+    } on TimeoutException catch (_) {
+      return {'status': 'timeout'};
+    } catch (e) {
+      debugPrint('🔐 checkUserStatus error: $e');
+      return {'status': 'network_error'};
+    }
+  }
 }
 
 /// Minimal JWT helper for local expiry checks (no extra deps).
