@@ -113,10 +113,10 @@ class _EULAAcceptancePageState extends State<EULAAcceptancePage> {
 
         // Navigate based on flow type
         if (widget.isSignupFlow) {
-          // For signup flow, go to welcome page
+          // For signup flow, go to welcome page (will auto-login for edu users)
           Navigator.pushReplacement(
             context,
-            FadePageRoute(page: const WelcomePage()),
+            FadePageRoute(page: const WelcomePage(isFromSignup: true)),
           );
         } else {
           // For login flow, go to main app

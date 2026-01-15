@@ -108,24 +108,101 @@ class _HomeScreenState extends State<HomeScreen> {
             );
             shouldGoToHome = true;
           } else if (status == 'still_valid') {
-            // Token is still valid locally; don't force refresh on every cold start.
-            // Restore user status from SharedPreferences (saved during login)
-            final isVerified = prefs.getBool('isVerified') ?? false;
-            final isOnboarded = prefs.getBool('isOnboarded') ?? false;
-            AppState.instance.setUserStatus(
-              isVerified: isVerified,
-              isOnboarded: isOnboarded,
-            );
+            // Token is still valid locally, but we need to check backend for latest verification status
+            // to avoid using stale SharedPreferences data
+            try {
+              final statusResult = await AuthHealthService.checkUserStatus().timeout(
+                const Duration(seconds: 5),
+                onTimeout: () => {'status': 'timeout'},
+              );
+              
+              if (statusResult['status'] == 'success') {
+                // Got fresh status from backend
+                final isVerified = statusResult['isVerified'] as bool? ?? false;
+                final isOnboarded = statusResult['isOnboarded'] as bool? ?? false;
+                // Update SharedPreferences with fresh data
+                await prefs.setBool('isVerified', isVerified);
+                await prefs.setBool('isOnboarded', isOnboarded);
+                AppState.instance.setUserStatus(
+                  isVerified: isVerified,
+                  isOnboarded: isOnboarded,
+                );
+                // Update token if provided
+                final newToken = statusResult['token']?.toString();
+                if (newToken != null && newToken.isNotEmpty) {
+                  await prefs.setString('authToken', newToken);
+                }
+              } else {
+                // Backend check failed, use SharedPreferences as fallback
+                // But add fallback logic: if SharedPreferences shows unverified but token is valid, 
+                // we should still allow access (token validation will happen on API calls)
+                final cachedIsVerified = prefs.getBool('isVerified') ?? false;
+                final cachedIsOnboarded = prefs.getBool('isOnboarded') ?? false;
+                
+                // Fallback: If cached status shows unverified but we have a valid token,
+                // assume user might be verified (database might have been updated)
+                // The backend middleware will enforce verification on protected routes
+                if (!cachedIsVerified && token != null && token.isNotEmpty) {
+                  debugPrint('⚠️ Cached status shows unverified but token is valid. Allowing access - backend will verify.');
+                }
+                
+                AppState.instance.setUserStatus(
+                  isVerified: cachedIsVerified,
+                  isOnboarded: cachedIsOnboarded,
+                );
+              }
+            } catch (e) {
+              debugPrint('Status check error: $e');
+              // Fallback to SharedPreferences
+              final isVerified = prefs.getBool('isVerified') ?? false;
+              final isOnboarded = prefs.getBool('isOnboarded') ?? false;
+              AppState.instance.setUserStatus(
+                isVerified: isVerified,
+                isOnboarded: isOnboarded,
+              );
+            }
             shouldGoToHome = true;
           } else if (status == 'timeout' || status == 'network_error') {
             // Critical behavior: do NOT log out due to network/server issues.
-            // Restore user status from SharedPreferences
-            final isVerified = prefs.getBool('isVerified') ?? false;
-            final isOnboarded = prefs.getBool('isOnboarded') ?? false;
-            AppState.instance.setUserStatus(
-              isVerified: isVerified,
-              isOnboarded: isOnboarded,
-            );
+            // Try to get status from backend with a quick check, but fallback to SharedPreferences
+            try {
+              final statusResult = await AuthHealthService.checkUserStatus().timeout(
+                const Duration(seconds: 3),
+                onTimeout: () => {'status': 'timeout'},
+              );
+              
+              if (statusResult['status'] == 'success') {
+                // Got fresh status despite network error on refresh
+                final isVerified = statusResult['isVerified'] as bool? ?? false;
+                final isOnboarded = statusResult['isOnboarded'] as bool? ?? false;
+                await prefs.setBool('isVerified', isVerified);
+                await prefs.setBool('isOnboarded', isOnboarded);
+                AppState.instance.setUserStatus(
+                  isVerified: isVerified,
+                  isOnboarded: isOnboarded,
+                );
+                final newToken = statusResult['token']?.toString();
+                if (newToken != null && newToken.isNotEmpty) {
+                  await prefs.setString('authToken', newToken);
+                }
+              } else {
+                // Fallback to SharedPreferences
+                final isVerified = prefs.getBool('isVerified') ?? false;
+                final isOnboarded = prefs.getBool('isOnboarded') ?? false;
+                AppState.instance.setUserStatus(
+                  isVerified: isVerified,
+                  isOnboarded: isOnboarded,
+                );
+              }
+            } catch (e) {
+              // Final fallback to SharedPreferences
+              final isVerified = prefs.getBool('isVerified') ?? false;
+              final isOnboarded = prefs.getBool('isOnboarded') ?? false;
+              AppState.instance.setUserStatus(
+                isVerified: isVerified,
+                isOnboarded: isOnboarded,
+              );
+            }
             debugPrint('⚠️ Auth refresh skipped due to $status. Keeping session.');
             shouldGoToHome = true;
           } else if (status == 'expired' || status == 'invalid') {

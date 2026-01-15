@@ -30,7 +30,8 @@ class _SignupPageState extends State<SignupPage> {
     setState(() {
       isValidEmail = lowerEmail.endsWith('.edu.in') ||
           lowerEmail.endsWith('.ac.in') ||
-          lowerEmail.endsWith('.edu');
+          lowerEmail.endsWith('.edu') ||
+          lowerEmail.endsWith('@junctionverse.com');
     });
   }
 

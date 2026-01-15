@@ -11,9 +11,9 @@ class PromotionalBanner {
   final String? actionType;
   final String? actionUrl;
   final String? registrationUrl; // Full URL for web-based registration (opens in WebView)
-  final double? imageOpacity;
-  final double? width;
-  final double? height;
+  final double? height; // Optional fixed height in logical pixels (null = dynamic)
+  final double? width; // Optional fixed width in logical pixels (null = dynamic)
+  final double? imageOpacity; // Optional image opacity (0.0 to 1.0, null = use default)
   final bool isActive;
   final int priority;
   final DateTime? startDate;
@@ -34,9 +34,9 @@ class PromotionalBanner {
     this.actionType,
     this.actionUrl,
     this.registrationUrl,
-    this.imageOpacity,
-    this.width,
     this.height,
+    this.width,
+    this.imageOpacity,
     required this.isActive,
     required this.priority,
     this.startDate,
@@ -59,9 +59,9 @@ class PromotionalBanner {
       actionType: json['actionType'],
       actionUrl: json['actionUrl'],
       registrationUrl: json['registrationUrl'],
-      imageOpacity: json['imageOpacity'] != null ? (json['imageOpacity'] is num ? json['imageOpacity'].toDouble() : double.tryParse(json['imageOpacity'].toString())) : null,
-      width: json['width'] != null ? (json['width'] is num ? json['width'].toDouble() : double.tryParse(json['width'].toString())) : null,
-      height: json['height'] != null ? (json['height'] is num ? json['height'].toDouble() : double.tryParse(json['height'].toString())) : null,
+      height: json['height'] != null ? (json['height'] is int ? (json['height'] as int).toDouble() : json['height'] as double) : null,
+      width: json['width'] != null ? (json['width'] is int ? (json['width'] as int).toDouble() : json['width'] as double) : null,
+      imageOpacity: json['imageOpacity'] != null ? (json['imageOpacity'] is int ? (json['imageOpacity'] as int).toDouble() : json['imageOpacity'] as double) : null,
       isActive: json['isActive'] ?? true,
       priority: json['priority'] ?? 0,
       startDate: json['startDate'] != null ? DateTime.tryParse(json['startDate']) : null,
@@ -85,9 +85,9 @@ class PromotionalBanner {
       'actionType': actionType,
       'actionUrl': actionUrl,
       'registrationUrl': registrationUrl,
-      'imageOpacity': imageOpacity,
-      'width': width,
       'height': height,
+      'width': width,
+      'imageOpacity': imageOpacity,
       'isActive': isActive,
       'priority': priority,
       'startDate': startDate?.toIso8601String(),
