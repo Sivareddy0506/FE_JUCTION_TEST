@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
-import 'referral_code_page.dart';
+import 'edu_details_page.dart';
 import '../../app.dart'; // For SlidePageRoute
 
 class OTPVerificationSignupPage extends StatefulWidget {
@@ -98,7 +98,7 @@ class _OTPVerificationSignupPageState extends State<OTPVerificationSignupPage> {
         Navigator.pushReplacement(
           context,
           SlidePageRoute(
-            page: ReferralCodePage(email: widget.email, otp: code),
+            page: EduDetailsPage(email: widget.email, otp: code),
           ),
         );
       } else {

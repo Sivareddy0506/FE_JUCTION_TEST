@@ -6,8 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/app_button.dart';
 import '../../app.dart';
 import '../products/home.dart';
-import 'referral_code_page.dart' as edu;
-import 'referral_code_page_non_edu.dart' as non_edu;
+import 'welcome_page.dart';
 
 class EULAAcceptancePage extends StatefulWidget {
   final String? email;
@@ -113,25 +112,14 @@ class _EULAAcceptancePageState extends State<EULAAcceptancePage> {
         await prefs.setString('eulaVersion', _eulaVersion);
 
         // Navigate based on flow type
-        if (widget.isSignupFlow && widget.email != null && widget.otp != null) {
-          // Continue signup flow to referral code page
-          if (widget.isEduFlow) {
-            Navigator.pushReplacement(
-              context,
-              SlidePageRoute(
-                page: edu.ReferralCodePage(email: widget.email!, otp: widget.otp!),
-              ),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              SlidePageRoute(
-                page: non_edu.ReferralCodePage(email: widget.email!, otp: widget.otp!),
-              ),
-            );
-          }
+        if (widget.isSignupFlow) {
+          // For signup flow, go to welcome page
+          Navigator.pushReplacement(
+            context,
+            FadePageRoute(page: const WelcomePage()),
+          );
         } else {
-          // For login flow or completed signup, go to main app
+          // For login flow, go to main app
           Navigator.pushAndRemoveUntil(
             context,
             SlidePageRoute(page: HomePage()),
