@@ -654,7 +654,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
             const Spacer(),
 
             AppButton(
-              bottomSpacing: 20,
+              bottomSpacing: 60,
               label: isLoading ? 'Submitting...' : 'Submit for Verification',
               onPressed: uploadedFiles.values.where((f) => f != null).length >= 3 && !isLoading
                   ? _submitAll

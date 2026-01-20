@@ -619,7 +619,7 @@ class _ChatPageState extends State<ChatPage> {
   // Show product status badge and buttons if product is sold or locked
   if (isProductSold || isProductLocked) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         border: Border(

@@ -157,7 +157,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               ],
             ),
             AppButton(
-              bottomSpacing: 30,
+              bottomSpacing: 40,
               label: 'Done',
               onPressed: isChecked ? _onSubmit : null,
              backgroundColor: isChecked ? const Color(0xFFFF6705) : Colors.grey,

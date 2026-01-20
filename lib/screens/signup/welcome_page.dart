@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import '../login/login_page.dart';
 import '../products/home.dart';
+import '../services/chat_service.dart';
 import '../../app.dart';
 import '../../app_state.dart';
 
@@ -32,33 +34,8 @@ class _WelcomePageState extends State<WelcomePage> {
 
       if (widget.isFromSignup) {
         // User just completed signup - they're already verified and onboarded
-        // Save their status and navigate to home
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('authToken');
-        final userId = prefs.getString('userId');
-        
-        await prefs.setBool('isVerified', true);
-        await prefs.setBool('isOnboarded', true);
-        
-        // Update AppState
-        AppState.instance.setUserStatus(
-          isVerified: true,
-          isOnboarded: true,
-        );
-
-        // Register FCM token after successful signup (non-blocking)
-        if (token != null) {
-          _registerFCMToken(token, userId);
-        }
-
-        if (!mounted) return;
-
-        // Navigate to home (clear navigation stack)
-        Navigator.pushAndRemoveUntil(
-          context,
-          SlidePageRoute(page: HomePage()),
-          (Route<dynamic> route) => false,
-        );
+        // Perform full login setup (matching otp_verification_login.dart flow)
+        await _performFullLoginSetup();
       } else {
         // Default behavior - navigate to login
         Navigator.pushReplacement(
@@ -69,7 +46,89 @@ class _WelcomePageState extends State<WelcomePage> {
     });
   }
 
-  Future<void> _registerFCMToken(String token, String? userId) async {
+  /// Performs full login setup matching the login flow
+  /// This ensures Firebase, Chat, and all features work correctly after signup
+  Future<void> _performFullLoginSetup() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken');
+    final userId = prefs.getString('userId');
+
+    // 1. Save verification status to SharedPreferences
+    await prefs.setBool('isVerified', true);
+    await prefs.setBool('isOnboarded', true);
+    await prefs.setBool('isLogin', true); // ✅ Set login flag (was missing)
+
+    // 2. Update AppState
+    AppState.instance.setUserStatus(
+      isVerified: true,
+      isOnboarded: true,
+    );
+
+    // 3. Setup Firebase Authentication (required for chat)
+    if (userId != null) {
+      await _setupFirebaseAuth(prefs, userId);
+    }
+
+    // 4. Register FCM token (after Firebase is set up)
+    if (token != null && userId != null) {
+      await _registerFCMToken(token, userId);
+    }
+
+    if (!mounted) return;
+
+    // 5. Navigate to home (clear navigation stack)
+    Navigator.pushAndRemoveUntil(
+      context,
+      SlidePageRoute(page: HomePage()),
+      (Route<dynamic> route) => false,
+    );
+  }
+
+  /// Sets up Firebase Authentication with custom token
+  /// This is required for chat functionality to work
+  Future<void> _setupFirebaseAuth(SharedPreferences prefs, String userId) async {
+    try {
+      debugPrint('🔥 [Firebase] Creating custom token for userId: $userId');
+      
+      final customTokenResponse = await http.post(
+        Uri.parse('https://api.junctionverse.com/user/firebase/createcustomtoken'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': userId}),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Firebase token creation timed out');
+        },
+      );
+
+      debugPrint('🔥 [Firebase] Custom token response status: ${customTokenResponse.statusCode}');
+
+      if (customTokenResponse.statusCode == 200) {
+        final customToken = jsonDecode(customTokenResponse.body)['token'];
+        
+        // Sign in to Firebase with custom token
+        await FirebaseAuth.instance.signInWithCustomToken(customToken);
+        debugPrint('🔥 [Firebase] ✅ Signed in with custom token');
+        
+        // Save Firebase credentials to SharedPreferences
+        await prefs.setString('firebaseUserId', FirebaseAuth.instance.currentUser?.uid ?? '');
+        await prefs.setString('firebaseToken', customToken);
+        
+        // Initialize ChatService userId cache (required for chat to work)
+        await ChatService.initializeUserId();
+        debugPrint('🔥 [Firebase] ✅ ChatService initialized');
+      } else {
+        debugPrint('🔥 [Firebase] ⚠️ Failed to create custom token: ${customTokenResponse.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('🔥 [Firebase] ⚠️ Error setting up Firebase Auth: $e');
+      // Don't block signup flow if Firebase setup fails
+      // User can still browse, but chat won't work until they re-login
+    }
+  }
+
+  /// Registers FCM token with backend and Firestore
+  Future<void> _registerFCMToken(String token, String userId) async {
     try {
       debugPrint('📱 [FCM] Getting FCM token after signup...');
       final fcmToken = await FirebaseMessaging.instance.getToken();
@@ -93,22 +152,22 @@ class _WelcomePageState extends State<WelcomePage> {
           // Don't block signup flow if FCM registration fails
         }
         
-        // Save to Firestore if userId is available
-        if (userId != null) {
-          try {
-            final firebaseUser = FirebaseAuth.instance.currentUser;
-            if (firebaseUser != null) {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(userId)
-                  .set({
-                'fcmTokens': [fcmToken],
-              }, SetOptions(merge: true));
-              debugPrint('📱 [FCM] ✅ FCM token saved to Firestore after signup');
-            }
-          } catch (e) {
-            debugPrint('📱 [FCM] ⚠️ Failed to save FCM token to Firestore: $e');
+        // Save to Firestore (now works because Firebase is signed in)
+        try {
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          if (firebaseUser != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userId)
+                .set({
+              'fcmTokens': [fcmToken],
+            }, SetOptions(merge: true));
+            debugPrint('📱 [FCM] ✅ FCM token saved to Firestore after signup');
+          } else {
+            debugPrint('📱 [FCM] ⚠️ Firebase Auth not signed in, skipping Firestore save');
           }
+        } catch (e) {
+          debugPrint('📱 [FCM] ⚠️ Failed to save FCM token to Firestore: $e');
         }
       } else {
         debugPrint('📱 [FCM] ⚠️ FCM token is null');

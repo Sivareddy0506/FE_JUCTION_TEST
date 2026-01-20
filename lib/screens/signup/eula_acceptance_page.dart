@@ -335,6 +335,7 @@ class _EULAAcceptancePageState extends State<EULAAcceptancePage> {
                         
                         // Accept Button
                         AppButton(
+                          bottomSpacing: 40,
                           label: _isAccepting ? 'Accepting...' : 'Accept & Continue',
                           onPressed: _canAccept && !_isAccepting ? _acceptEULA : null,
                           backgroundColor: _canAccept ? const Color(0xFF262626) : Colors.grey[300],

@@ -158,7 +158,7 @@ class _SignupPageState extends State<SignupPage> {
                       left: 24,
                       right: 24,
                       top: 16,
-                      bottom: viewInsets > 0 ? viewInsets + 16 : 32,
+                      bottom: viewInsets > 0 ? viewInsets + 16 : 20,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -194,6 +194,7 @@ class _SignupPageState extends State<SignupPage> {
                         const SizedBox(height: 12),
                         const PrivacyPolicyLink(),
                         AppButton(
+                          bottomSpacing: 40,
                           label: isLoading ? 'Sending...' : 'Send Verification Code',
                           onPressed: isValidEmail && !isLoading ? _sendVerification : null,
                           backgroundColor:

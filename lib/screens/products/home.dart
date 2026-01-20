@@ -19,6 +19,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart';
+import '../../services/version_check_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -42,6 +43,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // Separate flags for different data sources
   bool _favoritesReady = false;
   bool _productsReady = false;
+  
+  // Version check flag
+  bool _hasCheckedVersion = false;
   
   // Computed getter to check if all data is ready
   bool get _allDataReady => _favoritesReady && _productsReady;
@@ -75,6 +79,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _initializeApp();
     // Check user status on init
     _checkUserStatus();
+    // Check app version for updates
+    _checkAppVersion();
+  }
+  
+  /// Check if app needs update
+  Future<void> _checkAppVersion() async {
+    if (_hasCheckedVersion) return;
+    _hasCheckedVersion = true;
+
+    // Small delay to ensure app is fully loaded
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    final result = await VersionCheckService.checkVersion();
+    
+    if (result != null && mounted) {
+      if (result.needsUpdate || result.updateAvailable) {
+        _showUpdateDialog(result);
+      }
+    }
+  }
+
+  void _showUpdateDialog(VersionCheckResult result) {
+    showDialog(
+      context: context,
+      barrierDismissible: !result.forceUpdate,
+      builder: (context) => UpdateDialog(
+        versionInfo: result,
+        onSkip: result.forceUpdate ? null : () => Navigator.pop(context),
+      ),
+    );
   }
 
   @override

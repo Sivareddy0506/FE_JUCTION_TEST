@@ -475,7 +475,7 @@ class _EduDetailsPageState extends State<EduDetailsPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
             child: AppButton(
-              bottomSpacing: 24,
+              bottomSpacing: 60,
               label: loading ? 'Saving...' : 'Save',
               onPressed: (loading || !isFormValid) ? null : _submitForm,
             ),

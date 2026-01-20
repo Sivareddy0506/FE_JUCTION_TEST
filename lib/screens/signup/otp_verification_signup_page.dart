@@ -310,7 +310,7 @@ class _OTPVerificationSignupPageState extends State<OTPVerificationSignupPage> {
             ),
             const Spacer(),
             AppButton(
-              bottomSpacing: 24,
+              bottomSpacing: 60,
               label: isSubmitting ? 'Verifying...' : 'Verify',
               onPressed: enableVerify ? _verifyOTP : null,
               backgroundColor: isSubmitting ? const Color(0xFF8C8C8C) : const Color(0xFF262626),

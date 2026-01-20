@@ -328,7 +328,7 @@ _buildDualDropdown(
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: AppButton(
-              bottomSpacing: 24,
+              bottomSpacing: 60,
               label: loading ? 'Saving...' : 'Save',
               onPressed: (loading || !isFormValid) ? null : _submitForm,
             ),

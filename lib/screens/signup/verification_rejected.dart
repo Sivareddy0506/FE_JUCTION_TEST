@@ -112,7 +112,7 @@ class _VerificationRejectedPageState extends State<VerificationRejectedPage> {
             ),
             const Spacer(),
             AppButton(
-              bottomSpacing: 24,
+              bottomSpacing: 40,
               label: "Go to Signup",
              backgroundColor: const Color(0xFFFF6705),
               onPressed: () {

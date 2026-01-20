@@ -53,7 +53,7 @@ class VerificationSubmittedPage extends StatelessWidget {
             ),
             const Spacer(),
             AppButton(
-              bottomSpacing: 24,
+              bottomSpacing: 40,
               label: "Continue",
              backgroundColor: const Color(0xFFFF6705),
               onPressed: () {

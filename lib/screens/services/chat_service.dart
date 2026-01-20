@@ -28,6 +28,7 @@ class ChatModel {
   double? finalPrice;
   final List<String> participants;
   final bool isArchived;
+  final bool hasMessages; // Chat only visible in list when true (after first real message)
 
   ChatModel({
     required this.chatId,
@@ -47,6 +48,7 @@ class ChatModel {
     this.finalPrice,
     required this.participants,
     this.isArchived = false,
+    this.hasMessages = false, // Default to false - becomes true after first message
   });
 
   factory ChatModel.fromFirestore(Map<String, dynamic> data) {
@@ -68,6 +70,7 @@ class ChatModel {
       finalPrice: data['finalPrice']?.toDouble(),
       participants: List<String>.from(data['participants'] ?? []),
       isArchived: data['isArchived'] ?? false,
+      hasMessages: data['hasMessages'] ?? true, // Default to true for backward compatibility (existing chats)
     );
   }
 
@@ -90,6 +93,7 @@ class ChatModel {
       'finalPrice': finalPrice,
       'participants': participants,
       'isArchived': isArchived,
+      'hasMessages': hasMessages,
     };
   }
 }
@@ -293,7 +297,15 @@ Stream<ChatModel?> getChatStream(String chatId) {
   try {
     String chatId = '${productId}_${sellerId}_$buyerId';
     
-    // Use set with merge option instead of checking existence
+    // Check if chat already exists
+    final existingChat = await _firestore.collection('chats').doc(chatId).get();
+    if (existingChat.exists) {
+      // Chat exists, return existing chat model
+      return ChatModel.fromFirestore(existingChat.data()!);
+    }
+    
+    // Create new chat with hasMessages: false
+    // Chat will not appear in chat list until first real message is sent
     ChatModel newChat = ChatModel(
       chatId: chatId,
       productId: productId,
@@ -308,31 +320,18 @@ Stream<ChatModel?> getChatStream(String chatId) {
       lastMessageTime: DateTime.now(),
       createdAt: DateTime.now(),
       participants: [sellerId, buyerId],
+      hasMessages: false, // Chat hidden from list until first real message
     );
 
-    // Use merge: true to avoid overwriting existing chats
-    await _firestore.collection('chats').doc(chatId).set(
-      newChat.toFirestore(), 
-      SetOptions(merge: true)
-    );
+    await _firestore.collection('chats').doc(chatId).set(newChat.toFirestore());
 
-    // Only send product card if this is a new chat
-    // Check if there are any messages in this chat
-    var messagesSnapshot = await _firestore
-        .collection('messages')
-        .doc(chatId)
-        .collection('messages')
-        .limit(1)
-        .get();
-    
-    if (messagesSnapshot.docs.isEmpty) {
-      await _sendProductCard(chatId, buyerId, sellerId, {
-        'productId': productId,
-        'title': productTitle,
-        'image': productImage,
-        'price': productPrice,
-      });
-    }
+    // Send product card for UI display (doesn't trigger hasMessages: true)
+    await _sendProductCard(chatId, buyerId, sellerId, {
+      'productId': productId,
+      'title': productTitle,
+      'image': productImage,
+      'price': productPrice,
+    });
 
     return newChat;
   } catch (e) {
@@ -562,11 +561,13 @@ Stream<ChatModel?> getChatStream(String chatId) {
           .doc(messageId)
           .set(newMessage.toFirestore());
 
-      // Update last message in chat
+      // Update last message in chat AND set hasMessages: true
+      // This makes the chat visible in chat list for both users
       String lastMessageText = messageType == 'image' ? '📷 Photo' : message;
       await _firestore.collection('chats').doc(chatId).update({
         'lastMessage': lastMessageText,
         'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+        'hasMessages': true, // Chat now visible in chat list
       });
 
       // 🔔 Call backend API to trigger push notifications
@@ -1008,6 +1009,7 @@ static Future<String> lockDeal({
           .collection('chats')
           .where('participants', arrayContains: userId)
           .where('isArchived', isEqualTo: false)
+          .where('hasMessages', isEqualTo: true) // Only show chats with actual messages
           .orderBy('lastMessageTime', descending: true)
           .snapshots()
           .map((snapshot) => snapshot.docs

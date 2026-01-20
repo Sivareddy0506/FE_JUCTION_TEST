@@ -1138,7 +1138,7 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
   return SafeArea(
     top: false,
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
         children: [
           // For seller: Show "Mark as Sold" button (if product is not sold)
@@ -1172,6 +1172,25 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
   );
 }
 
+
+  /// Shows full-screen image viewer with pinch-to-zoom and swipe between images
+  void _showFullScreenImage(BuildContext context, List<String> imageUrls, int initialIndex) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _FullScreenImageViewer(
+            imageUrls: imageUrls,
+            initialIndex: initialIndex,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
 
   Widget _buildBadge(String text) {
     return Container(
@@ -1303,13 +1322,16 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
                     itemBuilder: (_, pageIndex) {
                       final url = imageUrls[pageIndex];
                       final isNetwork = url.startsWith('http');
-                      return isNetwork
-                          ? Image.network(
-                              url,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Image.asset('assets/placeholder.png', fit: BoxFit.cover),
-                            )
-                          : Image.asset(url, fit: BoxFit.cover);
+                      return GestureDetector(
+                        onTap: () => _showFullScreenImage(context, imageUrls, pageIndex),
+                        child: isNetwork
+                            ? Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset('assets/placeholder.png', fit: BoxFit.cover),
+                              )
+                            : Image.asset(url, fit: BoxFit.cover),
+                      );
                     },
                   ),
                 ),
@@ -2178,5 +2200,169 @@ Widget _buildBottomNavigationBar(bool isSellerViewing, bool isProductForSale, bo
     } catch (e) {
       ErrorHandler.showErrorSnackBar(context, e);
     }
+  }
+}
+
+/// Full-screen image viewer with pinch-to-zoom and swipe navigation
+class _FullScreenImageViewer extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const _FullScreenImageViewer({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Image viewer with swipe and zoom
+            PageView.builder(
+              controller: _pageController,
+              itemCount: widget.imageUrls.length,
+              onPageChanged: (index) {
+                setState(() => _currentIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final url = widget.imageUrls[index];
+                final isNetwork = url.startsWith('http');
+                
+                return GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Center(
+                      child: isNetwork
+                          ? Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    color: Colors.white,
+                                  ),
+                                );
+                              },
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.broken_image,
+                                color: Colors.white54,
+                                size: 64,
+                              ),
+                            )
+                          : Image.asset(url, fit: BoxFit.contain),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // Close button
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black45,
+                ),
+              ),
+            ),
+
+            // Image counter indicator
+            if (widget.imageUrls.length > 1)
+              Positioned(
+                top: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Dot indicators at bottom
+            if (widget.imageUrls.length > 1)
+              Positioned(
+                bottom: 24,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.imageUrls.length, (index) {
+                    final isActive = index == _currentIndex;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      height: 8,
+                      width: isActive ? 24 : 8,
+                      decoration: BoxDecoration(
+                        color: isActive ? Colors.white : Colors.white38,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+
+            // Hint text
+            Positioned(
+              bottom: 60,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  'Pinch to zoom • Tap to close',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

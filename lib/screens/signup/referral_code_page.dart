@@ -156,7 +156,7 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
               ),
             const Spacer(),
             AppButton(
-              bottomSpacing: 10,
+              bottomSpacing: 40,
               label: isLoading ? 'Verifying...' : 'Verify',
               onPressed: isLoading ? null : _submitCode,
               backgroundColor:
