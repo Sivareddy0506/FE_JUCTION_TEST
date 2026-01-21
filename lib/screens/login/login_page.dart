@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../constants/ui_spacing.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/privacy_policy_link.dart';
 import '../signup/signup_page.dart';
@@ -124,18 +126,9 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.only(
-                      left: 24,
-                      right: 24,
-                      top: 16,
-                      bottom: viewInsets > 0 ? viewInsets + 16 : 32,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                    ),
-                    child: Column(
+                  BottomButtonLayout(
+                    useContainer: true,
+                    contentAboveButton: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
@@ -166,13 +159,14 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: 12),
                         const PrivacyPolicyLink(),
-                        AppButton(
-                          label: isLoading ? 'Sending...' : 'Send Verification Code',
-                          onPressed: isValidEmail && !isLoading ? _login : null,
-                          backgroundColor:
-                              isValidEmail ? const Color(0xFF262626) : const Color(0xFF8C8C8C),
-                        ),
                       ],
+                    ),
+                    button: AppButton(
+                      bottomSpacing: 0, // Container handles spacing
+                      label: isLoading ? 'Sending...' : 'Send Verification Code',
+                      onPressed: isValidEmail && !isLoading ? _login : null,
+                      backgroundColor:
+                          isValidEmail ? const Color(0xFF262626) : const Color(0xFF8C8C8C),
                     ),
                   ),
                 ],

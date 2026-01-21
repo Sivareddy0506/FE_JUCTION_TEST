@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import '../../constants/ui_spacing.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
@@ -291,7 +292,7 @@ Widget _buildOtpBox(int index) {
               ),
 
             AppButton(
-              bottomSpacing: 60,
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: isSubmitting ? 'Verifying...' : 'Verify',
               onPressed: _isCodeComplete ? _verifyOTP : null,
               backgroundColor: _isCodeComplete ? const Color(0xFF262626) : const Color(0xFF8C8C8C),

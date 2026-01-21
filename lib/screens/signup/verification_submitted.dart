@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../constants/ui_spacing.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../login/login_page.dart';
@@ -53,7 +54,7 @@ class VerificationSubmittedPage extends StatelessWidget {
             ),
             const Spacer(),
             AppButton(
-              bottomSpacing: 40,
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: "Continue",
              backgroundColor: const Color(0xFFFF6705),
               onPressed: () {

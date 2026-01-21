@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
+import '../../constants/ui_spacing.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/privacy_policy_link.dart';
 import 'manual_signup_page.dart';
@@ -61,9 +63,17 @@ class _SignupPageState extends State<SignupPage> {
         );
       } else {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
-        final errorMessage = responseData['message'] ?? 'Failed to send code';
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(errorMessage)));
+        final errorMessage = responseData['error'] ?? responseData['message'] ?? 'Failed to send code';
+        
+        // Show error on same page without navigating
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
       }
     } catch (e) {
       setState(() => isLoading = false);
@@ -152,18 +162,9 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                     ),
                   ),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.only(
-                      left: 24,
-                      right: 24,
-                      top: 16,
-                      bottom: viewInsets > 0 ? viewInsets + 16 : 20,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                    ),
-                    child: Column(
+                  BottomButtonLayout(
+                    useContainer: true,
+                    contentAboveButton: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Wrap(
@@ -193,14 +194,14 @@ class _SignupPageState extends State<SignupPage> {
                         ),
                         const SizedBox(height: 12),
                         const PrivacyPolicyLink(),
-                        AppButton(
-                          bottomSpacing: 40,
-                          label: isLoading ? 'Sending...' : 'Send Verification Code',
-                          onPressed: isValidEmail && !isLoading ? _sendVerification : null,
-                          backgroundColor:
-                              isValidEmail ? const Color(0xFF262626) : const Color(0xFF8C8C8C),
-                        ),
                       ],
+                    ),
+                    button: AppButton(
+                      bottomSpacing: 0, // Container handles spacing
+                      label: isLoading ? 'Sending...' : 'Send Verification Code',
+                      onPressed: isValidEmail && !isLoading ? _sendVerification : null,
+                      backgroundColor:
+                          isValidEmail ? const Color(0xFF262626) : const Color(0xFF8C8C8C),
                     ),
                   ),
                 ],

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../../constants/ui_spacing.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/form_text.dart';
@@ -328,7 +329,7 @@ _buildDualDropdown(
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: AppButton(
-              bottomSpacing: 60,
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: loading ? 'Saving...' : 'Save',
               onPressed: (loading || !isFormValid) ? null : _submitForm,
             ),

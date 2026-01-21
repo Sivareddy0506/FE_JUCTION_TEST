@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../constants/ui_spacing.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/university_autocomplete.dart';
 import '../../widgets/headding_description.dart';
@@ -472,10 +474,11 @@ class _EduDetailsPageState extends State<EduDetailsPage> {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-            child: AppButton(
-              bottomSpacing: 60,
+          BottomButtonLayout(
+            horizontalPadding: 24,
+            topPadding: 24,
+            button: AppButton(
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: loading ? 'Saving...' : 'Save',
               onPressed: (loading || !isFormValid) ? null : _submitForm,
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../constants/ui_spacing.dart';
 import '../../widgets/headding_description.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -157,7 +158,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               ],
             ),
             AppButton(
-              bottomSpacing: 40,
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: 'Done',
               onPressed: isChecked ? _onSubmit : null,
              backgroundColor: isChecked ? const Color(0xFFFF6705) : Colors.grey,

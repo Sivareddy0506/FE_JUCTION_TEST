@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import '../../constants/ui_spacing.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
@@ -654,7 +655,7 @@ class _DocumentVerificationPageState extends State<DocumentVerificationPage> {
             const Spacer(),
 
             AppButton(
-              bottomSpacing: 60,
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: isLoading ? 'Submitting...' : 'Submit for Verification',
               onPressed: uploadedFiles.values.where((f) => f != null).length >= 3 && !isLoading
                   ? _submitAll

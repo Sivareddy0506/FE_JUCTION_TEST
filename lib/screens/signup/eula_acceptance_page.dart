@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../constants/ui_spacing.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../app.dart';
 import '../products/home.dart';
 import 'welcome_page.dart';
@@ -262,22 +264,12 @@ class _EULAAcceptancePageState extends State<EULAAcceptancePage> {
                   ),
                   
                   // Bottom Action Area
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        top: BorderSide(color: Colors.grey[200]!),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, -2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
+                  BottomButtonLayout(
+                    useContainer: true,
+                    showContainerBorder: true,
+                    horizontalPadding: 20,
+                    topPadding: 20,
+                    contentAboveButton: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Checkbox
@@ -330,34 +322,19 @@ class _EULAAcceptancePageState extends State<EULAAcceptancePage> {
                             ),
                           ),
                         ),
-                        
                         const SizedBox(height: 16),
-                        
-                        // Accept Button
-                        AppButton(
-                          bottomSpacing: 40,
-                          label: _isAccepting ? 'Accepting...' : 'Accept & Continue',
-                          onPressed: _canAccept && !_isAccepting ? _acceptEULA : null,
-                          backgroundColor: _canAccept ? const Color(0xFF262626) : Colors.grey[300],
-                          textColor: _canAccept ? Colors.white : Colors.grey[500],
-                        ),
-                        
-                        // Help text
-                        if (!_hasScrolledToBottom)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: Text(
-                              'Scroll to the bottom to enable acceptance',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                                fontStyle: FontStyle.italic,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
                       ],
                     ),
+                    button: AppButton(
+                      bottomSpacing: 0, // Container handles spacing
+                      label: _isAccepting ? 'Accepting...' : 'Accept & Continue',
+                      onPressed: _canAccept && !_isAccepting ? _acceptEULA : null,
+                      backgroundColor: _canAccept ? const Color(0xFF262626) : Colors.grey[300],
+                      textColor: _canAccept ? Colors.white : Colors.grey[500],
+                    ),
+                    helpText: !_hasScrolledToBottom
+                        ? 'Scroll to the bottom to enable acceptance'
+                        : null,
                   ),
                 ],
               ),

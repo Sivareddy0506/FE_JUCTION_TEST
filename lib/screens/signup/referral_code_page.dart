@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../constants/ui_spacing.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/form_text.dart';
 import '../../widgets/headding_description.dart';
@@ -155,25 +157,26 @@ class _ReferralCodePageState extends State<ReferralCodePage> {
                 ),
               ),
             const Spacer(),
-            AppButton(
-              bottomSpacing: 40,
-              label: isLoading ? 'Verifying...' : 'Verify',
-              onPressed: isLoading ? null : _submitCode,
-              backgroundColor:
-                  isLoading ? const Color(0xFF8C8C8C) : const Color(0xFF262626),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 15),
-              child: Center(
-                child: TextButton(
-                  onPressed: isLoading ? null : _skip,
-                  child: const Text(
-                    'Skip',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600, // semi-bold
-                      fontSize: 14,
-                      color: Color(0xFF262626),
+            BottomButtonLayout(
+              button: AppButton(
+                bottomSpacing: kSignupFlowButtonBottomSpacing,
+                label: isLoading ? 'Verifying...' : 'Verify',
+                onPressed: isLoading ? null : _submitCode,
+                backgroundColor:
+                    isLoading ? const Color(0xFF8C8C8C) : const Color(0xFF262626),
+              ),
+              secondaryButton: Padding(
+                padding: const EdgeInsets.only(bottom: 15),
+                child: Center(
+                  child: TextButton(
+                    onPressed: isLoading ? null : _skip,
+                    child: const Text(
+                      'Skip',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600, // semi-bold
+                        fontSize: 14,
+                        color: Color(0xFF262626),
+                      ),
                     ),
                   ),
                 ),

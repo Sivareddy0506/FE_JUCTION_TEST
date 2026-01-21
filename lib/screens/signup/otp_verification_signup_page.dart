@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../constants/ui_spacing.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
 import 'edu_details_page.dart';
@@ -91,9 +93,6 @@ class _OTPVerificationSignupPageState extends State<OTPVerificationSignupPage> {
         }
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verified!')),
-        );
 
         Navigator.pushReplacement(
           context,
@@ -153,13 +152,26 @@ class _OTPVerificationSignupPageState extends State<OTPVerificationSignupPage> {
         }
         FocusScope.of(context).requestFocus(focusNodes[0]);
       });
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Verification code resent')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verification code resent'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        ),
+      );
     } else {
       final responseBody = jsonDecode(response.body);
       final errorMessage =
           responseBody['error'] ?? responseBody['message'] ?? 'Failed to resend code';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        ),
+      );
     }
   } catch (e) {
     if (!mounted) return;
@@ -309,11 +321,13 @@ class _OTPVerificationSignupPageState extends State<OTPVerificationSignupPage> {
               ],
             ),
             const Spacer(),
-            AppButton(
-              bottomSpacing: 60,
-              label: isSubmitting ? 'Verifying...' : 'Verify',
-              onPressed: enableVerify ? _verifyOTP : null,
-              backgroundColor: isSubmitting ? const Color(0xFF8C8C8C) : const Color(0xFF262626),
+            BottomButtonLayout(
+              button: AppButton(
+                bottomSpacing: kSignupFlowButtonBottomSpacing, // Button handles spacing when useContainer=false
+                label: isSubmitting ? 'Verifying...' : 'Verify',
+                onPressed: enableVerify ? _verifyOTP : null,
+                backgroundColor: isSubmitting ? const Color(0xFF8C8C8C) : const Color(0xFF262626),
+              ),
             ),
           ],
         ),

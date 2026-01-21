@@ -1,7 +1,7 @@
 name: junction
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.10+60
+version: 1.0.11+62
 
 environment:
   sdk: ^3.8.0

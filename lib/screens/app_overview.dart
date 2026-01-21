@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/ui_spacing.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/app_button.dart';
+import '../widgets/bottom_button_layout.dart';
 import './signup/signup_page.dart';
 import '../app.dart'; // For SlidePageRoute
 
@@ -111,22 +113,21 @@ class AppOverviewScreen extends StatelessWidget {
             ),
 
             // CTA Button
-           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: AppButton(
-              label: 'Get Started',
-              backgroundColor: Colors.black,
-              bottomSpacing: 24,
-              onPressed: () async{
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('isFirstTime', false);
-                Navigator.push(
-                  context,
-                  SlidePageRoute(page: const SignupPage()),
-                );
-              },
+            BottomButtonLayout(
+              button: AppButton(
+                label: 'Get Started',
+                backgroundColor: Colors.black,
+                bottomSpacing: kSignupFlowButtonBottomSpacing,
+                onPressed: () async{
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('isFirstTime', false);
+                  Navigator.push(
+                    context,
+                    SlidePageRoute(page: const SignupPage()),
+                  );
+                },
+              ),
             ),
-          ),
           ],
         ),
       ),

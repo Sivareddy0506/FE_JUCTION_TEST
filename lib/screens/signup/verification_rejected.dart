@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../constants/ui_spacing.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_button.dart';
 import './manual_signup_page.dart';
@@ -112,7 +113,7 @@ class _VerificationRejectedPageState extends State<VerificationRejectedPage> {
             ),
             const Spacer(),
             AppButton(
-              bottomSpacing: 40,
+              bottomSpacing: kSignupFlowButtonBottomSpacing,
               label: "Go to Signup",
              backgroundColor: const Color(0xFFFF6705),
               onPressed: () {

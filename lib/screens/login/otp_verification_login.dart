@@ -7,7 +7,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../constants/ui_spacing.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/bottom_button_layout.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/headding_description.dart';
 import '../profile/user_profile.dart';
@@ -557,13 +559,15 @@ class _OTPVerificationLoginPageState extends State<OTPVerificationLoginPage> {
                 ),
               ),
 
-            AppButton(
-              bottomSpacing: 24,
-              label: isSubmitting ? 'Verifying...' : 'Verify',
-              onPressed: (!_isOTPComplete || isSubmitting) ? null : _verifyOTP,
-              backgroundColor: (!_isOTPComplete || isSubmitting)
-                  ? const Color(0xFF8C8C8C)
-                  : const Color(0xFFFF6705), // orange button
+            BottomButtonLayout(
+              button: AppButton(
+                bottomSpacing: kSignupFlowButtonBottomSpacing, // Button handles spacing when useContainer=false
+                label: isSubmitting ? 'Verifying...' : 'Verify',
+                onPressed: (!_isOTPComplete || isSubmitting) ? null : _verifyOTP,
+                backgroundColor: (!_isOTPComplete || isSubmitting)
+                    ? const Color(0xFF8C8C8C)
+                    : const Color(0xFFFF6705),
+              ),
             ),
           ],
         ),

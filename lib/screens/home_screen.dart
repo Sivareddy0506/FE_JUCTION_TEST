@@ -4,6 +4,7 @@ import 'package:junction/screens/products/home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_overview.dart';  
 import '../widgets/app_button.dart';
+import '../widgets/bottom_button_layout.dart';
 import '../services/app_cache_service.dart';
 import '../services/memory_monitor_service.dart';
 import 'services/api_service.dart';
@@ -426,12 +427,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: AppButton(
+    return BottomButtonLayout(
+      button: AppButton(
         label: _currentSlide == _slides.length - 1 ? 'Continue' : 'Next',
         backgroundColor: Colors.black,
-        bottomSpacing: 24, // Controls distance from bottom of screen
+        bottomSpacing: 24,
         onPressed: () {
           if (_currentSlide == _slides.length - 1) {
             // Mark that user has seen the onboarding
